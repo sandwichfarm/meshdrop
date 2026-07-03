@@ -12,6 +12,13 @@ class PairDrop {
         this.deferredScripts = [
             "scripts/browser-tabs-connector.js",
             "scripts/util.js",
+            "scripts/nostr-relays.js",
+            "scripts/nostr-identity.js",
+            "scripts/local-discovery.js",
+            "scripts/nostr-mesh.js",
+            "scripts/blossom-transfer.js",
+            "scripts/hashtree-transfer.js",
+            "scripts/fips-discovery.js",
             "scripts/network.js",
             "scripts/ui.js",
             "scripts/libs/heic2any.min.js",
@@ -107,9 +114,15 @@ class PairDrop {
 
     loadDeferredAssets() {
         const stylePromises = this.deferredStyles.map(url => this.loadAndApplyStylesheet(url));
-        const scriptPromises = this.deferredScripts.map(url => this.loadAndApplyScript(url));
 
-        return Promise.all([...stylePromises, ...scriptPromises]);
+        return Promise.all(stylePromises)
+            .then(() => this.loadDeferredScripts());
+    }
+
+    async loadDeferredScripts() {
+        for (const url of this.deferredScripts) {
+            await this.loadAndApplyScript(url);
+        }
     }
 
     loadStyleSheet(url) {
@@ -177,6 +190,8 @@ class PairDrop {
         this.publicRoomDialog = new PublicRoomDialog();
         this.base64Dialog = new Base64Dialog();
         this.shareTextDialog = new ShareTextDialog();
+        this.protocolSettingsDialog = new ProtocolSettingsDialog();
+        this.transferChoiceDialog = new TransferChoiceDialog();
         this.toast = new Toast();
         this.notifications = new Notifications();
         this.networkStatusUI = new NetworkStatusUI();
@@ -184,6 +199,12 @@ class PairDrop {
         this.webFileHandlersUI = new WebFileHandlersUI();
         this.noSleepUI = new NoSleepUI();
         this.broadCast = new BrowserTabsConnector();
+        this.nostrIdentity = new NostrIdentityController();
+        this.localDiscovery = new LocalDiscoveryController();
+        this.nostrMesh = new NostrMeshConnection();
+        this.blossomTransfer = new BlossomTransferController();
+        this.hashtreeTransfer = new HashtreeTransferController();
+        this.fipsDiscovery = new FipsDiscoveryController();
         this.server = new ServerConnection();
         this.peers = new PeersManager(this.server);
     }

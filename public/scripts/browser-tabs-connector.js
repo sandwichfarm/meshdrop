@@ -44,7 +44,11 @@ class BrowserTabsConnector {
 
     static async removePeerIdFromLocalStorage(peerId) {
         let peerIdsBrowser = JSON.parse(localStorage.getItem('peer_ids_browser'));
+        if (!peerId || !peerIdsBrowser) return false;
+
         const index = peerIdsBrowser.indexOf(peerId);
+        if (index === -1) return false;
+
         peerIdsBrowser.splice(index, 1);
         localStorage.setItem('peer_ids_browser', JSON.stringify(peerIdsBrowser));
         return peerId;

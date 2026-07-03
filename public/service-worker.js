@@ -1,5 +1,5 @@
-const cacheVersion = 'v1.11.2';
-const cacheTitle = `pairdrop-cache-${cacheVersion}`;
+const cacheVersion = 'v1.11.6';
+const cacheTitle = `meshdrop-cache-${cacheVersion}`;
 const relativePathsToCache = [
     './',
     'index.html',
@@ -14,6 +14,7 @@ const relativePathsToCache = [
     'scripts/ui.js',
     'scripts/ui-main.js',
     'scripts/util.js',
+    'scripts/nostr-relays.js',
     'scripts/worker/canvas-worker.js',
     'scripts/libs/heic2any.min.js',
     'scripts/libs/no-sleep.min.js',

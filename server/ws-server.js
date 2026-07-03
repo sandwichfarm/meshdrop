@@ -38,7 +38,8 @@ export default class PairDropWsServer {
             displayName: peer.name.displayName,
             deviceName: peer.name.deviceName,
             peerId: peer.id,
-            peerIdHash: hasher.hashCodeSalted(peer.id)
+            peerIdHash: hasher.hashCodeSalted(peer.id),
+            nostrIdentity: peer.nostrIdentity
         });
     }
 
@@ -60,6 +61,15 @@ export default class PairDropWsServer {
                 break;
             case 'join-ip-room':
                 this._joinIpRoom(sender);
+                break;
+            case 'leave-ip-room':
+                this._leaveIpRoom(sender);
+                break;
+            case 'join-fips-room':
+                this._onJoinFipsRoom(sender);
+                break;
+            case 'leave-fips-room':
+                this._leaveFipsRoom(sender);
                 break;
             case 'room-secrets':
                 this._onRoomSecrets(sender, message);
@@ -92,6 +102,8 @@ export default class PairDropWsServer {
                 this._signalAndRelay(sender, message);
                 break;
             case 'request':
+            case 'blossom-request':
+            case 'hashtree-request':
             case 'header':
             case 'partition':
             case 'partition-received':
@@ -142,6 +154,7 @@ export default class PairDropWsServer {
         delete this._keepAliveTimers[sender.id];
 
         this._leaveIpRoom(sender, true);
+        this._leaveFipsRoom(sender, true);
         this._leaveAllSecretRooms(sender, true);
         this._leavePublicRoom(sender, true);
 
@@ -313,6 +326,26 @@ export default class PairDropWsServer {
         this._joinRoom(peer, 'ip', peer.ip);
     }
 
+    async _onJoinFipsRoom(peer) {
+        if (!this._conf.fips.enabled) {
+            this._send(peer, {type: 'fips-status', status: await this._conf.fipsClient.status()});
+            return;
+        }
+
+        const status = await this._conf.fipsClient.status();
+        this._send(peer, {type: 'fips-status', status});
+
+        if (!status.available) return;
+
+        this._joinFipsRoom(peer);
+    }
+
+    _joinFipsRoom(peer) {
+        this._leaveFipsRoom(peer);
+        this._joinRoom(peer, 'fips', this._conf.fips.room);
+        peer.fipsRoomId = this._conf.fips.room;
+    }
+
     _joinSecretRoom(peer, roomSecret) {
         this._joinRoom(peer, 'secret', roomSecret);
 
@@ -350,6 +383,13 @@ export default class PairDropWsServer {
 
     _leaveIpRoom(peer, disconnect = false) {
         this._leaveRoom(peer, 'ip', peer.ip, disconnect);
+    }
+
+    _leaveFipsRoom(peer, disconnect = false) {
+        if (!peer.fipsRoomId) return;
+
+        this._leaveRoom(peer, 'fips', peer.fipsRoomId, disconnect);
+        peer.fipsRoomId = null;
     }
 
     _leaveSecretRoom(peer, roomSecret, disconnect = false) {
@@ -483,4 +523,3 @@ export default class PairDropWsServer {
         }
     }
 }
-

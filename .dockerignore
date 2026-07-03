@@ -6,6 +6,7 @@ docs
 licenses
 node_modules
 pairdrop-cli
+test
 *.md
 *.yml
 Dockerfile

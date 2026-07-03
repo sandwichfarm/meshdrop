@@ -3,6 +3,7 @@ import fs from "fs";
 
 import PairDropServer from "./server.js";
 import PairDropWsServer from "./ws-server.js";
+import FipsControlClient, {createFipsConfig} from "./fips-control.js";
 
 // Handle SIGINT
 process.on('SIGINT', () => {
@@ -54,6 +55,24 @@ conf.rtcConfig = process.env.RTC_CONFIG && process.env.RTC_CONFIG !== "false"
 conf.signalingServer = process.env.SIGNALING_SERVER && process.env.SIGNALING_SERVER !== "false"
     ? process.env.SIGNALING_SERVER
     : false;
+
+conf.nostrMesh = {
+    relays: (process.env.NOSTR_RELAYS || "wss://bucket.coracle.social")
+        .split(",")
+        .map(relay => relay.trim())
+        .filter(Boolean),
+    room: process.env.NOSTR_ROOM || "meshdrop"
+};
+
+conf.blossom = {
+    servers: (process.env.BLOSSOM_SERVERS || "")
+        .split(",")
+        .map(server => server.trim())
+        .filter(Boolean)
+};
+
+conf.fips = createFipsConfig();
+conf.fipsClient = new FipsControlClient(conf.fips);
 
 conf.ipv6Localize = parseInt(process.env.IPV6_LOCALIZE) || false;
 
@@ -126,7 +145,7 @@ if (conf.signalingServer) {
     const endsWithSlash = /\/$/.test(conf.signalingServer)
     if (!isValidUrl || containsProtocol) {
         console.error("SIGNALING_SERVER must be a valid url without the protocol prefix.\n" +
-            "Examples of valid values: `pairdrop.net`, `pairdrop.example.com:3000`, `example.com/pairdrop`");
+            "Examples of valid values: `meshdrop.example`, `meshdrop.example:3000`, `example.com/meshdrop`");
         process.exit(1);
     }
 
@@ -151,7 +170,7 @@ if (conf.debugMode) {
     console.debug("\n");
 }
 
-// Start a new PairDrop instance when an uncaught exception occurs
+// Start a new MeshDrop instance when an uncaught exception occurs
 if (conf.autoStart) {
     process.on(
         'uncaughtException',
@@ -174,13 +193,16 @@ if (conf.autoStart) {
 }
 
 // Start server to serve client files
-const pairDropServer = new PairDropServer(conf);
+const meshDropServer = new PairDropServer(conf);
 
 if (!conf.signalingServer) {
     // Start websocket server if SIGNALING_SERVER is not set
-    new PairDropWsServer(pairDropServer.server, conf);
+    new PairDropWsServer(meshDropServer.server, conf);
 } else {
-    console.log("This instance does not include a signaling server. Clients on this instance connect to the following signaling server:", conf.signalingServer);
+    console.log(
+        "This instance does not include a signaling server. Clients on this instance connect to the following signaling server:",
+        conf.signalingServer
+    );
 }
 
-console.log('\nPairDrop is running on port', conf.port);
+console.log('\nMeshDrop is running on port', conf.port);

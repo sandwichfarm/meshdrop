@@ -1,0 +1,213 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import net from "node:net";
+
+import FipsControlClient, {createFipsConfig, DEFAULT_FIPS_CONTROL_PORT, DEFAULT_FIPS_ROOM} from "../server/fips-control.js";
+
+async function withFipsControlServer(handler, testBody) {
+    const server = net.createServer(socket => {
+        let request = "";
+
+        socket.on("data", chunk => {
+            request += chunk.toString("utf8");
+            if (!request.includes("\n")) return;
+
+            const payload = JSON.parse(request);
+            socket.end(`${JSON.stringify(handler(payload))}\n`);
+        });
+    });
+
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+
+    try {
+        await testBody(server.address().port);
+    }
+    finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+}
+
+test("FIPS config uses the default control socket unless explicitly disabled", () => {
+    const config = createFipsConfig({});
+
+    assert.equal(config.enabled, true);
+    assert.equal(config.room, DEFAULT_FIPS_ROOM);
+    assert.equal(config.timeoutMs, 1000);
+    assert.equal(config.controlSocket, DEFAULT_FIPS_CONTROL_PORT);
+});
+
+test("FIPS config can be disabled explicitly", () => {
+    const config = createFipsConfig({FIPS_DISCOVERY: "false"});
+
+    assert.equal(config.enabled, false);
+    assert.equal(config.room, DEFAULT_FIPS_ROOM);
+});
+
+test("FIPS config enables discovery when control socket is set", () => {
+    assert.deepEqual(
+        createFipsConfig({
+            FIPS_CONTROL_SOCKET: "21210",
+            FIPS_ROOM: "meshdrop-test",
+            FIPS_CONTROL_TIMEOUT_MS: "2500"
+        }),
+        {
+            enabled: true,
+            controlSocket: "21210",
+            controlHost: "127.0.0.1",
+            room: "meshdrop-test",
+            timeoutMs: 2500
+        }
+    );
+});
+
+test("FIPS config supports a TCP control host override", () => {
+    const config = createFipsConfig({
+        FIPS_CONTROL_SOCKET: "21210",
+        FIPS_CONTROL_HOST: "host.docker.internal"
+    });
+
+    assert.equal(config.controlSocket, "21210");
+    assert.equal(config.controlHost, "host.docker.internal");
+});
+
+test("FIPS control client reads status and peers from line-delimited JSON", async () => {
+    await withFipsControlServer(request => {
+        if (request.command === "show_status") {
+            return {
+                status: "ok",
+                data: {
+                    npub: "npub1local",
+                    ipv6_addr: "fd00::1",
+                    peer_count: 1,
+                    estimated_mesh_size: 7
+                }
+            };
+        }
+
+        if (request.command === "show_peers") {
+            return {
+                status: "ok",
+                data: {
+                    peers: [{
+                        npub: "npub1peer",
+                        display_name: "Peer",
+                        ipv6_addr: "fd00::2",
+                        connectivity: "connected",
+                        transport_type: "udp",
+                        transport_addr: "203.0.113.9:2121",
+                        direction: "outbound",
+                        tree_depth: 2
+                    }]
+                }
+            };
+        }
+
+        return {status: "error", message: "unknown command"};
+    }, async port => {
+        const client = new FipsControlClient({
+            enabled: true,
+            controlSocket: String(port),
+            controlHost: "127.0.0.1",
+            room: "meshdrop-test",
+            timeoutMs: 1000
+        });
+        const status = await client.status();
+
+        assert.equal(status.enabled, true);
+        assert.equal(status.available, true);
+        assert.equal(status.npub, "npub1local");
+        assert.equal(status.ipv6Addr, "fd00::1");
+        assert.equal(status.peerCount, 1);
+        assert.equal(status.meshSize, 7);
+        assert.deepEqual(status.peers, [{
+            npub: "npub1peer",
+            displayName: "Peer",
+            ipv6Addr: "fd00::2",
+            connectivity: "connected",
+            transportType: "udp",
+            transportAddr: "203.0.113.9:2121",
+            direction: "outbound",
+            treeDepth: 2
+        }]);
+    });
+});
+
+test("FIPS control client reports unavailable daemon without throwing", async () => {
+    const server = net.createServer();
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const port = server.address().port;
+    await new Promise(resolve => server.close(resolve));
+
+    const client = new FipsControlClient({
+        enabled: true,
+        controlSocket: String(port),
+        controlHost: "127.0.0.1",
+        room: "meshdrop-test",
+        timeoutMs: 100
+    });
+    const status = await client.status();
+
+    assert.equal(status.enabled, true);
+    assert.equal(status.available, false);
+    assert.equal(status.room, "meshdrop-test");
+    assert.match(status.error, /ECONNREFUSED|connect/);
+});
+
+test("FIPS control client saves peers then requests a server restart", async () => {
+    const commands = [];
+    await withFipsControlServer(request => {
+        commands.push(request);
+        return {status: "ok", data: {accepted: true}};
+    }, async port => {
+        const client = new FipsControlClient({
+            enabled: true,
+            controlSocket: String(port),
+            controlHost: "127.0.0.1",
+            room: "meshdrop-test",
+            timeoutMs: 1000
+        });
+
+        const result = await client.savePeers([{
+            npub: "npub1peer",
+            alias: "Peer",
+            transport: "tcp",
+            address: "203.0.113.9:2121"
+        }]);
+
+        assert.equal(result.restart.available, true);
+        assert.deepEqual(commands, [
+            {
+                command: "connect",
+                params: {
+                    peer: "npub1peer",
+                    address: "203.0.113.9:2121",
+                    transport: "tcp"
+                }
+            },
+            {
+                command: "restart"
+            }
+        ]);
+    });
+});
+
+test("FIPS control client reports restart command failures without losing saved peers", async () => {
+    await withFipsControlServer(request => {
+        if (request.command === "restart") return {status: "error", message: "unknown command"};
+        return {status: "ok", data: {accepted: true}};
+    }, async port => {
+        const client = new FipsControlClient({
+            enabled: true,
+            controlSocket: String(port),
+            controlHost: "127.0.0.1",
+            room: "meshdrop-test",
+            timeoutMs: 1000
+        });
+
+        const result = await client.savePeers([{npub: "npub1peer", address: "203.0.113.9:2121"}]);
+
+        assert.equal(result.peers.length, 1);
+        assert.equal(result.restart.available, false);
+        assert.equal(result.restart.error, "unknown command");
+    });
+});

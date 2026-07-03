@@ -132,7 +132,8 @@ html {
 
 header {
     position: relative;
-    align-items: baseline;
+    align-items: flex-start;
+    align-content: flex-start;
     padding: 8px 12px;
     box-sizing: border-box;
     width: 100vw;
@@ -146,8 +147,24 @@ header.overflow-hidden {
     overflow: hidden;
 }
 
+header.overflow-hidden:has(#theme-wrapper:hover),
+header.overflow-hidden:has(#theme-wrapper:focus-within) {
+    overflow: visible;
+}
+
 header:not(.overflow-expanded) {
     height: 56px;
+}
+
+@media (max-width: 520px) {
+    header.overflow-hidden:not(.overflow-expanded) {
+        height: auto;
+        overflow: visible;
+    }
+
+    header.overflow-hidden:not(.overflow-expanded) #expand {
+        display: none;
+    }
 }
 
 header > * {
@@ -166,6 +183,63 @@ header > .icon-button {
     height: 40px;
 }
 
+header > a[href="#about"] {
+    order: 0;
+}
+
+.header-divider-info {
+    order: 5;
+}
+
+#protocol-settings {
+    order: 8;
+}
+
+#language-selector,
+#theme-wrapper,
+#notification,
+#install,
+#pair-device,
+#edit-paired-devices,
+#join-public-room {
+    order: 10;
+}
+
+.header-divider-settings {
+    order: 15;
+}
+
+#local-discovery,
+#nostr-mesh,
+#fips-discovery,
+#blossom-transfer,
+#hashtree-transfer {
+    order: 20;
+}
+
+.header-divider-network {
+    order: 25;
+}
+
+#nostr-identity {
+    order: 30;
+}
+
+#expand {
+    order: 40;
+}
+
+.header-divider {
+    display: block;
+    width: 1px;
+    height: 28px;
+    margin: 6px 8px;
+    align-self: flex-start;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: rgba(var(--text-color), 0.18);
+}
+
 header * {
     transition: all 300ms;
 }
@@ -173,6 +247,16 @@ header * {
 #theme-wrapper > div {
     display: flex;
     flex-direction: column;
+}
+
+#theme-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+#theme-wrapper:hover,
+#theme-wrapper:focus-within {
+    z-index: 30;
 }
 
 /* expand theme buttons */
@@ -521,6 +605,14 @@ footer .logo {
     --badge-color: var(--public-room-color);
 }
 
+.badge-room-nostr {
+    --badge-color: #4d7cff;
+}
+
+.badge-room-fips {
+    --badge-color: #00a69c;
+}
+
 .known-as-wrapper {
     font-size: 16px; /* prevents auto-zoom on edit */
 }
@@ -546,6 +638,15 @@ footer .logo {
     z-index: 1;
 }
 
+#display-avatar {
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+
 .edit-pen {
     width: 1rem;
     height: 1rem;
@@ -562,9 +663,18 @@ html:not([dir="rtl"]) .edit-pen {
     margin-left: -1rem;
 }
 
+html:not([dir="rtl"]) #display-avatar + #display-name {
+    margin-left: 0;
+}
+
 html[dir="rtl"] #display-name,
 html[dir="rtl"] .edit-pen {
     margin-right: -1rem;
+}
+
+html[dir="rtl"] #display-avatar {
+    margin-left: 0.35rem;
+    margin-right: 0;
 }
 
 html[dir="rtl"] .edit-pen {
@@ -689,6 +799,221 @@ button::-moz-focus-inner {
     border-radius: 50%;
 }
 
+header > .icon-button:not(.protocol-toggle),
+header > a.icon-button,
+#theme-wrapper .icon-button {
+    color: color-mix(in srgb, rgb(var(--text-color)) 86%, rgb(var(--bg-color)));
+    isolation: isolate;
+}
+
+header > .icon-button:not(.protocol-toggle):before,
+header > a.icon-button:before,
+#theme-wrapper .icon-button:before {
+    opacity: 1;
+    background: rgba(var(--text-color), 0.06);
+    box-shadow: inset 0 0 0 1px rgba(var(--text-color), 0.14);
+    transform: scale(0.88);
+}
+
+header > .icon-button:not(.protocol-toggle):hover:before,
+header > a.icon-button:hover:before,
+#theme-wrapper .icon-button:hover:before,
+header > .icon-button:not(.protocol-toggle):focus:before,
+header > a.icon-button:focus:before,
+#theme-wrapper .icon-button:focus:before {
+    opacity: 1;
+    background: rgba(var(--text-color), 0.12);
+    box-shadow: inset 0 0 0 1px rgba(var(--text-color), 0.22);
+    transform: scale(0.98);
+}
+
+#theme-wrapper .icon-button.selected:before {
+    background: rgba(var(--text-color), 0.1);
+    box-shadow: inset 0 0 0 1px rgba(var(--text-color), 0.2);
+}
+
+.protocol-toggle {
+    --protocol-color: var(--primary-color);
+    color: color-mix(in srgb, var(--protocol-color) 72%, currentColor);
+    isolation: isolate;
+}
+
+.protocol-toggle:before {
+    opacity: 1;
+    background: color-mix(in srgb, var(--protocol-color) 14%, transparent);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--protocol-color) 48%, transparent);
+    transform: scale(0.9);
+}
+
+.protocol-toggle:after {
+    content: '';
+    display: none;
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    width: 7px;
+    height: 7px;
+    border: 2px solid color-mix(in srgb, var(--protocol-color) 65%, rgb(var(--bg-color)));
+    border-radius: 50%;
+    background: rgb(var(--bg-color));
+    box-shadow: 0 0 0 1px rgb(var(--bg-color));
+    box-sizing: border-box;
+}
+
+.icon-button[data-badge]:after {
+    content: attr(data-badge);
+    display: block;
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    bottom: auto;
+    width: auto;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border: 2px solid rgb(var(--bg-color));
+    border-radius: 999px;
+    box-sizing: border-box;
+    background: var(--protocol-color, var(--primary-color));
+    color: white;
+    box-shadow: none;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 12px;
+    text-align: center;
+}
+
+.protocol-toggle.selected:not([data-badge]):after {
+    display: block;
+}
+
+.icon-button[data-badge="!"]:after {
+    background: #d93025;
+}
+
+.protocol-toggle.loading,
+.protocol-toggle.unavailable {
+    filter: grayscale(1);
+    opacity: 0.58;
+}
+
+.protocol-toggle.loading {
+    cursor: progress;
+}
+
+.protocol-toggle.connecting {
+    color: var(--protocol-color);
+    cursor: progress;
+}
+
+.protocol-toggle.connecting:before {
+    opacity: 1;
+    background: color-mix(in srgb, var(--protocol-color) 18%, transparent);
+    box-shadow:
+        inset 0 0 0 1.5px color-mix(in srgb, var(--protocol-color) 62%, transparent),
+        0 0 0 0 color-mix(in srgb, var(--protocol-color) 42%, transparent);
+    animation: protocol-connecting-ring 1.15s ease-out infinite;
+    transform: scale(1);
+}
+
+.protocol-toggle.connecting .icon {
+    animation: protocol-connecting-icon 0.85s ease-in-out infinite alternate;
+}
+
+.protocol-toggle.unavailable {
+    cursor: not-allowed;
+}
+
+.protocol-toggle:hover:before,
+.protocol-toggle:focus:before {
+    opacity: 1;
+    background: color-mix(in srgb, var(--protocol-color) 22%, transparent);
+    transform: scale(0.98);
+}
+
+.protocol-toggle.selected {
+    color: white;
+}
+
+.protocol-toggle.selected:before {
+    opacity: 1;
+    background: var(--protocol-color);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, white 42%, transparent),
+        0 4px 14px color-mix(in srgb, var(--protocol-color) 34%, transparent);
+    transform: scale(1);
+}
+
+.protocol-toggle.selected:not([data-badge]):after {
+    background: white;
+    border-color: white;
+    box-shadow:
+        0 0 0 2px rgb(var(--bg-color)),
+        0 0 0 4px color-mix(in srgb, var(--protocol-color) 38%, transparent);
+}
+
+.protocol-toggle.selected[data-badge]:after {
+    background: var(--protocol-color);
+    border-color: rgb(var(--bg-color));
+    color: white;
+}
+
+.protocol-toggle.selected .icon {
+    transform: scale(0.92);
+}
+
+@keyframes protocol-connecting-ring {
+    0% {
+        box-shadow:
+            inset 0 0 0 1.5px color-mix(in srgb, var(--protocol-color) 68%, transparent),
+            0 0 0 0 color-mix(in srgb, var(--protocol-color) 48%, transparent);
+    }
+    100% {
+        box-shadow:
+            inset 0 0 0 1.5px color-mix(in srgb, var(--protocol-color) 34%, transparent),
+            0 0 0 7px color-mix(in srgb, var(--protocol-color) 0%, transparent);
+    }
+}
+
+@keyframes protocol-connecting-icon {
+    from {
+        transform: scale(0.84);
+        opacity: 0.72;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+#nostr-mesh {
+    --protocol-color: #4d7cff;
+}
+
+#nostr-identity {
+    --protocol-color: #c4932f;
+}
+
+#local-discovery {
+    --protocol-color: #ef9b28;
+}
+
+#fips-discovery {
+    --protocol-color: #00a69c;
+}
+
+#blossom-transfer {
+    --protocol-color: #d94888;
+}
+
+#hashtree-transfer {
+    --protocol-color: #2f8a4c;
+}
+
+#protocol-settings {
+    --protocol-color: #6f7482;
+}
+
 
 /* Info Animation */
 #about {
@@ -774,6 +1099,23 @@ html[dir="rtl"] #about x-background {
 
 #about .row a {
     margin: 8px 8px -16px;
+}
+
+#about .about-copy {
+    box-sizing: border-box;
+    max-width: 680px;
+    padding: 8px 28px 0;
+    text-align: center;
+    line-height: 1.55;
+}
+
+#about .about-copy a {
+    color: inherit;
+    font-weight: 700;
+}
+
+#about .about-credit {
+    opacity: 0.85;
 }
 
 #about section {
@@ -1114,4 +1456,3 @@ See note here: https://developer.mozilla.org/en-US/docs/Web/CSS/user-select */
     -webkit-user-select: text;
     user-select: text;
 }
-

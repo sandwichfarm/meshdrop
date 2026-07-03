@@ -1,3 +1,86 @@
+const PeerAvailabilityProtocol = {
+    roomTypeOrder: ["ip", "secret", "nostr", "fips", "public-id"],
+    roomTypeMeta: {
+        "ip": {id: "local", label: "Local", shortLabel: "LAN", className: "badge-room-ip"},
+        "secret": {id: "paired", label: "Paired", shortLabel: "Pair", className: "badge-room-secret"},
+        "nostr": {id: "webrtc", label: "WEB-RTC", shortLabel: "WEB", className: "badge-room-nostr"},
+        "fips": {id: "fips", label: "FIPS", shortLabel: "FIPS", className: "badge-room-fips"},
+        "public-id": {id: "room", label: "Room", shortLabel: "Room", className: "badge-room-public-id"}
+    },
+
+    roomTypes(peer) {
+        const roomIds = peer?._roomIds || {};
+        return this.roomTypeOrder.filter(roomType => roomIds[roomType]);
+    },
+
+    availability(peer) {
+        return this.roomTypes(peer).map(roomType => ({
+            roomType,
+            ...this.roomTypeMeta[roomType]
+        }));
+    },
+
+    directOptions(peer) {
+        return this.availability(peer)
+            .map(option => ({
+                id: option.id,
+                type: "direct",
+                roomType: option.roomType,
+                label: option.label,
+                description: `${option.label} direct transfer`
+            }));
+    },
+
+    storageOptions() {
+        const options = [];
+        if (globalThis.meshdropHashtreeTransfer?.isActive?.()) {
+            options.push({
+                id: "hashtree",
+                type: "storage",
+                label: "Hashtree",
+                description: "Upload a verified hashtree manifest"
+            });
+        }
+        if (globalThis.meshdropBlossomTransfer?.isActive?.()) {
+            options.push({
+                id: "blossom",
+                type: "storage",
+                label: "Blossom",
+                description: "Upload files to selected Blossom servers"
+            });
+        }
+        return options;
+    },
+
+    optionsFor(peer) {
+        const direct = this.directOptions(peer);
+        const storage = this.storageOptions();
+        const localIndex = direct.findIndex(option => option.id === "local");
+        const orderedDirect = localIndex > 0
+            ? [direct[localIndex], ...direct.slice(0, localIndex), ...direct.slice(localIndex + 1)]
+            : direct;
+
+        return [...orderedDirect, ...storage];
+    },
+
+    countByRoomType(peers, roomType) {
+        return Object.values(peers || {})
+            .filter(peer => !!peer?._roomIds?.[roomType])
+            .length;
+    },
+
+    badgeClassName(peer) {
+        const availability = this.availability(peer);
+        const preferred = availability.find(option => option.roomType === "secret")
+            || availability.find(option => option.roomType === "ip")
+            || availability[0];
+
+        return preferred?.className || "badge-room-public-id";
+    }
+};
+
+globalThis.PeerAvailabilityProtocol = PeerAvailabilityProtocol;
+
 class PeersUI {
 
     constructor() {
@@ -49,6 +132,8 @@ class PeersUI {
         this.$shareModeCancelBtn.addEventListener('click', _ => this._deactivateShareMode());
 
         Events.on('peer-display-name-changed', e => this._onPeerDisplayNameChanged(e));
+        Events.on('peer-profile-changed', e => this._onPeerProfileChanged(e));
+        Events.on('nostr-identity-changed', e => this._onNostrIdentityChanged(e.detail));
 
         Events.on('ws-config', e => this._evaluateRtcSupport(e.detail))
     }
@@ -77,6 +162,24 @@ class PeersUI {
         this._changePeerDisplayName(e.detail.peerId, e.detail.displayName);
     }
 
+    _onPeerProfileChanged(e) {
+        const peer = this.peers[e.detail.peerId];
+        if (!peer) return;
+
+        if (e.detail.displayName) peer.name.displayName = e.detail.displayName;
+        peer.nostrIdentity = {
+            ...(peer.nostrIdentity || {}),
+            picture: e.detail.picture || peer.nostrIdentity?.picture || ""
+        };
+
+        const peerNode = $(e.detail.peerId);
+        if (!peerNode) return;
+
+        if (e.detail.displayName) peerNode.querySelector('.name').textContent = e.detail.displayName;
+        peerNode.ui._setAvatar(peer.nostrIdentity.picture);
+        this._redrawPeerRoomTypes(e.detail.peerId);
+    }
+
     async _onKeyDown(e) {
         if (!this.shareMode.active || Dialog.anyDialogShown()) return;
 
@@ -95,6 +198,8 @@ class PeersUI {
     }
 
     _joinPeer(peer, roomType, roomId) {
+        if (globalThis.NostrFollowPolicy?.allowsPeer(peer, roomType) === false) return;
+
         const existingPeer = this.peers[peer.id];
         if (existingPeer) {
             // peer already exists. Abort but add roomType to GUI
@@ -108,6 +213,15 @@ class PeersUI {
 
         peer._roomIds[roomType] = roomId;
         this.peers[peer.id] = peer;
+        this._renderProtocolPeerCounts();
+    }
+
+    _onNostrIdentityChanged(identity) {
+        for (const peerId of Object.keys(this.peers)) {
+            if (globalThis.NostrFollowPolicy?.allowsPeer(this.peers[peerId], null, identity) !== false) continue;
+
+            this._onPeerDisconnected(peerId);
+        }
     }
 
     _onPeerConnected(peerId, connectionHash) {
@@ -127,13 +241,16 @@ class PeersUI {
 
         if (!peer || !peerNode) return;
 
-        peerNode.classList.remove('type-ip', 'type-secret', 'type-public-id', 'type-same-browser');
+        peerNode.classList.remove('type-ip', 'type-secret', 'type-public-id', 'type-nostr', 'type-same-browser');
+        peerNode.classList.remove('type-fips');
 
         if (peer._isSameBrowser()) {
             peerNode.classList.add(`type-same-browser`);
         }
 
         Object.keys(peer._roomIds).forEach(roomType => peerNode.classList.add(`type-${roomType}`));
+        peerNode.ui?.refreshAvailability();
+        this._renderProtocolPeerCounts();
     }
 
     _evaluateOverflowingPeers() {
@@ -147,14 +264,19 @@ class PeersUI {
 
     _onPeers(msg) {
         msg.peers.forEach(peer => this._joinPeer(peer, msg.roomType, msg.roomId));
+        this._renderProtocolPeerCounts();
     }
 
     _onPeerDisconnected(peerId) {
         // Remove peer from UI
+        delete this.peers[peerId];
+        this._renderProtocolPeerCounts();
+
         const $peer = $(peerId);
         if (!$peer) return;
         $peer.remove();
         this._evaluateOverflowingPeers();
+        this._renderProtocolPeerCounts();
 
         // If no peer is shown -> start background animation again
         if ($$('x-peers:empty')) {
@@ -176,7 +298,16 @@ class PeersUI {
     _onSetProgress(progress) {
         const $peer = $(progress.peerId);
         if (!$peer) return;
-        $peer.ui.setProgress(progress.progress, progress.status)
+        $peer.ui.setProgress(progress.progress, progress.status, progress.transport)
+    }
+
+    _renderProtocolPeerCounts() {
+        const nostrCount = PeerAvailabilityProtocol.countByRoomType(this.peers, "nostr");
+        const fipsCount = PeerAvailabilityProtocol.countByRoomType(this.peers, "fips");
+
+        globalThis.meshdropPeerAvailabilityCounts = {nostr: nostrCount, fips: fipsCount};
+        globalThis.meshdropNostrMesh?._render?.();
+        globalThis.meshdropFipsDiscovery?._render?.();
     }
 
     _onDrop(e) {
@@ -390,7 +521,7 @@ class PeersUI {
         const text = this.shareMode.text;
 
         if (files.length > 0) {
-            Events.fire('files-selected', {
+            Events.fire('select-files-transport', {
                 files: files,
                 to: peerId
             });
@@ -440,10 +571,13 @@ class PeerUI {
                 <x-icon>
                     <div class="icon-wrapper" shadow="1">
                         <svg class="icon"><use xlink:href="#"/></svg>
+                        <img class="avatar" alt="" hidden>
                     </div>
                     <div class="highlight-wrapper center">
                         <div class="highlight highlight-room-ip" shadow="1"></div>
                         <div class="highlight highlight-room-secret" shadow="1"></div>
+                        <div class="highlight highlight-room-nostr" shadow="1"></div>
+                        <div class="highlight highlight-room-fips" shadow="1"></div>
                         <div class="highlight highlight-room-public-id" shadow="1"></div>
                     </div>
                 </x-icon>
@@ -454,6 +588,7 @@ class PeerUI {
                 <div class="device-descriptor">
                     <div class="name font-subheading"></div>
                     <div class="device-name font-body2"></div>
+                    <div class="availability-row"></div>
                     <div class="status font-body2"></div>
                 </div>
             </label>`;
@@ -461,9 +596,28 @@ class PeerUI {
         this.$el.querySelector('svg use').setAttribute('xlink:href', this._icon());
         this.$el.querySelector('.name').textContent = this._displayName();
         this.$el.querySelector('.device-name').textContent = this._deviceName();
+        this._setAvatar(this._peer.nostrIdentity?.picture);
+        this.refreshAvailability();
 
         this.$label = this.$el.querySelector('label');
         this.$input = this.$el.querySelector('input');
+    }
+
+    _setAvatar(picture) {
+        const avatar = this.$el.querySelector('.avatar');
+        const icon = this.$el.querySelector('svg.icon');
+        if (!avatar || !icon) return;
+
+        if (!picture) {
+            avatar.hidden = true;
+            avatar.removeAttribute('src');
+            icon.hidden = false;
+            return;
+        }
+
+        avatar.src = picture;
+        avatar.hidden = false;
+        icon.hidden = true;
     }
 
     addTypesToClassList() {
@@ -580,12 +734,24 @@ class PeerUI {
     }
 
     _badgeClassName() {
-        const roomTypes = Object.keys(this._peer._roomIds);
-        return roomTypes.includes('secret')
-            ? 'badge-room-secret'
-            : roomTypes.includes('ip')
-                ? 'badge-room-ip'
-                : 'badge-room-public-id';
+        return PeerAvailabilityProtocol.badgeClassName(this._peer);
+    }
+
+    refreshAvailability() {
+        const row = this.$el.querySelector('.availability-row');
+        if (!row) return;
+
+        const pills = PeerAvailabilityProtocol.availability(this._peer)
+            .map(option => {
+                const pill = document.createElement('span');
+                pill.className = `availability-pill ${option.className}`;
+                pill.dataset.transport = option.id;
+                pill.textContent = option.shortLabel;
+                pill.title = option.label;
+                return pill;
+            });
+
+        row.replaceChildren(...pills);
     }
 
     _icon() {
@@ -605,14 +771,14 @@ class PeerUI {
 
         if (files.length === 0) return;
 
-        Events.fire('files-selected', {
+        Events.fire('select-files-transport', {
             files: files,
             to: this._peer.id
         });
         $input.files = null; // reset input
     }
 
-    setProgress(progress, status) {
+    setProgress(progress, status, transport = null) {
         const $progress = this.$el.querySelector('.progress');
         if (0.5 < progress && progress < 1) {
             $progress.classList.add('over50');
@@ -628,6 +794,7 @@ class PeerUI {
                     "process": Localization.getTranslation("peer-ui.processing"),
                     "wait": Localization.getTranslation("peer-ui.waiting")
                 }[status];
+                if (transport?.label) statusName = `${statusName} · ${transport.label}`;
 
                 this.$el.setAttribute('status', status);
                 this.$el.querySelector('.status').innerText = statusName;
@@ -656,7 +823,7 @@ class PeerUI {
         const text = e.dataTransfer.getData("text");
 
         if (files.length > 0) {
-            Events.fire('files-selected', {
+            Events.fire('select-files-transport', {
                 files: files,
                 to: peerId
             });
@@ -747,7 +914,7 @@ class Dialog {
             document.activeElement.blur();
             window.blur();
         }
-        document.title = 'PairDrop | Transfer Files Cross-Platform. No Setup, No Signup.';
+        document.title = 'MeshDrop | Transfer Files Cross-Platform. No Setup, No Signup.';
         changeFavicon("images/favicon-96x96.png");
         this.correspondingPeerId = undefined;
     }
@@ -822,6 +989,431 @@ class LanguageSelectDialog extends Dialog {
 
         Localization.setTranslation(languageCode)
             .then(_ => this.hide());
+    }
+}
+
+class ProtocolSettingsDialog extends Dialog {
+
+    constructor() {
+        super('protocol-settings-dialog');
+
+        this.$button = $('protocol-settings');
+        this.$tabs = [...this.$el.querySelectorAll('[data-settings-tab]')];
+        this.$panels = [...this.$el.querySelectorAll('[data-settings-panel]')];
+        this.$status = this.$el.querySelector('.protocol-settings-status');
+        this.$serverList = this.$el.querySelector('.protocol-server-list');
+        this.$fipsStatus = this.$el.querySelector('.fips-settings-status');
+        this.$fipsPeerList = this.$el.querySelector('.fips-peer-list');
+        this.$fipsAddPeer = this.$el.querySelector('.fips-add-peer');
+        this.$fipsSavePeers = this.$el.querySelector('.fips-save-peers');
+        this.$relayStatus = this.$el.querySelector('.relay-settings-status');
+        this.$relayBootstrap = this.$el.querySelector('.relay-bootstrap');
+        this.$relayWebRtc = this.$el.querySelector('.relay-webrtc');
+        this.$relayInbox = this.$el.querySelector('.relay-inbox');
+        this.$relayOutbox = this.$el.querySelector('.relay-outbox');
+        this.$relaySave = this.$el.querySelector('.relay-save-settings');
+        this._activeTab = 'blossom';
+
+        if (this.$button) this.$button.addEventListener('click', _ => this.show());
+
+        Events.on('nostr-identity-changed', _ => this.render());
+        Events.on('nostr-server-list-changed', _ => this.render());
+        Events.on('protocol-server-preferences-changed', _ => this.render());
+        Events.on('relay-settings-changed', _ => this._renderRelays());
+        this.$tabs.forEach(tab => tab.addEventListener('click', _ => this._selectTab(tab.dataset.settingsTab)));
+        this.$serverList.addEventListener('change', e => this._onToggle(e));
+        this.$fipsAddPeer.addEventListener('click', _ => this._addFipsPeerRow());
+        this.$fipsSavePeers.addEventListener('click', _ => this._saveFipsPeers());
+        this.$relaySave.addEventListener('click', _ => this._saveRelays());
+        this.render();
+    }
+
+    show() {
+        this.render();
+        this._loadFipsPeers();
+        super.show();
+    }
+
+    render() {
+        this._renderButton();
+        this._renderTabs();
+        this._renderServers();
+        this._renderRelays();
+    }
+
+    _renderButton() {
+        if (!this.$button) return;
+
+        const identity = globalThis.meshdropNostrIdentity?.getIdentity();
+        this.$button.removeAttribute('hidden');
+        if (!identity) {
+            this.$button.classList.remove('loading', 'unavailable');
+            this.$button.removeAttribute('data-state');
+            this.$button.removeAttribute('data-badge');
+            return;
+        }
+
+        const status = identity.blossomServerListStatus || 'loading';
+        this.$button.classList.toggle('loading', status === 'loading');
+        this.$button.classList.toggle('unavailable', status === 'missing' || status === 'error');
+        this.$button.setAttribute('data-state', status);
+
+        if (status === 'missing' || status === 'error') {
+            this.$button.setAttribute('data-badge', '!');
+        }
+        else {
+            this.$button.removeAttribute('data-badge');
+        }
+    }
+
+    _renderTabs() {
+        this.$tabs.forEach(tab => {
+            const selected = tab.dataset.settingsTab === this._activeTab;
+            tab.classList.toggle('selected', selected);
+            tab.setAttribute('aria-selected', String(selected));
+        });
+        this.$panels.forEach(panel => {
+            panel.toggleAttribute('hidden', panel.dataset.settingsPanel !== this._activeTab);
+        });
+    }
+
+    _selectTab(tabName) {
+        this._activeTab = tabName || 'blossom';
+        this._renderTabs();
+        if (this._activeTab === 'fips') this._loadFipsPeers();
+    }
+
+    _renderServers() {
+        const identity = globalThis.meshdropNostrIdentity?.getIdentity();
+        if (!identity) {
+            this.$status.textContent = 'Sign in with Nostr to load your Blossom server list.';
+            this.$serverList.textContent = '';
+            return;
+        }
+
+        const status = identity.blossomServerListStatus || 'loading';
+        const servers = ProtocolServerPreferences.normalizeServers(identity.blossomServers);
+
+        if (status === 'loading') {
+            this.$status.textContent = 'Loading your Blossom server list from Nostr relays.';
+            this.$serverList.textContent = '';
+            return;
+        }
+
+        if (status === 'missing') {
+            this.$status.textContent = 'No Blossom server list was found for this npub.';
+            this.$serverList.textContent = '';
+            return;
+        }
+
+        if (status === 'error') {
+            this.$status.textContent = 'Blossom server list lookup failed.';
+            this.$serverList.textContent = '';
+            return;
+        }
+
+        this.$status.textContent = 'Choose which discovered servers MeshDrop may use.';
+        this.$serverList.replaceChildren(...servers.map(server => this._serverRow(server)));
+    }
+
+    _serverRow(server) {
+        const row = document.createElement('div');
+        row.className = 'protocol-server-row column';
+
+        const name = document.createElement('div');
+        name.className = 'protocol-server-name';
+        name.textContent = server;
+
+        const toggles = document.createElement('div');
+        toggles.className = 'protocol-server-toggles column';
+        toggles.append(
+            this._toggle(server, 'hashtree', 'Hashtree'),
+            this._toggle(server, 'blossom', 'Blossom')
+        );
+
+        row.append(name, toggles);
+        return row;
+    }
+
+    _toggle(server, protocol, label) {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'protocol-server-toggle row';
+
+        const text = document.createElement('span');
+        text.textContent = label;
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.dataset.server = server;
+        input.dataset.protocol = protocol;
+        input.checked = ProtocolServerPreferences.protocolEnabled(server, protocol);
+
+        wrapper.append(text, input);
+        return wrapper;
+    }
+
+    _onToggle(event) {
+        const input = event.target;
+        if (!input?.dataset?.server || !input.dataset.protocol) return;
+
+        ProtocolServerPreferences.setProtocolEnabled(
+            input.dataset.server,
+            input.dataset.protocol,
+            input.checked
+        );
+    }
+
+    async _loadFipsPeers() {
+        if (!this.$fipsStatus || !this.$fipsPeerList) return;
+
+        this.$fipsStatus.textContent = 'Loading FIPS peers.';
+        try {
+            const response = await fetch('/fips/status');
+            const status = await response.json();
+            if (!status.available) {
+                this.$fipsStatus.textContent = status.error
+                    ? `FIPS control plane unavailable: ${status.error}`
+                    : 'FIPS control plane unavailable.';
+                this.$fipsPeerList.textContent = '';
+                return;
+            }
+
+            const peers = (status.peers || []).map(peer => ({
+                npub: peer.npub || '',
+                alias: peer.displayName || '',
+                transport: peer.transportType || 'udp',
+                address: peer.transportAddr || ''
+            }));
+            this.$fipsStatus.textContent = 'Edit peers connected through the local FIPS control plane.';
+            this.$fipsPeerList.replaceChildren(...peers.map(peer => this._fipsPeerRow(peer)));
+            if (!peers.length) this._addFipsPeerRow();
+        } catch (error) {
+            this.$fipsStatus.textContent = `FIPS lookup failed: ${error.message}`;
+            this.$fipsPeerList.textContent = '';
+        }
+    }
+
+    _addFipsPeerRow(peer = {}) {
+        this.$fipsPeerList.append(this._fipsPeerRow(peer));
+    }
+
+    _fipsPeerRow(peer) {
+        const row = document.createElement('div');
+        row.className = 'fips-peer-row column';
+
+        row.append(
+            this._settingsInput('npub or host', 'npub', peer.npub || ''),
+            this._settingsInput('Display name', 'alias', peer.alias || ''),
+            this._settingsSelect('Transport', 'transport', peer.transport || 'udp', ['udp', 'tcp', 'tor', 'ethernet']),
+            this._settingsInput('Address', 'address', peer.address || '')
+        );
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn btn-rounded btn-grey';
+        remove.textContent = 'Remove';
+        remove.addEventListener('click', _ => row.remove());
+        row.append(remove);
+
+        return row;
+    }
+
+    _settingsInput(label, field, value) {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'settings-field column';
+
+        const text = document.createElement('span');
+        text.textContent = label;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.dataset.field = field;
+        input.value = value;
+
+        wrapper.append(text, input);
+        return wrapper;
+    }
+
+    _settingsSelect(label, field, value, options) {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'settings-field column';
+
+        const text = document.createElement('span');
+        text.textContent = label;
+
+        const select = document.createElement('select');
+        select.dataset.field = field;
+        options.forEach(option => {
+            const item = document.createElement('option');
+            item.value = option;
+            item.textContent = option;
+            item.selected = option === value;
+            select.append(item);
+        });
+
+        wrapper.append(text, select);
+        return wrapper;
+    }
+
+    async _saveFipsPeers() {
+        const peers = [...this.$fipsPeerList.querySelectorAll('.fips-peer-row')]
+            .map(row => ({
+                npub: row.querySelector('[data-field="npub"]')?.value || '',
+                alias: row.querySelector('[data-field="alias"]')?.value || '',
+                transport: row.querySelector('[data-field="transport"]')?.value || 'udp',
+                address: row.querySelector('[data-field="address"]')?.value || ''
+            }))
+            .filter(peer => peer.npub.trim() && peer.address.trim());
+
+        this.$fipsStatus.textContent = 'Saving FIPS peers.';
+        try {
+            const response = await fetch('/settings/fips/peers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({peers})
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+
+            this.$fipsStatus.textContent = result.restart?.available
+                ? 'Saved FIPS peers and restarted the FIPS server.'
+                : `Saved FIPS peers. FIPS restart unavailable: ${result.restart?.error || 'unsupported control command'}`;
+            await globalThis.meshdropFipsDiscovery?.fetchStatus?.();
+        } catch (error) {
+            this.$fipsStatus.textContent = `FIPS save failed: ${error.message}`;
+        }
+    }
+
+    _renderRelays() {
+        if (!globalThis.RelaySettingsPreferences) return;
+
+        const settings = RelaySettingsPreferences.normalize(RelaySettingsPreferences.read());
+        this.$relayBootstrap.value = settings.bootstrapRelays.join('\n');
+        this.$relayWebRtc.value = settings.webRtcRelays.join('\n');
+        this.$relayInbox.value = settings.inboxRelays.join('\n');
+        this.$relayOutbox.value = settings.outboxRelays.join('\n');
+        this.$relayStatus.textContent = 'Configure relays used for identity bootstrap, WebRTC announcements, and your NIP-65 relay list.';
+    }
+
+    async _saveRelays() {
+        const settings = RelaySettingsPreferences.write({
+            bootstrapRelays: this._textareaLines(this.$relayBootstrap),
+            webRtcRelays: this._textareaLines(this.$relayWebRtc),
+            inboxRelays: this._textareaLines(this.$relayInbox),
+            outboxRelays: this._textareaLines(this.$relayOutbox)
+        });
+
+        const identityController = globalThis.meshdropNostrIdentity;
+        const identity = identityController?.getIdentity?.();
+        if (!identity) {
+            this.$relayStatus.textContent = 'Saved relay settings locally. Sign in with Nostr to publish your NIP-65 relay list.';
+            return;
+        }
+
+        try {
+            const event = await identityController.signEvent({
+                kind: NostrDiscoveryProtocol.relayListKind,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: RelaySettingsPreferences.relayListTags(settings.inboxRelays, settings.outboxRelays),
+                content: ''
+            });
+            const relays = [
+                ...settings.outboxRelays,
+                ...settings.bootstrapRelays,
+                ...(identity.relays?.write || [])
+            ];
+            const result = await globalThis.meshdropNostrRelays.publishEvent(relays, event);
+            this.$relayStatus.textContent = `Saved relay settings and published NIP-65 to ${result.accepted}/${result.attempted} relays.`;
+            identityController.hydrateIdentity();
+        } catch (error) {
+            this.$relayStatus.textContent = `Saved relay settings locally. NIP-65 publish failed: ${error.message}`;
+        }
+    }
+
+    _textareaLines(textarea) {
+        return textarea.value.split(/\s+/).map(line => line.trim()).filter(Boolean);
+    }
+}
+
+class TransferChoiceDialog extends Dialog {
+
+    constructor() {
+        super('transfer-choice-dialog');
+
+        this.$recipient = this.$el.querySelector('.transfer-choice-recipient');
+        this.$list = this.$el.querySelector('.transfer-choice-list');
+        this.$list.addEventListener('click', e => this._onOptionClick(e));
+
+        Events.on('select-files-transport', e => this._onFilesSelected(e.detail));
+    }
+
+    _onFilesSelected(detail) {
+        const peerNode = $(detail.to);
+        const peer = peerNode?.ui?._peer;
+        if (!peer) {
+            Events.fire('files-selected', detail);
+            return;
+        }
+
+        this._detail = {
+            files: [...detail.files],
+            to: detail.to,
+            options: PeerAvailabilityProtocol.optionsFor(peer)
+        };
+
+        if (!this._detail.options.length) {
+            Events.fire('files-selected', {
+                ...detail,
+                transport: {id: 'direct', type: 'direct', label: 'Direct'}
+            });
+            return;
+        }
+
+        this._render(peerNode);
+        this.show();
+    }
+
+    _render(peerNode) {
+        this.$recipient.textContent = peerNode.ui._displayName();
+        this.$recipient.className = `transfer-choice-recipient badge ${peerNode.ui._badgeClassName()}`;
+        this.$list.replaceChildren(...this._detail.options.map((option, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'transport-choice-option';
+            button.dataset.transportId = option.id;
+            if (index === 0) button.dataset.default = 'true';
+
+            const label = document.createElement('span');
+            label.className = 'transport-choice-label';
+            label.textContent = option.label;
+
+            const description = document.createElement('span');
+            description.className = 'transport-choice-description';
+            description.textContent = option.description;
+
+            button.append(label, description);
+            return button;
+        }));
+    }
+
+    _onOptionClick(event) {
+        const button = event.target.closest('button[data-transport-id]');
+        if (!button || !this._detail) return;
+
+        const transport = this._detail.options.find(option => option.id === button.dataset.transportId);
+        if (!transport) return;
+
+        Events.fire('files-selected', {
+            files: this._detail.files,
+            to: this._detail.to,
+            transport
+        });
+        this.hide();
+    }
+
+    hide() {
+        this._detail = null;
+        super.hide();
     }
 }
 
@@ -1017,7 +1609,7 @@ class ReceiveFileDialog extends ReceiveDialog {
                 hours = hours.length < 2 ? "0" + hours : hours;
                 let minutes = now.getMinutes().toString();
                 minutes = minutes.length < 2 ? "0" + minutes : minutes;
-                filenameDownload = `PairDrop_files_${year+month+date}_${hours+minutes}.zip`;
+                filenameDownload = `MeshDrop_files_${year+month+date}_${hours+minutes}.zip`;
             } catch (e) {
                 console.error(e);
                 downloadZipped = false;
@@ -1048,8 +1640,8 @@ class ReceiveFileDialog extends ReceiveDialog {
         };
 
         document.title = files.length === 1
-            ? `${ Localization.getTranslation("document-titles.file-received") } - PairDrop`
-            : `${ Localization.getTranslation("document-titles.file-received-plural", null, {count: files.length}) } - PairDrop`;
+            ? `${ Localization.getTranslation("document-titles.file-received") } - MeshDrop`
+            : `${ Localization.getTranslation("document-titles.file-received-plural", null, {count: files.length}) } - MeshDrop`;
         changeFavicon("images/favicon-96x96-notification.png");
 
         Events.fire('set-progress', {peerId: peerId, progress: 1, status: 'process'})
@@ -1155,7 +1747,7 @@ class ReceiveRequestDialog extends ReceiveDialog {
 
         this.$receiveTitle.innerText = transferRequestTitle;
 
-        document.title =  `${transferRequestTitle} - PairDrop`;
+        document.title =  `${transferRequestTitle} - MeshDrop`;
         changeFavicon("images/favicon-96x96-notification.png");
 
         this.$acceptRequestBtn.removeAttribute('disabled');
@@ -2146,8 +2738,8 @@ class ReceiveTextDialog extends Dialog {
 
     _setDocumentTitleMessages() {
         document.title = this._receiveTextQueue.length <= 1
-            ? `${ Localization.getTranslation("document-titles.message-received") } - PairDrop`
-            : `${ Localization.getTranslation("document-titles.message-received-plural", null, {count: this._receiveTextQueue.length + 1}) } - PairDrop`;
+            ? `${ Localization.getTranslation("document-titles.message-received") } - MeshDrop`
+            : `${ Localization.getTranslation("document-titles.message-received-plural", null, {count: this._receiveTextQueue.length + 1}) } - MeshDrop`;
     }
 
     async _onCopy() {

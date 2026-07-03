@@ -10,11 +10,15 @@ class ServerConnection {
 
         Events.on('room-secrets', e => this.send({ type: 'room-secrets', roomSecrets: e.detail }));
         Events.on('join-ip-room', _ => this.send({ type: 'join-ip-room'}));
+        Events.on('leave-ip-room', _ => this.send({ type: 'leave-ip-room'}));
+        Events.on('join-fips-room', _ => this.send({ type: 'join-fips-room'}));
+        Events.on('leave-fips-room', _ => this.send({ type: 'leave-fips-room'}));
         Events.on('room-secrets-deleted', e => this.send({ type: 'room-secrets-deleted', roomSecrets: e.detail}));
         Events.on('regenerate-room-secret', e => this.send({ type: 'regenerate-room-secret', roomSecret: e.detail}));
         Events.on('pair-device-initiate', _ => this._onPairDeviceInitiate());
         Events.on('pair-device-join', e => this._onPairDeviceJoin(e.detail));
         Events.on('pair-device-cancel', _ => this.send({ type: 'pair-device-cancel' }));
+        Events.on('nostr-identity-changed', _ => this._reconnect());
 
         Events.on('create-public-room', _ => this._onCreatePublicRoom());
         Events.on('join-public-room', e => this._onJoinPublicRoom(e.detail.roomId, e.detail.createIfInvalid));
@@ -69,6 +73,7 @@ class ServerConnection {
 
     _connect() {
         clearTimeout(this._reconnectTimer);
+        if (!this._config) return;
         if (this._isConnected() || this._isConnecting() || this._isOffline()) return;
         if (this._isReconnect) {
             Events.fire('notify-user', {
@@ -186,7 +191,12 @@ class ServerConnection {
             case 'public-room-left':
                 Events.fire('public-room-left');
                 break;
+            case 'fips-status':
+                Events.fire('fips-status', msg.status);
+                break;
             case 'request':
+            case 'blossom-request':
+            case 'hashtree-request':
             case 'header':
             case 'partition':
             case 'partition-received':
@@ -233,7 +243,12 @@ class ServerConnection {
                 console.log("successfully added peerId to localStorage");
 
                 // Only now join rooms
-                Events.fire('join-ip-room');
+                if (globalThis.meshdropLocalDiscovery?.join) {
+                    globalThis.meshdropLocalDiscovery.join();
+                }
+                else if (globalThis.meshdropLocalDiscovery?.isEnabled?.() !== false) {
+                    Events.fire('join-ip-room');
+                }
                 PersistentStorage.getAllRoomSecrets()
                     .then(roomSecrets => {
                         Events.fire('room-secrets', roomSecrets);
@@ -259,6 +274,11 @@ class ServerConnection {
         if (peerId && peerIdHash) {
             wsUrl.searchParams.append('peer_id', peerId);
             wsUrl.searchParams.append('peer_id_hash', peerIdHash);
+        }
+
+        const nostrIdentity = localStorage.getItem('meshdrop_nostr_identity');
+        if (nostrIdentity) {
+            wsUrl.searchParams.append('nostr_identity', nostrIdentity);
         }
 
         return wsUrl.toString();
@@ -314,6 +334,7 @@ class ServerConnection {
     }
 
     _reconnect() {
+        if (!this._config) return;
         this._disconnect();
         this._connect();
     }
@@ -433,12 +454,92 @@ class Peer {
             : false;
     }
 
-    async requestFileTransfer(files) {
+    async requestFileTransfer(files, transfer = null) {
+        if (!this._allowsNostrPeer()) return;
+
+        const selectedTransfer = transfer || this._defaultTransferSelection();
+
+        if (selectedTransfer?.id === "hashtree") {
+            return this.requestHashtreeFileTransfer(files, selectedTransfer);
+        }
+
+        if (selectedTransfer?.id === "blossom") {
+            return this.requestBlossomFileTransfer(files, selectedTransfer);
+        }
+
+        const request = await this._createFileTransferRequest(files, selectedTransfer);
+        this._filesRequested = files;
+        this._selectedTransfer = selectedTransfer;
+
+        this.sendJSON({
+            type: 'request',
+            ...request
+        });
+        Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: selectedTransfer})
+    }
+
+    _defaultTransferSelection() {
+        if (globalThis.meshdropHashtreeTransfer?.isActive()) {
+            return {id: "hashtree", type: "storage", label: "Hashtree"};
+        }
+
+        if (globalThis.meshdropBlossomTransfer?.isActive()) {
+            return {id: "blossom", type: "storage", label: "Blossom"};
+        }
+
+        return {id: "direct", type: "direct", label: "Direct"};
+    }
+
+    async requestBlossomFileTransfer(files, transfer = {id: "blossom", type: "storage", label: "Blossom"}) {
+        try {
+            const request = await this._createFileTransferRequest(files, transfer);
+            const blossomDescriptors = await globalThis.meshdropBlossomTransfer.uploadFiles(files, progress => {
+                Events.fire('set-progress', {peerId: this._peerId, progress: 0.8 + 0.2 * progress, status: 'prepare', transport: transfer});
+            });
+
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
+            this.sendJSON({
+                type: 'blossom-request',
+                ...request,
+                blossomDescriptors
+            });
+            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
+        }
+        catch (error) {
+            console.error(error);
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
+            Events.fire('notify-user', Localization.getTranslation("notifications.blossom-transfer-upload-failed"));
+        }
+    }
+
+    async requestHashtreeFileTransfer(files, transfer = {id: "hashtree", type: "storage", label: "Hashtree"}) {
+        try {
+            const request = await this._createFileTransferRequest(files, transfer);
+            const hashtreeManifest = await globalThis.meshdropHashtreeTransfer.uploadFiles(files, progress => {
+                Events.fire('set-progress', {peerId: this._peerId, progress: 0.8 + 0.2 * progress, status: 'prepare', transport: transfer});
+            });
+
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
+            this.sendJSON({
+                type: 'hashtree-request',
+                ...request,
+                hashtreeManifest
+            });
+            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
+        }
+        catch (error) {
+            console.error(error);
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
+            Events.fire('notify-user', Localization.getTranslation("notifications.hashtree-transfer-upload-failed"));
+        }
+    }
+
+    async _createFileTransferRequest(files, transfer = null) {
         let header = [];
         let totalSize = 0;
         let imagesOnly = true
         for (let i=0; i<files.length; i++) {
-            Events.fire('set-progress', {peerId: this._peerId, progress: 0.8*i/files.length, status: 'prepare'})
+            Events.fire('set-progress', {peerId: this._peerId, progress: 0.8*i/files.length, status: 'prepare', transport: transfer})
             header.push({
                 name: files[i].name,
                 mime: files[i].type,
@@ -448,7 +549,7 @@ class Peer {
             if (files[i].type.split('/')[0] !== 'image') imagesOnly = false;
         }
 
-        Events.fire('set-progress', {peerId: this._peerId, progress: 0.8, status: 'prepare'})
+        Events.fire('set-progress', {peerId: this._peerId, progress: 0.8, status: 'prepare', transport: transfer})
 
         let dataUrl = '';
         if (files[0].type.split('/')[0] === 'image') {
@@ -459,20 +560,20 @@ class Peer {
             }
         }
 
-        Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare'})
+        Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer})
 
-        this._filesRequested = files;
-
-        this.sendJSON({type: 'request',
+        return {
             header: header,
             totalSize: totalSize,
             imagesOnly: imagesOnly,
-            thumbnailDataUrl: dataUrl
-        });
-        Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait'})
+            thumbnailDataUrl: dataUrl,
+            transport: transfer
+        };
     }
 
     async sendFiles() {
+        if (!this._allowsNostrPeer()) return;
+
         for (let i=0; i<this._filesRequested.length; i++) {
             this._filesQueue.push(this._filesRequested[i]);
         }
@@ -518,6 +619,8 @@ class Peer {
     }
 
     _onMessage(message) {
+        if (!this._allowsNostrPeerMessage(message)) return;
+
         if (typeof message !== 'string') {
             this._onChunkReceived(message);
             return;
@@ -526,6 +629,12 @@ class Peer {
         switch (messageJSON.type) {
             case 'request':
                 this._onFilesTransferRequest(messageJSON);
+                break;
+            case 'blossom-request':
+                this._onBlossomFilesTransferRequest(messageJSON);
+                break;
+            case 'hashtree-request':
+                this._onHashtreeFilesTransferRequest(messageJSON);
                 break;
             case 'header':
                 this._onFileHeader(messageJSON);
@@ -558,6 +667,10 @@ class Peer {
     }
 
     _onFilesTransferRequest(request) {
+        if (!this._allowsFileTransferRequest()) {
+            this.sendJSON({type: 'files-transfer-response', accepted: false, reason: 'not-followed'});
+            return;
+        }
         if (this._requestPending) {
             // Only accept one request at a time per peer
             this.sendJSON({type: 'files-transfer-response', accepted: false});
@@ -585,15 +698,68 @@ class Peer {
         });
     }
 
+    _allowsFileTransferRequest() {
+        return this._allowsNostrPeer();
+    }
+
+    _allowsNostrPeer() {
+        if (!this._roomIds.nostr) return true;
+
+        const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
+        return globalThis.NostrFollowPolicy?.allowsPubkey(this._peerId, identity) !== false;
+    }
+
+    _allowsNostrPeerMessage(message) {
+        if (this._allowsNostrPeer()) return true;
+
+        if (typeof message !== "string") return false;
+
+        try {
+            const parsed = JSON.parse(message);
+            if (["request", "blossom-request", "hashtree-request"].includes(parsed.type)) {
+                this.sendJSON({type: 'files-transfer-response', accepted: false, reason: 'not-followed'});
+            }
+        } catch {
+            return false;
+        }
+
+        return false;
+    }
+
+    _onBlossomFilesTransferRequest(request) {
+        request.blossom = true;
+        this._onFilesTransferRequest(request);
+    }
+
+    _onHashtreeFilesTransferRequest(request) {
+        request.hashtree = true;
+        this._onFilesTransferRequest(request);
+    }
+
     _respondToFileTransferRequest(accepted) {
-        this.sendJSON({type: 'files-transfer-response', accepted: accepted});
+        const pendingRequest = this._requestPending;
+
+        this.sendJSON({
+            type: 'files-transfer-response',
+            accepted: accepted,
+            blossom: !!pendingRequest?.blossom,
+            hashtree: !!pendingRequest?.hashtree
+        });
         if (accepted) {
-            this._requestAccepted = this._requestPending;
+            this._requestAccepted = pendingRequest;
             this._totalBytesReceived = 0;
             this._busy = true;
             this._filesReceived = [];
         }
         this._requestPending = null;
+
+        if (accepted && pendingRequest?.blossom) {
+            this._downloadBlossomFiles(pendingRequest);
+        }
+
+        if (accepted && pendingRequest?.hashtree) {
+            this._downloadHashtreeFiles(pendingRequest);
+        }
     }
 
     _onFileHeader(header) {
@@ -657,7 +823,81 @@ class Peer {
         if (!this._requestAccepted.header.length) {
             this._busy = false;
             Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
-            Events.fire('files-received', {peerId: this._peerId, files: this._filesReceived, imagesOnly: this._requestAccepted.imagesOnly, totalSize: this._requestAccepted.totalSize});
+            Events.fire('files-received', {
+                peerId: this._peerId,
+                files: this._filesReceived,
+                imagesOnly: this._requestAccepted.imagesOnly,
+                totalSize: this._requestAccepted.totalSize
+            });
+            this._filesReceived = [];
+            this._requestAccepted = null;
+        }
+    }
+
+    async _downloadBlossomFiles(request) {
+        try {
+            for (let i = 0; i < request.blossomDescriptors.length; i++) {
+                const file = await globalThis.meshdropBlossomTransfer.downloadDescriptor(
+                    request.blossomDescriptors[i],
+                    request.header[i]
+                );
+
+                this._totalBytesReceived += file.size;
+                this._onDownloadProgress(this._totalBytesReceived / request.totalSize);
+                Events.fire('file-received', file);
+                this._filesReceived.push(file);
+            }
+
+            this._busy = false;
+            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
+            Events.fire('files-received', {
+                peerId: this._peerId,
+                files: this._filesReceived,
+                imagesOnly: request.imagesOnly,
+                totalSize: request.totalSize
+            });
+            this._filesReceived = [];
+            this._requestAccepted = null;
+            this.sendJSON({type: 'file-transfer-complete'});
+        }
+        catch (error) {
+            console.error(error);
+            Events.fire('notify-user', Localization.getTranslation("notifications.blossom-transfer-download-failed"));
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
+            this._busy = false;
+            this._filesReceived = [];
+            this._requestAccepted = null;
+        }
+    }
+
+    async _downloadHashtreeFiles(request) {
+        try {
+            const files = await globalThis.meshdropHashtreeTransfer.downloadFiles(
+                request.hashtreeManifest,
+                request.header,
+                progress => this._onDownloadProgress(progress)
+            );
+
+            this._filesReceived = files;
+            files.forEach(file => Events.fire('file-received', file));
+
+            this._busy = false;
+            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
+            Events.fire('files-received', {
+                peerId: this._peerId,
+                files: this._filesReceived,
+                imagesOnly: request.imagesOnly,
+                totalSize: request.totalSize
+            });
+            this._filesReceived = [];
+            this._requestAccepted = null;
+            this.sendJSON({type: 'file-transfer-complete'});
+        }
+        catch (error) {
+            console.error(error);
+            Events.fire('notify-user', Localization.getTranslation("notifications.hashtree-transfer-download-failed"));
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
+            this._busy = false;
             this._filesReceived = [];
             this._requestAccepted = null;
         }
@@ -667,6 +907,7 @@ class Peer {
         this._chunker = null;
         if (!this._filesQueue.length) {
             this._busy = false;
+            this._selectedTransfer = null;
             Events.fire('notify-user', Localization.getTranslation("notifications.file-transfer-completed"));
             Events.fire('files-sent'); // used by 'Snapdrop & PairDrop for Android' app
         }
@@ -679,13 +920,17 @@ class Peer {
         if (!message.accepted) {
             Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
             this._filesRequested = null;
+            this._selectedTransfer = null;
             if (message.reason === 'ios-memory-limit') {
                 Events.fire('notify-user', Localization.getTranslation("notifications.ios-memory-limit"));
             }
             return;
         }
         Events.fire('file-transfer-accepted');
-        Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'transfer'});
+        Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'transfer', transport: this._selectedTransfer});
+        if (message.blossom || message.hashtree) {
+            return;
+        }
         this.sendFiles();
     }
 
@@ -694,6 +939,8 @@ class Peer {
     }
 
     sendText(text) {
+        if (!this._allowsNostrPeer()) return;
+
         const unescaped = btoa(unescape(encodeURIComponent(text)));
         this.sendJSON({ type: 'text', text: unescaped });
     }
@@ -726,6 +973,7 @@ class RTCPeer extends Peer {
 
         this.rtcSupported = true;
         this.rtcConfig = rtcConfig
+        this._intentionalDisconnect = false;
 
         if (!this._isCaller) return; // we will listen for a caller
         this._connect();
@@ -858,6 +1106,7 @@ class RTCPeer extends Peer {
     }
 
     _disconnect() {
+        this._intentionalDisconnect = true;
         if (this._conn && this._channel) {
             this._channel.onclose = null;
             this._channel.close();
@@ -868,6 +1117,7 @@ class RTCPeer extends Peer {
     _onChannelClosed() {
         console.log('RTC: channel closed', this._peerId);
         Events.fire('peer-disconnected', this._peerId);
+        if (this._intentionalDisconnect) return;
         if (!this._isCaller) return;
         this._connect(); // reopen the channel
     }
@@ -1017,6 +1267,7 @@ class PeersManager {
 
     _onMessage(message) {
         const peerId = message.sender.id;
+        if (!this.peers[peerId]) return;
         this.peers[peerId].onServerMessage(message);
     }
 
@@ -1041,16 +1292,20 @@ class PeersManager {
         return true;
     }
 
-    _createOrRefreshPeer(isCaller, peerId, roomType, roomId, rtcSupported) {
+    _createOrRefreshPeer(isCaller, peerId, roomType, roomId, rtcSupported, transport = this._server, peerInfo = null) {
+        const policyPeer = peerInfo || {id: peerId};
+        const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
+        if (globalThis.NostrFollowPolicy?.allowsPeer(policyPeer, roomType, identity) === false) return;
+
         if (this._peerExists(peerId)) {
             this._refreshPeer(peerId, roomType, roomId);
             return;
         }
 
         if (window.isRtcSupported && rtcSupported) {
-            this.peers[peerId] = new RTCPeer(this._server, isCaller, peerId, roomType, roomId, this._wsConfig.rtcConfig);
+            this.peers[peerId] = new RTCPeer(transport, isCaller, peerId, roomType, roomId, this._wsConfig.rtcConfig);
         }
-        else if (this._wsConfig.wsFallback) {
+        else if (roomType !== 'nostr' && this._wsConfig.wsFallback) {
             this.peers[peerId] = new WSPeer(this._server, isCaller, peerId, roomType, roomId);
         }
         else {
@@ -1060,12 +1315,20 @@ class PeersManager {
     }
 
     _onPeerJoined(message) {
-        this._createOrRefreshPeer(false, message.peer.id, message.roomType, message.roomId, message.peer.rtcSupported);
+        this._createOrRefreshPeer(
+            !!message.isCaller,
+            message.peer.id,
+            message.roomType,
+            message.roomId,
+            message.peer.rtcSupported,
+            message.transport,
+            message.peer
+        );
     }
 
     _onPeers(message) {
         message.peers.forEach(peer => {
-            this._createOrRefreshPeer(true, peer.id, message.roomType, message.roomId, peer.rtcSupported);
+            this._createOrRefreshPeer(true, peer.id, message.roomType, message.roomId, peer.rtcSupported, message.transport, peer);
         })
     }
 
@@ -1082,11 +1345,15 @@ class PeersManager {
     }
 
     async _onFilesSelected(message) {
+        if (!this.peers[message.to]) return;
+
         let files = mime.addMissingMimeTypesToFiles([...message.files]);
-        await this.peers[message.to].requestFileTransfer(files);
+        await this.peers[message.to].requestFileTransfer(files, message.transport || null);
     }
 
     _onSendText(message) {
+        if (!this.peers[message.to]) return;
+
         this.peers[message.to].sendText(message.text);
     }
 
@@ -1137,6 +1404,7 @@ class PeersManager {
         const peer = this.peers[peerId];
         delete this.peers[peerId];
         if (!peer || !peer._conn) return;
+        peer._intentionalDisconnect = true;
         if (peer._channel) peer._channel.onclose = null;
         peer._conn.close();
         peer._busy = false;
@@ -1190,6 +1458,10 @@ class PeersManager {
     }
 
     _notifyPeersDisplayNameChanged(newDisplayName) {
+        if (newDisplayName && typeof newDisplayName === "object") {
+            newDisplayName = newDisplayName.displayName || "";
+        }
+
         this._displayName = newDisplayName ? newDisplayName : this._originalDisplayName;
         for (const peerId in this.peers) {
             this._notifyPeerDisplayNameChanged(peerId);

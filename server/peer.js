@@ -1,7 +1,7 @@
-import crypto from "crypto";
 import parser from "ua-parser-js";
 import {animals, colors, uniqueNamesGenerator} from "unique-names-generator";
-import {cyrb53, hasher} from "./helper.js";
+import {cyrb53, hasher, randomizer} from "./helper.js";
+import {getNostrIdentityFromRequest} from "./nostr-identity.js";
 
 export default class Peer {
 
@@ -19,6 +19,9 @@ export default class Peer {
 
         // is WebRTC supported
         this._setRtcSupported(request);
+
+        // optional signed Nostr identity
+        this._setNostrIdentity(request);
 
         // set name
         this._setName(request);
@@ -72,7 +75,7 @@ export default class Peer {
             if (ipv6_was_localized) {
                 console.debug("IPv6 client IP was localized to", this.conf.ipv6Localize, this.conf.ipv6Localize > 1 ? "segments" : "segment");
             }
-            console.debug("PairDrop uses:", this.ip);
+            console.debug("MeshDrop uses:", this.ip);
             console.debug("IP is private:", this.ipIsPrivate(this.ip));
             console.debug("if IP is private, '127.0.0.1' is used instead");
             console.debug("----DEBUGGING-PEER-IP-END----");
@@ -132,13 +135,17 @@ export default class Peer {
         if (peerId && Peer.isValidUuid(peerId) && this.isPeerIdHashValid(peerId, peerIdHash)) {
             this.id = peerId;
         } else {
-            this.id = crypto.randomUUID();
+            this.id = randomizer.getRandomUuid();
         }
     }
 
     _setRtcSupported(request) {
         const searchParams = new URL(request.url, "http://server").searchParams;
         this.rtcSupported = searchParams.get('webrtc_supported') === "true";
+    }
+
+    _setNostrIdentity(request) {
+        this.nostrIdentity = getNostrIdentityFromRequest(request);
     }
 
     _setName(req) {
@@ -174,7 +181,7 @@ export default class Peer {
             browser: ua.browser.name,
             type: ua.device.type,
             deviceName,
-            displayName
+            displayName: this.nostrIdentity?.displayName || displayName
         };
     }
 
@@ -182,7 +189,8 @@ export default class Peer {
         return {
             id: this.id,
             name: this.name,
-            rtcSupported: this.rtcSupported
+            rtcSupported: this.rtcSupported,
+            nostrIdentity: this.nostrIdentity
         }
     }
 

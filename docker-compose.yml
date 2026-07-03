@@ -1,8 +1,8 @@
-version: "3"
 services:
-  pairdrop:
-    image: "lscr.io/linuxserver/pairdrop:latest"
-    container_name: pairdrop
+  meshdrop:
+    build: .
+    image: meshdrop:local
+    container_name: meshdrop
     restart: unless-stopped
     environment:
       - PUID=1000 # UID to run the application as
@@ -11,6 +11,16 @@ services:
       - RATE_LIMIT=false # Set to true to limit clients to 1000 requests per 5 min.
       - RTC_CONFIG=false # Set to the path of a file that specifies the STUN/TURN servers.
       - DEBUG_MODE=false # Set to true to debug container and peer connections.
+      - NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net # Relay list for Nostr mesh discovery.
+      - NOSTR_ROOM=meshdrop # Room namespace for Nostr mesh discovery.
+      - BLOSSOM_SERVERS= # Comma-separated Blossom servers for optional storage-backed transfers.
+      - FIPS_DISCOVERY=true # Set to true when a FIPS daemon control socket is reachable from the container.
+      - FIPS_CONTROL_SOCKET=/run/fips/control.sock # FIPS control socket path or local TCP port, for example /run/fips/control.sock or 21210.
+      - FIPS_ROOM=meshdrop-fips # Room namespace for FIPS-backed peer discovery.
       - TZ=Etc/UTC # Time Zone
+    group_add:
+      - "953" # Host fips group, required for /run/fips/control.sock on this machine.
+    volumes:
+      - /run/fips/control.sock:/run/fips/control.sock
     ports:
-      - "127.0.0.1:3000:3000" # Web UI. Change the port number before the last colon e.g. `127.0.0.1:9000:3000`
+      - "3000:3000" # Web UI, exposed to this LAN for local-device testing.

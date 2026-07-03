@@ -1,7 +1,42 @@
-node_modules
-.DS_Store
-/dev/certs
-qrcode-svg/
-turnserver.conf
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build and test output
+coverage/
+dist/
+build/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Local environment and runtime config
+.env
+.env.*
+!.env.example
 rtc_config.json
+turnserver.conf
+docker-compose.override.yml
+
+# Local certificates and generated assets
+/dev/certs/
 ssl/
+qrcode-svg/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Agent/local workflow state
+.omx/

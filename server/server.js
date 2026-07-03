@@ -8,6 +8,7 @@ export default class PairDropServer {
 
     constructor(conf) {
         const app = express();
+        app.use(express.json({limit: "64kb"}));
 
         if (conf.rateLimit) {
             const limiter = RateLimit({
@@ -38,7 +39,10 @@ export default class PairDropServer {
         if (conf.debugMode && conf.rateLimit) {
             console.debug("\n");
             console.debug("----DEBUG RATE_LIMIT----")
-            console.debug("To find out the correct value for RATE_LIMIT go to '/ip' and ensure the returned IP-address is the IP-address of your client.")
+            console.debug(
+                "To find out the correct value for RATE_LIMIT go to '/ip' " +
+                "and ensure the returned IP-address is the IP-address of your client."
+            )
             console.debug("See https://github.com/express-rate-limit/express-rate-limit#troubleshooting-proxy-issues for more info")
             app.get('/ip', (req, res) => {
                 res.send(req.ip);
@@ -50,8 +54,26 @@ export default class PairDropServer {
         app.get('/config', (req, res) => {
             res.send({
                 signalingServer: conf.signalingServer,
+                nostrMesh: conf.nostrMesh,
+                blossom: conf.blossom,
+                fips: {
+                    enabled: conf.fips.enabled,
+                    room: conf.fips.room
+                },
                 buttons: conf.buttons
             });
+        });
+
+        app.get('/fips/status', async (req, res) => {
+            res.send(await conf.fipsClient.status());
+        });
+
+        app.post('/settings/fips/peers', async (req, res) => {
+            try {
+                res.send(await conf.fipsClient.savePeers(req.body?.peers || []));
+            } catch (error) {
+                res.status(502).send({error: error.message});
+            }
         });
 
         app.use((req, res) => {

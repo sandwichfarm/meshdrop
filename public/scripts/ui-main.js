@@ -2,6 +2,18 @@
 const $ = query => document.getElementById(query);
 const $$ = query => document.querySelector(query);
 
+if (window.crypto && typeof window.crypto.randomUUID !== "function" && typeof window.crypto.getRandomValues === "function") {
+    window.crypto.randomUUID = () => {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+        const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    };
+}
+
 // Event listener shortcuts
 class Events {
     static fire(type, detail = {}) {
@@ -198,13 +210,14 @@ class FooterUI {
     constructor() {
         this.$footer = $$('footer');
         this.$displayName = $('display-name');
+        this.$displayAvatar = $('display-avatar');
         this.$discoveryWrapper = $$('footer .discovery-wrapper');
 
         this.$displayName.addEventListener('keydown', e => this._onKeyDownDisplayName(e));
         this.$displayName.addEventListener('focus', e => this._onFocusDisplayName(e));
         this.$displayName.addEventListener('blur', e => this._onBlurDisplayName(e));
 
-        Events.on('display-name', e => this._onDisplayName(e.detail.displayName));
+        Events.on('display-name', e => this._onDisplayName(e.detail));
         Events.on('self-display-name-changed', e => this._insertDisplayName(e.detail));
         Events.on('evaluate-footer-badges', _ => this._evaluateFooterBadges());
     }
@@ -238,7 +251,20 @@ class FooterUI {
         Events.fire('self-display-name-changed', displayNameSaved);
     }
 
-    async _onDisplayName(displayNameServer){
+    async _onDisplayName(message){
+        const displayNameServer = message.displayName;
+
+        if (message.nostrIdentity) {
+            const identity = globalThis.meshdropNostrIdentity?.getIdentity();
+            const profile = identity?.pubkey === message.nostrIdentity.pubkey
+                ? identity
+                : message.nostrIdentity;
+
+            this.$displayName.setAttribute('placeholder', displayNameServer);
+            this._insertDisplayName(profile);
+            return;
+        }
+
         // load saved displayname first to prevent flickering
         await this._loadSavedDisplayName();
 
@@ -248,7 +274,36 @@ class FooterUI {
 
 
     _insertDisplayName(displayName) {
-        this.$displayName.textContent = displayName;
+        const profile = this._profileFromDetail(displayName);
+        this.$displayName.textContent = profile.displayName;
+        this._setAvatar(profile.picture);
+    }
+
+    _profileFromDetail(detail) {
+        if (detail && typeof detail === "object") {
+            return {
+                displayName: detail.displayName || "",
+                picture: detail.picture || ""
+            };
+        }
+
+        return {
+            displayName: detail || "",
+            picture: ""
+        };
+    }
+
+    _setAvatar(picture) {
+        if (!this.$displayAvatar) return;
+
+        if (!picture) {
+            this.$displayAvatar.hidden = true;
+            this.$displayAvatar.removeAttribute("src");
+            return;
+        }
+
+        this.$displayAvatar.src = picture;
+        this.$displayAvatar.hidden = false;
     }
 
     _onKeyDownDisplayName(e) {
