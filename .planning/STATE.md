@@ -51,6 +51,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `260704-vlf-target-artifact-ci` | complete | CI runs target-artifact transfer smoke after unit tests; red/green workflow guard; actionlint; target-artifact smoke; `npm test`; diff/slop gates |
 | 2026-07-04 | `260704-vqw-umbrel-package-smoke` | complete | Rendered Umbrel package compose booted, `/config` reported target `umbrel`, and browser proof transferred over local and Pollen WebRTC; `npm test`; diff/slop gates |
 | 2026-07-04 | `260704-start9-package-smoke` | complete | Generated Start9 package env booted the Start9 target image, `/config` reported target `start9`, and browser proof transferred over local and Pollen WebRTC; `npm test`; diff/slop gates |
+| 2026-07-04 | `260704-ghcr-anonymous-readback` | complete | Local anonymous verifier added; `npm run verify:ghcr-anonymous -- v0.1.0` proves current GHCR `unauthorized`; package API requires `read:packages`; `npm test`; changed-code slop clean |
 
 ## Active Quick Task
 

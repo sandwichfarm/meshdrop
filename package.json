@@ -22,7 +22,8 @@
     "test:spa-artifact": "node scripts/spa-artifact-smoke.mjs",
     "test:start9-package": "node scripts/start9-package-smoke.mjs",
     "test:target-artifacts": "node scripts/target-artifact-smoke.mjs",
-    "test:umbrel-package": "node scripts/umbrel-package-smoke.mjs"
+    "test:umbrel-package": "node scripts/umbrel-package-smoke.mjs",
+    "verify:ghcr-anonymous": "node scripts/ghcr-anonymous-readback.mjs"
   },
   "author": "",
   "license": "ISC",

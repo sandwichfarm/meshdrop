@@ -6,6 +6,11 @@ const releaseWorkflow = fs.readFileSync(new URL("../.github/workflows/release.ym
 const releaseVerifyWorkflowUrl = new URL("../.github/workflows/release-verify.yml", import.meta.url);
 const duplicateGhcrWorkflow = new URL("../.github/workflows/github-image.yml", import.meta.url);
 const dockerfile = fs.readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+const packageJson = fs.readFileSync(new URL("../package.json", import.meta.url), "utf8");
+const anonymousReadbackScript = fs.readFileSync(
+    new URL("../scripts/ghcr-anonymous-readback.mjs", import.meta.url),
+    "utf8"
+);
 
 test("release workflow publishes GHCR images for alpha target packages", () => {
     assert.match(releaseWorkflow, /permissions:\n  contents: write\n  packages: write/);
@@ -64,4 +69,18 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /linux\/arm64/);
     assert.match(releaseVerifyWorkflow, /MESHDROP_DOCKER_IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}:\$\{\{ inputs\.tag \}\}-standalone/);
     assert.match(releaseVerifyWorkflow, /npm run test:docker/);
+});
+
+test("anonymous GHCR readback can run locally without mutating Docker login state", () => {
+    assert.match(packageJson, /"verify:ghcr-anonymous": "node scripts\/ghcr-anonymous-readback\.mjs"/);
+    assert.match(anonymousReadbackScript, /mkdtemp\(path\.join\(os\.tmpdir\(\), "meshdrop-ghcr-anon-"\)\)/);
+    assert.match(anonymousReadbackScript, /env: \{DOCKER_CONFIG: dockerConfig\}/);
+    assert.doesNotMatch(anonymousReadbackScript, /docker", \["logout"/);
+
+    for (const target of ["standalone", "start9", "umbrel"]) {
+        assert.match(anonymousReadbackScript, new RegExp(`"${target}"`));
+    }
+    assert.match(anonymousReadbackScript, /linux/);
+    assert.match(anonymousReadbackScript, /amd64/);
+    assert.match(anonymousReadbackScript, /arm64/);
 });
