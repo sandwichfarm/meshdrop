@@ -80,3 +80,15 @@ during the two-page transfer proof. To retry that proof in GitHub Actions withou
 
 Passing output must include `Proof backend-free-spa-nostr-webrtc:webkit: nostr delivered meshdrop-spa-proof.txt`.
 No current WebKit transfer proof is recorded.
+
+Current failed WebKit transfer attempts:
+
+- Manual CI run `28713995244` reached the forced WebKit transfer job after PR #35 and failed with WebKit page crashes
+  and transfer wait timeouts.
+- Manual CI run `28714194498` retried with separate WebKit browser processes after PR #36 and still crashed during
+  runtime or receiver hydration.
+- Manual CI run `28714388605` retried with one WebKit context and two static origins after PR #37 and still crashed
+  during sender or receiver hydration.
+
+In all three runs, the normal WebKit `SPA browser matrix` runtime smoke passed, so the open gap is the two-peer
+WebKit WebRTC transfer proof, not packaged SPA runtime boot.
