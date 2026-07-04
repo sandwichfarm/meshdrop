@@ -48,6 +48,11 @@ export function createRuntimeCapabilities(conf = {}) {
                 requiresBackend: false,
                 requiresNostrIdentity: true
             },
+            bluetooth: {
+                supported: false,
+                requiresBackend: false,
+                requiresNativeShell: true
+            },
             pollen: {
                 supported: pollenSupported,
                 requiresBackend: true,

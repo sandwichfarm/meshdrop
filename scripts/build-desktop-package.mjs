@@ -88,7 +88,8 @@ async function writeTargetManifest(stageDir, version) {
             blossom: true,
             hashtree: true,
             pollen: false,
-            fips: false
+            fips: false,
+            bluetooth: false
         },
         remainingProof: [
             "native shell build",

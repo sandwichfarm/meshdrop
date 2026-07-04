@@ -62,6 +62,11 @@ const RuntimeCapabilities = {
                         requiresBackend: false,
                         requiresNostrIdentity: true
                     },
+                    bluetooth: {
+                        supported: staticTransports.bluetooth,
+                        requiresBackend: false,
+                        requiresNativeShell: true
+                    },
                     pollen: {
                         supported: staticTransports.pollen,
                         requiresBackend: true,
@@ -117,6 +122,7 @@ const RuntimeCapabilities = {
             nostr: transports.nostr !== false,
             blossom: transports.blossom !== false,
             hashtree: transports.hashtree !== false,
+            bluetooth: transports.bluetooth === true,
             pollen: transports.pollen === true,
             fips: transports.fips === true
         };
