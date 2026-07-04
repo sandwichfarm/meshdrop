@@ -6,8 +6,8 @@ Use this runbook for the server-backed Docker target built from `Dockerfile` and
 
 1. Run `npm ci`.
 2. Run `npm run test:docker`.
-3. Confirm the smoke builds `meshdrop:smoke`, starts a container, waits for `/config`, initiates browser file transfers,
-   and removes the container after the run.
+3. Confirm the smoke builds `meshdrop:smoke`, starts a container, waits for `/config`, submits a signed admin GUI
+   settings request, initiates browser file transfers, and removes the container after the run.
 
 ## Compose Configuration
 
@@ -50,12 +50,14 @@ npm run test:docker
 ```
 
 The smoke proves container boot, `/config`, runtime capability metadata, FIPS/Pollen npub-network discovery IDs,
-signed-admin capability exposure, Pollen local status, federation metadata, served browser assets, local WebRTC transfer,
-and Pollen mesh transfer between two browser peers loaded from the container.
+signed-admin capability exposure, a signed admin GUI FIPS peer save against a container-local FIPS control mock, Pollen
+local status, federation metadata, served browser assets, local WebRTC transfer, and Pollen mesh transfer between two
+browser peers loaded from the container.
 
 ## Not proven
 
 - The Docker smoke does not prove a two-host public-relay deployment.
 - The Docker smoke proves local WebRTC and Pollen mesh transfers; run `npm run test:e2e` for the broader source-served
   transfer matrix.
-- Real shared-instance admin UAT still needs a manual signed GUI request using the deployment admin npub.
+- Real shared-instance admin UAT still needs a manual signed GUI request using the deployment admin npub and deployment
+  FIPS control plane.
