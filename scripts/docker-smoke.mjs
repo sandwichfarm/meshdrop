@@ -28,6 +28,7 @@ async function main() {
         await assertRuntimeCapabilitiesScript(baseUrl);
         await runBrowserSmoke(baseUrl);
         await assertAdminGuiDroveFipsCommands();
+        await runTwoHostRelaySmoke();
 
         console.log(`Docker smoke passed for ${image} on ${baseUrl}`);
     }
@@ -137,6 +138,15 @@ async function assertAdminGuiDroveFipsCommands() {
         commands.some(request => request.command === "connect") && commands.some(request => request.command === "restart"),
         "Admin GUI smoke did not drive FIPS connect and restart commands"
     );
+}
+
+async function runTwoHostRelaySmoke() {
+    await run("node", ["scripts/docker-two-host-relay-smoke.mjs"], {
+        env: {
+            MESHDROP_DOCKER_IMAGE: image,
+            MESHDROP_DOCKER_SKIP_BUILD: "1"
+        }
+    });
 }
 
 function run(command, args, options = {}) {

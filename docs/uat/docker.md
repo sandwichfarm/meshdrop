@@ -7,7 +7,8 @@ Use this runbook for the server-backed Docker target built from `Dockerfile` and
 1. Run `npm ci`.
 2. Run `npm run test:docker`.
 3. Confirm the smoke builds `meshdrop:smoke`, starts a container, waits for `/config`, submits a signed admin GUI
-   settings request, initiates browser file transfers, and removes the container after the run.
+   settings request, initiates browser file transfers, starts two Docker-served instances for relay transfer proof, and
+   removes the containers after the run.
 
 ## Compose Configuration
 
@@ -51,13 +52,37 @@ npm run test:docker
 
 The smoke proves container boot, `/config`, runtime capability metadata, FIPS/Pollen npub-network discovery IDs,
 signed-admin capability exposure, a signed admin GUI FIPS peer save against a container-local FIPS control mock, Pollen
-local status, federation metadata, served browser assets, local WebRTC transfer, and Pollen mesh transfer between two
-browser peers loaded from the container.
+local status, federation metadata, served browser assets, local WebRTC transfer, Pollen mesh transfer between two
+browser peers loaded from one container, and Nostr WebRTC transfer between browser peers loaded from two separate Docker
+containers through a deterministic relay.
+
+To run only the two-container relay proof:
+
+```sh
+npm run test:docker:two-host
+```
+
+Passing output must include `Proof docker-two-host-nostr-webrtc: nostr delivered meshdrop-proof-icon.svg between two Docker instances`.
+
+## Public Relay UAT
+
+The default two-host smoke uses an in-process relay so CI remains deterministic. To prove the same Docker-served
+two-host path against public Nostr infrastructure, run:
+
+```sh
+MESHDROP_DOCKER_PUBLIC_RELAY_URLS=wss://bucket.coracle.social npm run test:docker:two-host
+```
+
+Passing output must include `Proof docker-public-relay-two-host-webrtc: nostr delivered meshdrop-proof-icon.svg between two Docker instances`.
+
+For GitHub-hosted proof, dispatch the `CI` workflow manually with `docker_public_relay_urls` set to one or more relay
+URLs. The manual-only `Docker public relay UAT` job installs Chromium, builds the Docker image, starts two containers,
+and does not run on normal PR or push events.
 
 ## Not proven
 
-- The Docker smoke does not prove a two-host public-relay deployment.
-- The Docker smoke proves local WebRTC and Pollen mesh transfers; run `npm run test:e2e` for the broader source-served
-  transfer matrix.
+- The Docker smoke proves two Docker-served hosts through a deterministic relay, not a public relay deployment.
+- The Docker smoke proves local WebRTC, Pollen mesh, and deterministic two-host Nostr WebRTC transfers; run
+  `npm run test:e2e` for the broader source-served transfer matrix.
 - Real shared-instance admin UAT still needs a manual signed GUI request using the deployment admin npub and deployment
   FIPS control plane.
