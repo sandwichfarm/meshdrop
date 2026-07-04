@@ -1347,12 +1347,22 @@ class RTCPeer extends Peer {
         this._conn
             .setLocalDescription(description)
             .then(_ => this._sendSignal({ sdp: description }))
-            .catch(e => this._onError(e));
+            .catch(e => {
+                if (this._shouldIgnoreLocalDescriptionError(description, e)) return;
+                this._onError(e);
+            });
     }
 
     _onIceCandidate(event) {
         if (!event.candidate) return;
         this._sendSignal({ ice: event.candidate });
+    }
+
+    _shouldIgnoreLocalDescriptionError(description, error) {
+        if (description.type !== 'answer') return false;
+        if (error?.name !== 'InvalidStateError') return false;
+        const message = `${error?.message || ''}`;
+        return this._conn?.signalingState !== 'have-remote-offer' || message.includes('wrong state: stable');
     }
 
     onServerMessage(message) {
