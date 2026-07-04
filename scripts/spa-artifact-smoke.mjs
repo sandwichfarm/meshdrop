@@ -26,8 +26,15 @@ const browserExecutablePaths = {
 const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
 const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
-const smokeAttempts = browserTypeName === "webkit" ? 3 : 1;
 const webkitTransferRequested = process.env.MESHDROP_SPA_WEBKIT_TRANSFER === "1";
+const webkitTransferStrategies = webkitTransferRequested && browserTypeName === "webkit"
+    ? [
+        {name: "one-context-two-origins", singleBrowserContext: true},
+        {name: "two-contexts-two-origins", singleBrowserContext: false},
+        {name: "two-contexts-two-origins", singleBrowserContext: false}
+    ]
+    : [{name: "default", singleBrowserContext: false}];
+const smokeAttempts = webkitTransferStrategies.length;
 const runsBackendFreeTransferProof = browserTypeName !== "webkit" || webkitTransferRequested;
 const publicRelayUrls = parseRelayUrls(process.env.MESHDROP_SPA_PUBLIC_RELAY_URLS || "");
 
@@ -59,14 +66,16 @@ async function main() {
     try {
         const playwright = await loadPlaywright(playwrightModulePath);
         const browserType = playwright[browserTypeName];
-        await retrySmoke(async () => {
+        await retrySmoke(async attempt => {
             const browser = await launchBrowser(browserType);
+            const strategy = webkitTransferStrategies[Math.min(attempt - 1, webkitTransferStrategies.length - 1)];
             try {
                 await runRuntimeCapabilityProof(browser, server.port, relayUrls);
                 if (runsBackendFreeTransferProof) {
                     await runBackendFreeTransferProof(browser, server.port, relayUrls, {
                         peerBPort: peerBServer?.port,
-                        singleBrowserContext: browserTypeName === "webkit" && webkitTransferRequested
+                        singleBrowserContext: strategy.singleBrowserContext,
+                        strategyName: strategy.name
                     });
                 } else {
                     console.log(
@@ -100,7 +109,7 @@ async function retrySmoke(run) {
     let lastError = null;
     for (let attempt = 1; attempt <= smokeAttempts; attempt++) {
         try {
-            return await run();
+            return await run(attempt);
         } catch (error) {
             lastError = error;
             if (attempt === smokeAttempts) break;
@@ -147,8 +156,8 @@ async function runRuntimeCapabilityProof(browser, port, relayUrls) {
 }
 
 async function runBackendFreeTransferProof(browser, port, relayUrls, options = {}) {
-    if (options.singleBrowserContext) {
-        console.log("WebKit transfer UAT: using one browser context with two static origins");
+    if (options.strategyName && options.strategyName !== "default") {
+        console.log(`WebKit transfer UAT strategy: ${options.strategyName}`);
     }
 
     const contextA = await browser.newContext({serviceWorkers: "block"});
