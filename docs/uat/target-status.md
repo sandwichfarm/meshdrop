@@ -6,7 +6,7 @@ This ledger prevents release or UAT notes from overstating platform support.
 |--------|--------|---------------|---------------------------------|
 | SPA | Chromium/Firefox/WebKit backend-free transfer smoke exists; Chromium/Firefox public relay UAT exists | `SPA browser matrix` CI job; `npm run test:spa-artifact`; manual run `28713488687` public relay jobs against `wss://bucket.coracle.social`; manual run `28716511864` WebKit transfer UAT | None recorded for current SPA runbook |
 | Docker | Container admin, local, Pollen, deterministic two-host relay, public relay two-host UAT, and deployed-admin UAT exists | `npm run test:docker`; `npm run test:docker:two-host`; `npm run test:docker:admin`; manual run `28715209725` Docker public relay UAT against `wss://bucket.coracle.social` | None recorded for Docker |
-| Start9 | Package source smoke exists | `npm run build:start9`; package test | `.s9pk` build, device install, and transfer UAT |
+| Start9 | Package source typecheck exists | `npm run build:start9`; `node --test test/start9-package.test.js`; generated source `npm run check`; `make` reaches `start-cli s9pk pack` and is blocked by missing local `start-cli` | `.s9pk` build with `start-cli`, device install, and transfer UAT |
 | Umbrel | Package artifact smoke exists | `npm run build:umbrel`; package test | Umbrel device install and transfer UAT |
 | Desktop Native | Not implemented | None | Native shell selection, build target, runtime capability manifest, and transfer UAT |
 | iOS | Not implemented | None | Mobile runtime design, build target, platform transport negotiation, and transfer UAT |

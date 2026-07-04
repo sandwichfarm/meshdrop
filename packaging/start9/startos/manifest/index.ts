@@ -1,6 +1,6 @@
 import { setupManifest } from "@start9labs/start-sdk";
 
-import { short, long } from "./i18n";
+import { short, long } from "./i18n.js";
 
 export const manifest = setupManifest({
   id: "meshdrop",

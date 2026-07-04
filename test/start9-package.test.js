@@ -1,10 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {execFile} from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import {promisify} from "node:util";
 
 import {buildStart9Package, listTarEntries, readTarEntry} from "../scripts/build-start9-package.mjs";
+
+const run = promisify(execFile);
 
 test("Start9 package builder creates SDK source artifact", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-start9-test-"));
@@ -21,6 +25,7 @@ test("Start9 package builder creates SDK source artifact", async () => {
         assert.equal(result.version, "0.0.0-test");
         for (const entry of [
             "Makefile",
+            "s9pk.mk",
             "package.json",
             "instructions.md",
             "README.md",
@@ -38,6 +43,9 @@ test("Start9 package builder creates SDK source artifact", async () => {
         assert.match(packageJson, /"@start9labs\/start-sdk": "1\.5\.3"/);
         assert.match(packageJson, /"typescript": "5\.8\.3"/);
 
+        const makefile = await readTarEntry(result.artifactPath, `${prefix}/Makefile`);
+        assert.match(makefile, /include s9pk\.mk/);
+
         const manifest = await readTarEntry(result.artifactPath, `${prefix}/startos/manifest/index.ts`);
         assert.match(manifest, /id: "meshdrop"/);
         assert.match(manifest, /dockerTag: "ghcr\.io\/sandwichfarm\/meshdrop:v0\.0\.0-start9"/);
@@ -54,6 +62,27 @@ test("Start9 package builder creates SDK source artifact", async () => {
         assert.match(target, /"target": "start9"/);
         assert.match(target, /"s9pkBuilt": false/);
         assert.match(target, /"staticRooms": false/);
+    }
+    finally {
+        await fs.rm(tempDir, {recursive: true, force: true});
+    }
+});
+
+test("Start9 generated package source typechecks against declared SDK dependency", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-start9-typecheck-"));
+
+    try {
+        const result = await buildStart9Package({
+            version: "0.0.0 typecheck",
+            outDir: tempDir,
+            image: "ghcr.io/sandwichfarm/meshdrop:v0.0.0-start9"
+        });
+        const prefix = "meshdrop-start9-0.0.0-typecheck";
+        const packageDir = path.join(tempDir, prefix);
+
+        await run("tar", ["-xzf", result.artifactPath, "-C", tempDir]);
+        await run("npm", ["install", "--ignore-scripts", "--no-audit", "--fund=false"], {cwd: packageDir});
+        await run("npm", ["run", "check"], {cwd: packageDir});
     }
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});

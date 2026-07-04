@@ -1,5 +1,5 @@
-import { sdk } from "./sdk";
-import { uiPort, pollenPort } from "./utils";
+import { sdk } from "./sdk.js";
+import { uiPort, pollenPort } from "./utils.js";
 
 export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
   const web = sdk.MultiHost.of(effects, "web");

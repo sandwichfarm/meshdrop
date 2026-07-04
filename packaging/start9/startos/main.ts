@@ -1,9 +1,9 @@
-import { sdk } from "./sdk";
-import { meshdropImageId, uiPort } from "./utils";
+import { sdk } from "./sdk.js";
+import { meshdropImageId, uiPort } from "./utils.js";
 
 export const main = sdk.setupMain(async ({ effects }) => {
   return sdk.Daemons.of(effects).addDaemon("meshdrop", {
-    subcontainer: sdk.SubContainer.of(
+    subcontainer: await sdk.SubContainer.of(
       effects,
       { imageId: meshdropImageId },
       sdk.Mounts.of().mountVolume({
