@@ -31,10 +31,12 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-release-multiarch-images` | complete | Release workflow test; UAT guard; YAML parse; `npm test`; diff gates |
 | 2026-07-04 | `20260704-release-verification-workflow` | complete | Release workflow test; UAT guard; YAML parse; dispatch run `28711452622` |
 | 2026-07-04 | `20260704-release-v010-readback` | complete | Release `v0.1.0`; release run `28711136765`; verification run `28711452622` |
+| 2026-07-04 | `20260704-spa-browser-matrix` | complete | PR #29; master CI run `28712787297`; Chromium/Firefox SPA transfer proof; WebKit runtime proof |
+| 2026-07-04 | `20260704-docker-transfer-timeout-fix` | complete | PR #30; master CI run `28713014340`; Docker smoke passed |
 
 ## Active Quick Task
 
-- `20260704-spa-browser-matrix`
+- None. Next work should start from the highest-risk remaining target-status gap.
 
 ---
 *Initialized: 2026-07-04 from goal objective.*
