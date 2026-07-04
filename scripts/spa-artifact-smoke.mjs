@@ -52,6 +52,7 @@ async function main() {
 
     const root = path.join(unpackDir, result.prefix);
     const server = await startStaticServer(root);
+    const peerBServer = webkitTransferRequested ? await startStaticServer(root) : null;
     const relay = publicRelayUrls.length ? null : await startFakeRelay();
     const relayUrls = publicRelayUrls.length ? publicRelayUrls : [relay.url];
 
@@ -64,8 +65,8 @@ async function main() {
                 await runRuntimeCapabilityProof(browser, server.port, relayUrls);
                 if (runsBackendFreeTransferProof) {
                     await runBackendFreeTransferProof(browser, server.port, relayUrls, {
-                        browserType,
-                        separateBrowserProcesses: browserTypeName === "webkit" && webkitTransferRequested
+                        peerBPort: peerBServer?.port,
+                        singleBrowserContext: browserTypeName === "webkit" && webkitTransferRequested
                     });
                 } else {
                     console.log(
@@ -83,6 +84,7 @@ async function main() {
     }
     finally {
         if (relay) await new Promise(resolve => relay.close(resolve));
+        if (peerBServer) await new Promise(resolve => peerBServer.close(resolve));
         await new Promise(resolve => server.close(resolve));
         await fs.rm(tempDir, {recursive: true, force: true});
     }
@@ -145,13 +147,12 @@ async function runRuntimeCapabilityProof(browser, port, relayUrls) {
 }
 
 async function runBackendFreeTransferProof(browser, port, relayUrls, options = {}) {
-    const peerBBrowser = options.separateBrowserProcesses ? await launchBrowser(options.browserType) : browser;
-    if (options.separateBrowserProcesses) {
-        console.log("WebKit transfer UAT: using separate browser processes for sender and receiver");
+    if (options.singleBrowserContext) {
+        console.log("WebKit transfer UAT: using one browser context with two static origins");
     }
 
     const contextA = await browser.newContext({serviceWorkers: "block"});
-    const contextB = await peerBBrowser.newContext({serviceWorkers: "block"});
+    const contextB = options.singleBrowserContext ? contextA : await browser.newContext({serviceWorkers: "block"});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const identities = createProofIdentityPair();
@@ -171,7 +172,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrls, options = {
         ]);
         await Promise.all([
             pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
-            pageB.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"})
+            pageB.goto(`http://127.0.0.1:${options.peerBPort || port}`, {waitUntil: "domcontentloaded"})
         ]);
         await Promise.all([waitForSpaHydration(pageA, "sender"), waitForSpaHydration(pageB, "receiver")]);
         await Promise.all([connectNostr(pageA), connectNostr(pageB)]);
@@ -197,8 +198,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrls, options = {
         console.log(`Proof ${proofName}:${browserTypeName}: nostr delivered meshdrop-spa-proof.txt`);
     }
     finally {
-        await Promise.allSettled([contextA.close(), contextB.close()]);
-        if (peerBBrowser !== browser) await peerBBrowser.close();
+        await Promise.allSettled(contextA === contextB ? [contextA.close()] : [contextA.close(), contextB.close()]);
     }
 }
 
