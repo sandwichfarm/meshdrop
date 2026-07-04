@@ -17,5 +17,12 @@
 
 ## Remaining
 
-- The workflow must be merged to `master`, then dispatched for `v0.1.0`.
 - Local GHCR readback is still blocked by this host token lacking `read:packages`.
+
+## Live Dispatch
+
+- PR #27 merged to `master` at `89b889ee5940a728c3aa8e61dbf383a4fa26f406`.
+- Master CI run `28711396305` passed after merge.
+- `release-verify.yml` run `28711452622` passed for `v0.1.0`.
+- The verification run checked GitHub release assets, GHCR `linux/amd64` and `linux/arm64` manifests, pulled target
+  metadata for `standalone`, `start9`, and `umbrel`, and Docker transfer smoke against the pulled standalone release image.

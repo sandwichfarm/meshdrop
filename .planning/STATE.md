@@ -29,7 +29,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-umbrel-package-artifact` | complete | Umbrel package build/test; `npm test`; diff/slop gates |
 | 2026-07-04 | `20260704-start9-package-source-artifact` | complete | Start9 source build/test; `npm test`; diff/slop gates |
 | 2026-07-04 | `20260704-release-multiarch-images` | complete | Release workflow test; UAT guard; YAML parse; `npm test`; diff gates |
-| 2026-07-04 | `20260704-release-verification-workflow` | complete | Release workflow test; UAT guard; YAML parse; pending live dispatch after merge |
+| 2026-07-04 | `20260704-release-verification-workflow` | complete | Release workflow test; UAT guard; YAML parse; dispatch run `28711452622` |
+| 2026-07-04 | `20260704-release-v010-readback` | complete | Release `v0.1.0`; release run `28711136765`; verification run `28711452622` |
 
 ## Active Quick Task
 
