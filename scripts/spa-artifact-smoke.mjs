@@ -44,13 +44,13 @@ async function main() {
         const launchOptions = {headless: true};
         if (browserTypeName === "chromium" && chromiumPath) launchOptions.executablePath = chromiumPath;
         browser = await browserType.launch(launchOptions);
-        const page = await browser.newPage();
+        const context = await browser.newContext({serviceWorkers: "block"});
+        const page = await context.newPage();
         const pageErrors = watchPage(`spa-runtime:${browserTypeName}`, page);
         await addSpaInitScript(page, "runtime", relay.url);
 
         await page.goto(`http://127.0.0.1:${server.port}`, {waitUntil: "domcontentloaded"});
-        await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager);
-        await page.waitForFunction(() => globalThis.__meshdropE2E?.configLoaded);
+        await waitForInitialSpaState(page, pageErrors);
 
         const state = await page.evaluate(() => ({
             target: globalThis.__meshdropE2E.config.capabilities.runtime.target,
@@ -68,6 +68,7 @@ async function main() {
         assert(state.pollenHidden === true, "Pollen transfer control must be hidden");
         assert(state.serverSettings === false, "Server settings must be unsupported");
         assert(pageErrors.length === 0, `SPA smoke page errors:\n${pageErrors.join("\n")}`);
+        await context.close();
 
         await runBackendFreeTransferProof(browser, server.port, relay.url);
 
@@ -204,6 +205,8 @@ async function addSpaInitScript(page, identityName, relayUrl) {
 
 function watchPage(name, page) {
     const pageErrors = [];
+    page.on("crash", () => pageErrors.push(`${name}: page crashed`));
+    page.on("close", () => pageErrors.push(`${name}: page closed before smoke completed`));
     page.on("pageerror", error => pageErrors.push(`${name}: ${error.stack || error.message}`));
     page.on("console", message => {
         if (message.type() !== "error") return;
@@ -212,6 +215,15 @@ function watchPage(name, page) {
         pageErrors.push(`${name} console error: ${text}`);
     });
     return pageErrors;
+}
+
+async function waitForInitialSpaState(page, pageErrors) {
+    try {
+        await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager);
+        await page.waitForFunction(() => globalThis.__meshdropE2E?.configLoaded);
+    } catch (error) {
+        throw new Error(`${error.message}\n${pageErrors.join("\n")}`, {cause: error});
+    }
 }
 
 async function waitForSpaHydration(page) {

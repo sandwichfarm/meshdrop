@@ -41,6 +41,7 @@ test("SPA artifact smoke proves backend-free Nostr WebRTC transfer", async () =>
     assert.match(smoke, /PLAYWRIGHT_BROWSER/);
     assert.match(smoke, /browserTypeName/);
     assert.match(smoke, /\[\"chromium\", "firefox", "webkit"\]/);
+    assert.match(smoke, /newContext\(\{serviceWorkers: "block"\}\)/);
     assert.match(smoke, /backend-free-spa-nostr-webrtc/);
     assert.match(smoke, /startFakeRelay/);
     assert.match(smoke, /meshdropNostrMesh\.connect/);
