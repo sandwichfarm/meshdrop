@@ -2,6 +2,7 @@
 # This file is imported by ./Makefile. Make edits there
 
 PACKAGE_ID ?= $(shell awk -F"'" '/id:/ {print $$2}' startos/manifest/index.ts)
+export PATH := $(CURDIR)/bin:$(PATH)
 INGREDIENTS := $(shell start-cli s9pk list-ingredients 2>/dev/null)
 # Resolve the actual git dir so this works inside git worktrees, where .git
 # is a file pointing at <main>/.git/worktrees/<name> rather than a directory.
