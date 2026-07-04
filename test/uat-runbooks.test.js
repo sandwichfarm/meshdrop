@@ -42,14 +42,17 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         assert.match(releaseTargets, new RegExp(`MESHDROP_TARGET=${target}`));
         assert.match(releaseTargets, new RegExp(`:${target}`));
     }
+    assert.match(releaseTargets, /multi-architecture manifests for `linux\/amd64` and `linux\/arm64`/);
+    assert.match(releaseTargets, /docker buildx imagetools inspect/);
     assert.match(releaseTargets, /Start9 source tarball/);
     assert.match(releaseTargets, /Umbrel package tarball/);
     assert.match(releaseTargets, /Not proven/);
 
     const targetStatus = readDoc("docs/uat/target-status.md");
-    for (const target of ["SPA", "Docker", "Start9", "Umbrel", "Desktop Native", "iOS", "Android"]) {
+    for (const target of ["SPA", "Docker", "Start9", "Umbrel", "Desktop Native", "iOS", "Android", "Release Images"]) {
         assert.match(targetStatus, new RegExp(`\\| ${target} \\|`));
     }
+    assert.match(targetStatus, /\| Release Images \| Multi-arch workflow configured \|/);
     assert.match(targetStatus, /\| Desktop Native \| Not implemented \|/);
     assert.match(targetStatus, /\| iOS \| Not implemented \|/);
     assert.match(targetStatus, /\| Android \| Not implemented \|/);
