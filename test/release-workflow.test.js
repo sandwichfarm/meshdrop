@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const releaseWorkflow = fs.readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+const releaseVerifyWorkflowUrl = new URL("../.github/workflows/release-verify.yml", import.meta.url);
 const duplicateGhcrWorkflow = new URL("../.github/workflows/github-image.yml", import.meta.url);
 const dockerfile = fs.readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
 
@@ -38,4 +39,20 @@ test("Dockerfile records the image target inside released containers", () => {
 
 test("release tags use one workflow for GitHub release artifacts and GHCR images", () => {
     assert.equal(fs.existsSync(duplicateGhcrWorkflow), false);
+});
+
+test("release verification workflow reads back assets, manifests, and pulled standalone smoke", () => {
+    assert.equal(fs.existsSync(releaseVerifyWorkflowUrl), true);
+
+    const releaseVerifyWorkflow = fs.readFileSync(releaseVerifyWorkflowUrl, "utf8");
+    assert.match(releaseVerifyWorkflow, /workflow_dispatch:/);
+    assert.match(releaseVerifyWorkflow, /tag:/);
+    assert.match(releaseVerifyWorkflow, /permissions:\n  contents: read\n  packages: read/);
+    assert.match(releaseVerifyWorkflow, /ref: \$\{\{ inputs\.tag \}\}/);
+    assert.match(releaseVerifyWorkflow, /gh release view "\$\{tag\}"/);
+    assert.match(releaseVerifyWorkflow, /docker buildx imagetools inspect "\$\{image\}"/);
+    assert.match(releaseVerifyWorkflow, /linux\/amd64/);
+    assert.match(releaseVerifyWorkflow, /linux\/arm64/);
+    assert.match(releaseVerifyWorkflow, /MESHDROP_DOCKER_IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}:\$\{\{ inputs\.tag \}\}-standalone/);
+    assert.match(releaseVerifyWorkflow, /npm run test:docker/);
 });

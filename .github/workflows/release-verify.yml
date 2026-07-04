@@ -1,0 +1,117 @@
+name: Release Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Alpha release tag to verify, for example v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: release-verify-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Release readback (${{ inputs.tag }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Login to GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Verify GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag }}"
+          case "${tag}" in
+            v0.*.*) ;;
+            *) echo "expected alpha tag v0.*.*, got ${tag}" >&2; exit 1 ;;
+          esac
+          version="${tag#v}"
+
+          expected="$(mktemp)"
+          actual="$(mktemp)"
+          {
+            echo "SHA256SUMS"
+            echo "meshdrop-node-${version}.tar.gz"
+            echo "meshdrop-source-${version}.tar.gz"
+            echo "meshdrop-spa-${version}.tar.gz"
+            echo "meshdrop-start9-${version}.tar.gz"
+            echo "meshdrop-umbrel-${version}.tar.gz"
+          } | sort > "${expected}"
+
+          gh release view "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --json assets \
+            --jq '.assets[].name' \
+            | sort > "${actual}"
+
+          diff -u "${expected}" "${actual}"
+          test "$(gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" --json isPrerelease --jq '.isPrerelease')" = "true"
+
+      - name: Verify GHCR multi-arch manifests
+        run: |
+          set -euo pipefail
+          image_base="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="${{ inputs.tag }}"
+          version="${tag#v}"
+
+          for target in standalone start9 umbrel; do
+            for prefix in "${tag}" "${version}"; do
+              image="${image_base}:${prefix}-${target}"
+              echo "Inspecting ${image}"
+              manifest="$(docker buildx imagetools inspect "${image}")"
+              grep -q "linux/amd64" <<< "${manifest}"
+              grep -q "linux/arm64" <<< "${manifest}"
+            done
+          done
+
+      - name: Verify pulled target metadata
+        run: |
+          set -euo pipefail
+          image_base="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="${{ inputs.tag }}"
+
+          for target in standalone start9 umbrel; do
+            image="${image_base}:${tag}-${target}"
+            docker pull "${image}"
+            test "$(docker image inspect "${image}" \
+              --format '{{ index .Config.Labels "farm.sandwich.meshdrop.target" }}')" = "${target}"
+            docker image inspect "${image}" \
+              --format '{{ range .Config.Env }}{{ println . }}{{ end }}' \
+              | grep -qx "MESHDROP_TARGET=${target}"
+          done
+
+      - name: Run Docker smoke against pulled standalone image
+        env:
+          MESHDROP_DOCKER_IMAGE: ghcr.io/${{ github.repository }}:${{ inputs.tag }}-standalone
+        run: npm run test:docker

@@ -62,10 +62,18 @@ Repeat with `target=start9` and `target=umbrel`.
    MESHDROP_DOCKER_IMAGE=ghcr.io/sandwichfarm/meshdrop:v0.x.y-standalone npm run test:docker
    ```
 
+8. Dispatch the repo-owned release verification workflow so GHCR readback runs with GitHub Actions package permissions:
+
+   ```sh
+   gh workflow run release-verify.yml --repo sandwichfarm/meshdrop --ref master -f tag=v0.x.y
+   gh run watch <run-id> --repo sandwichfarm/meshdrop --exit-status
+   ```
+
 ## Not proven
 
 - No release is proven until a real `v0.*.*` tag runs and the GitHub release plus GHCR tags are read back.
 - The release workflow is configured for multi-architecture GHCR manifests, but no multi-arch release is proven until
-  `docker buildx imagetools inspect` confirms the published tags.
+  `docker buildx imagetools inspect` confirms the published tags. If the local token lacks `read:packages`, use
+  `release-verify.yml` for that readback.
 - The Start9 package-source artifact is not complete until `.s9pk` build, device install, and transfer UAT pass.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
