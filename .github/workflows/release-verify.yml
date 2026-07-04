@@ -117,21 +117,9 @@ jobs:
       - name: Verify anonymous GHCR manifests
         run: |
           set -euo pipefail
-          docker logout ghcr.io || true
-
           image_base="ghcr.io/${GITHUB_REPOSITORY,,}"
           tag="${{ inputs.tag }}"
-          version="${tag#v}"
-
-          for target in standalone start9 umbrel; do
-            for prefix in "${tag}" "${version}"; do
-              image="${image_base}:${prefix}-${target}"
-              echo "Inspecting ${image} without GHCR login"
-              manifest="$(docker buildx imagetools inspect "${image}")"
-              grep -q "linux/amd64" <<< "${manifest}"
-              grep -q "linux/arm64" <<< "${manifest}"
-            done
-          done
+          MESHDROP_GHCR_IMAGE_BASE="${image_base}" npm run verify:ghcr-anonymous -- "${tag}"
 
       - name: Run Docker smoke against pulled standalone image
         env:
