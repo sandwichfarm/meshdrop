@@ -511,6 +511,7 @@ async function runFederatedFipsWebRtcScenario(browser, relayPort, blossomPort, p
             const [stateA, stateB] = await Promise.all([debugPageState(pageA), debugPageState(pageB)]);
             throw new Error(`${error.message}\nserverA=${JSON.stringify(stateA)}\nserverB=${JSON.stringify(stateB)}`);
         }
+        await waitForConnectedPeer(pageB, "fips");
         await sendProofIcon(pageA, peerId, "fips");
 
         const received = await waitForReceivedFiles(pageB, 1);
