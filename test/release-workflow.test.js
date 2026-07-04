@@ -77,6 +77,11 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /linux\/arm64/);
     assert.match(releaseVerifyWorkflow, /MESHDROP_DOCKER_IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}:\$\{\{ inputs\.tag \}\}-standalone/);
     assert.match(releaseVerifyWorkflow, /npm run test:docker/);
+    assert.ok(
+        releaseVerifyWorkflow.indexOf("Run Docker smoke against pulled standalone image")
+            < releaseVerifyWorkflow.indexOf("Verify anonymous GHCR manifests"),
+        "release verifier should collect Docker smoke proof before the anonymous GHCR visibility gate"
+    );
 });
 
 test("anonymous GHCR readback can run locally without mutating Docker login state", () => {
