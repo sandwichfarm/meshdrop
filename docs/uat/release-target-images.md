@@ -34,8 +34,9 @@ Repeat with `target=start9` and `target=umbrel`.
 
 1. Push an alpha tag that matches `v0.*.*`.
 2. Wait for the `Release` workflow to finish.
-3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Desktop Native source tarball, iOS source
-   tarball, Android source tarball, Start9 source tarball, Umbrel package tarball, and `SHA256SUMS` artifacts.
+3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Desktop Native source tarball, Desktop Native
+   Linux shell tarball, iOS source tarball, Android source tarball, Start9 source tarball, Umbrel package tarball, and
+   `SHA256SUMS` artifacts.
 4. Confirm GHCR has both tag-preserving and version-only tags for each target:
    - `v0.x.y-standalone` and `0.x.y-standalone`.
    - `v0.x.y-start9` and `0.x.y-start9`.
@@ -86,8 +87,9 @@ Repeat with `target=start9` and `target=umbrel`.
   `ghcr.io/sandwichfarm/meshdrop:v0.1.2-standalone`.
 - The local GitHub token lacks `read:packages`, so this session cannot inspect package visibility through the Packages
   REST API. Making `ghcr.io/sandwichfarm/meshdrop` public is still required before anonymous manifest readback can pass.
-- The Desktop Native, iOS, and Android source artifacts are not complete native targets until native shells, installable
-  packages, and transfer UAT pass.
+- The iOS and Android source artifacts are not complete native targets until native shells, installable packages, and
+  transfer UAT pass.
+- The Desktop Native Linux shell artifact is not complete until native transfer UAT and installer/signing proof pass.
 - The Start9 package is not complete until device install and transfer UAT pass on StartOS.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
 
@@ -102,6 +104,8 @@ Repeat with `target=start9` and `target=umbrel`.
   `meshdrop-ios-0.1.2.tar.gz`, `meshdrop-node-0.1.2.tar.gz`, `meshdrop-source-0.1.2.tar.gz`,
   `meshdrop-spa-0.1.2.tar.gz`, `meshdrop-start9-0.1.2.tar.gz`, `meshdrop-umbrel-0.1.2.tar.gz`,
   and `SHA256SUMS`.
+- Desktop Native Linux shell artifacts are added after `v0.1.2`; the next release verification must include
+  `meshdrop-desktop-linux-<version>.tar.gz`.
 - GHCR target image jobs passed for `start9`, `standalone`, and `umbrel`.
 - GHCR tags checked by `release-verify.yml`: `v0.1.2-standalone`, `0.1.2-standalone`, `v0.1.2-start9`,
   `0.1.2-start9`, `v0.1.2-umbrel`, and `0.1.2-umbrel`.

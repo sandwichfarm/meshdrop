@@ -1,10 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {execFile} from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import {promisify} from "node:util";
 
-import {buildDesktopPackage, listTarEntries, readTarEntry} from "../scripts/build-desktop-package.mjs";
+import {
+    buildDesktopNativePackage,
+    buildDesktopPackage,
+    listTarEntries,
+    readTarEntry
+} from "../scripts/build-desktop-package.mjs";
+
+const execFileAsync = promisify(execFile);
 
 test("Desktop package builder creates source artifact with target metadata", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-desktop-test-"));
@@ -52,6 +61,60 @@ test("Desktop package builder creates source artifact with target metadata", asy
 
         const readme = await readTarEntry(result.artifactPath, `${prefix}/README-DESKTOP.md`);
         assert.match(readme, /not a native installer or executable/i);
+    }
+    finally {
+        await fs.rm(tempDir, {recursive: true, force: true});
+    }
+});
+
+test("Desktop native package builder compiles a Linux shell artifact", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-desktop-native-test-"));
+
+    try {
+        const result = await buildDesktopNativePackage({
+            version: "0.0.0 native",
+            outDir: tempDir,
+            env: {
+                MESH_DROP_BUILD_ID: "unit"
+            }
+        });
+        const entries = await listTarEntries(result.artifactPath);
+        const prefix = "meshdrop-desktop-linux-0.0.0-native";
+        const extractDir = path.join(tempDir, "extract");
+
+        assert.equal(result.version, "0.0.0-native");
+        assert.equal(result.nativeShellBuilt, true);
+        assert(entries.includes(`${prefix}/app/index.html`));
+        assert(entries.includes(`${prefix}/bin/meshdrop-desktop`));
+        assert(entries.includes(`${prefix}/src/meshdrop-desktop.c`));
+        assert(entries.includes(`${prefix}/meshdrop-target.json`));
+        assert(entries.includes(`${prefix}/README-DESKTOP.md`));
+        assert(entries.includes(`${prefix}/UAT-DESKTOP.md`));
+
+        const manifest = JSON.parse(await readTarEntry(result.artifactPath, `${prefix}/meshdrop-target.json`));
+        assert.equal(manifest.target, "desktop");
+        assert.equal(manifest.nativeShellBuilt, true);
+        assert.equal(manifest.runtime.platform, "desktop");
+        assert.equal(manifest.runtime.hasBackend, false);
+        assert.equal(manifest.nativeShell.executable, "bin/meshdrop-desktop");
+        assert.equal(manifest.nativeShell.toolkit, "gtk4-webkitgtk");
+        assert.equal(manifest.transports.webrtc, true);
+        assert.equal(manifest.transports.nostr, true);
+        assert.deepEqual(manifest.remainingProof, [
+            "native desktop WebRTC transfer UAT",
+            "desktop installer or signed binary"
+        ]);
+
+        await fs.mkdir(extractDir);
+        await execFileAsync("tar", ["-xzf", result.artifactPath, "-C", extractDir]);
+        const binary = path.join(extractDir, prefix, "bin", "meshdrop-desktop");
+        const appDir = path.join(extractDir, prefix, "app");
+        const {stdout} = await execFileAsync(binary, ["--meshdrop-print-config", "--app-dir", appDir]);
+        const smoke = JSON.parse(stdout);
+
+        assert.equal(smoke.target, "desktop");
+        assert.equal(smoke.nativeShellBuilt, true);
+        assert.equal(smoke.appIndexExists, true);
     }
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});

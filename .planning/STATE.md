@@ -57,6 +57,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `260704-release-auto-verify` | complete | Tagged alpha releases call reusable release readback after GHCR target images publish; focused red/green test; YAML parse; `npm test`; changed-code slop clean |
 | 2026-07-04 | `260704-release-smoke-before-anon` | complete | Release verifier runs Docker smoke before anonymous GHCR visibility gate; focused red/green test; YAML parse; `npm test`; changed-code slop clean |
 | 2026-07-05 | `20260705-release-v012-status` | complete | Release UAT docs now point at `v0.1.2` assets, GHCR target images, Docker smoke proof, and anonymous GHCR blocker; focused red/green UAT guard |
+| 2026-07-05 | `20260705-desktop-native-linux-shell` | complete | Linux GTK/WebKit shell artifact builds and config-smokes; release workflow will include `meshdrop-desktop-linux`; native transfer UAT still open |
 
 ## Active Quick Task
 
