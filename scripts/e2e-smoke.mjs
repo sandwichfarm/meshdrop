@@ -575,7 +575,7 @@ async function leaveIpRoom(page) {
 async function disableLocalDiscovery(page) {
     await page.evaluate(() => globalThis.meshdropLocalDiscovery.setEnabled(false));
     try {
-        await page.waitForFunction(() => !document.querySelector("x-peer.type-ip"), {timeout: 10000});
+        await page.waitForFunction(() => !document.querySelector("x-peer.type-ip"), undefined, {timeout: 10000});
     } catch (error) {
         const state = await debugPageState(page);
         throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);

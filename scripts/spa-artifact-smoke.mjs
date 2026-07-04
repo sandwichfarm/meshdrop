@@ -220,8 +220,8 @@ function watchPage(name, page) {
 
 async function waitForInitialSpaState(page, pageErrors) {
     try {
-        await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager, {timeout: spaHydrationTimeoutMs});
-        await page.waitForFunction(() => globalThis.__meshdropE2E?.configLoaded, {timeout: spaHydrationTimeoutMs});
+        await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager, undefined, {timeout: spaHydrationTimeoutMs});
+        await page.waitForFunction(() => globalThis.__meshdropE2E?.configLoaded, undefined, {timeout: spaHydrationTimeoutMs});
     } catch (error) {
         throw new Error(`${error.message}\n${pageErrors.join("\n")}`, {cause: error});
     }
@@ -234,7 +234,7 @@ async function waitForSpaHydration(page, role) {
             && globalThis.__meshdropE2E?.peersManager
             && globalThis.meshdropNostrIdentity
             && globalThis.meshdropNostrMesh
-        ), {timeout: spaHydrationTimeoutMs});
+        ), undefined, {timeout: spaHydrationTimeoutMs});
     } catch (error) {
         throw new Error(`${role} SPA hydration failed: ${error.message}\n${JSON.stringify(await safeDebugPageState(page), null, 2)}`, {
             cause: error
@@ -286,7 +286,7 @@ async function waitForReceivedFiles(page) {
             const batch = globalThis.__meshdropE2E.received.at(-1);
             if (!batch || batch.files.length !== 1) return null;
             return batch.files;
-        }, {timeout: 45000});
+        }, undefined, {timeout: 45000});
         return handle.jsonValue();
     } catch (error) {
         throw new Error(`${error.message}\n${JSON.stringify(await safeDebugPageState(page), null, 2)}`, {cause: error});
