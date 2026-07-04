@@ -40,3 +40,22 @@ only because Playwright WebKit crashes during the two-page WebRTC transfer proof
 
 CI runs the `SPA browser matrix` job for Chromium, Firefox, and WebKit. Treat the Chromium and Firefox legs as transfer
 proof and the WebKit leg as no-backend packaged-runtime proof.
+
+## Public Relay UAT
+
+The default automated smoke uses an in-process relay so CI remains deterministic. To prove the backend-free SPA path
+against public Nostr infrastructure, run the same artifact smoke with explicit relay URLs:
+
+```sh
+MESHDROP_SPA_PUBLIC_RELAY_URLS=wss://bucket.coracle.social \
+  PLAYWRIGHT_MODULE_PATH= \
+  PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium \
+  PLAYWRIGHT_BROWSER=chromium \
+  npm run test:spa-artifact
+```
+
+Passing output must include `Proof public-spa-nostr-webrtc:<browser>: nostr delivered meshdrop-spa-proof.txt`.
+
+For GitHub-hosted proof, dispatch the `CI` workflow manually with `spa_public_relay_urls` set to one or more relay URLs.
+The manual-only `SPA public relay UAT` job runs Chromium and Firefox, installs the matching Playwright browser, and
+does not run on normal PR or push events.

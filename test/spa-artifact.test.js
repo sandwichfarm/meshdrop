@@ -37,14 +37,19 @@ test("SPA artifact builder packages public assets with target metadata", async (
 
 test("SPA artifact smoke proves runtime support plus browser-backed WebRTC transfer", async () => {
     const smoke = await fs.readFile(new URL("../scripts/spa-artifact-smoke.mjs", import.meta.url), "utf8");
+    const support = await fs.readFile(new URL("../scripts/spa-smoke-support.mjs", import.meta.url), "utf8");
     const ciWorkflow = await fs.readFile(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 
     assert.match(smoke, /PLAYWRIGHT_BROWSER/);
+    assert.match(smoke, /PLAYWRIGHT_FIREFOX_PATH/);
     assert.match(smoke, /browserTypeName/);
     assert.match(smoke, /\[\"chromium\", "firefox", "webkit"\]/);
     assert.match(smoke, /newContext\(\{serviceWorkers: "block"\}\)/);
     assert.match(smoke, /backend-free-spa-nostr-webrtc/);
     assert.match(smoke, /startFakeRelay/);
+    assert.match(smoke, /MESHDROP_SPA_PUBLIC_RELAY_URLS/);
+    assert.match(smoke, /installProofSigner/);
+    assert.match(smoke, /public-spa-nostr-webrtc/);
     assert.match(smoke, /meshdropNostrMesh\.connect/);
     assert.match(smoke, /meshdrop-spa-proof\.txt/);
     assert.match(smoke, /safeDebugPageState/);
@@ -53,11 +58,19 @@ test("SPA artifact smoke proves runtime support plus browser-backed WebRTC trans
     assert.match(smoke, /runsBackendFreeTransferProof = browserTypeName !== "webkit"/);
     assert.match(smoke, /retrySmoke/);
 
+    assert.match(support, /finalizeEvent/);
+    assert.match(support, /generateSecretKey/);
+    assert.match(support, /getPublicKey/);
+
     assert.match(ciWorkflow, /spa-browser-matrix:/);
     assert.match(ciWorkflow, /browser: \[chromium, firefox, webkit\]/);
     assert.match(ciWorkflow, /npx playwright install --with-deps \$\{\{ matrix\.browser \}\}/);
     assert.match(ciWorkflow, /PLAYWRIGHT_BROWSER: \$\{\{ matrix\.browser \}\}/);
     assert.match(ciWorkflow, /npm run test:spa-artifact/);
+    assert.match(ciWorkflow, /spa_public_relay_urls:/);
+    assert.match(ciWorkflow, /spa-public-relay-uat:/);
+    assert.match(ciWorkflow, /github\.event_name == 'workflow_dispatch'/);
+    assert.match(ciWorkflow, /MESHDROP_SPA_PUBLIC_RELAY_URLS: \$\{\{ inputs\.spa_public_relay_urls \}\}/);
 });
 
 test("SPA artifact version sanitizer rejects empty versions", () => {

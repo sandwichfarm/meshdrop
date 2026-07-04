@@ -36,7 +36,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 
 ## Active Quick Task
 
-- None. Next work should start from the highest-risk remaining target-status gap.
+- `20260704-spa-public-relay-uat` - add an opt-in public relay SPA UAT path, prove Chromium against a real relay, and
+  prepare GitHub-hosted Firefox public relay readback without running external-relay UAT on every PR/push.
 
 ---
 *Initialized: 2026-07-04 from goal objective.*

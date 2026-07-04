@@ -25,6 +25,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(spa, /SPA browser matrix/);
     assert.match(spa, /Chromium and Firefox also connect two Nostr identities/);
     assert.match(spa, /WebKit currently proves packaged runtime compatibility\s+only/);
+    assert.match(spa, /MESHDROP_SPA_PUBLIC_RELAY_URLS=wss:\/\/bucket\.coracle\.social/);
+    assert.match(spa, /Proof public-spa-nostr-webrtc:<browser>/);
+    assert.match(spa, /manual-only `SPA public relay UAT` job runs Chromium and Firefox/);
 
     assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_ADMIN_NPUB/);
@@ -67,7 +70,11 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         assert.match(targetStatus, new RegExp(`\\| ${target} \\|`));
     }
     assert.match(targetStatus, /\| Release Images \| `v0\.1\.0` verified \|/);
-    assert.match(targetStatus, /\| SPA \| Chromium\/Firefox backend-free transfer smoke exists; WebKit runtime smoke exists \|/);
+    assert.match(
+        targetStatus,
+        /\| SPA \| Chromium\/Firefox backend-free transfer smoke exists; WebKit runtime smoke exists; Chromium public relay UAT exists \|/
+    );
+    assert.match(targetStatus, /Firefox public relay UAT readback; WebKit transfer UAT/);
     assert.match(targetStatus, /\| Desktop Native \| Not implemented \|/);
     assert.match(targetStatus, /\| iOS \| Not implemented \|/);
     assert.match(targetStatus, /\| Android \| Not implemented \|/);
