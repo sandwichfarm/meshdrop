@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress.
+Complete.
 
 ## Implemented
 
@@ -19,7 +19,10 @@ In progress.
 - `npm test` passed: 166/166.
 - `git diff --check` passed.
 - `npx --yes aislop scan --changes .` exited 0 with existing `public/scripts/network.js` warnings.
+- PR #33 passed CI run `28713624102`.
+- PR #33 merged at `ae3b98a`.
+- Master CI run `28713678271` passed, including `Browser transfer smoke`.
 
 ## Remaining
 
-- PR CI and master CI readback.
+- None for this quick task.

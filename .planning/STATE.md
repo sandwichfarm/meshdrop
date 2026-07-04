@@ -34,11 +34,11 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-spa-browser-matrix` | complete | PR #29; master CI run `28712787297`; Chromium/Firefox SPA transfer proof; WebKit runtime proof |
 | 2026-07-04 | `20260704-docker-transfer-timeout-fix` | complete | PR #30; master CI run `28713014340`; Docker smoke passed |
 | 2026-07-04 | `20260704-spa-public-relay-uat` | complete | PR #32; manual CI run `28713488687` public relay jobs passed for Chromium/Firefox |
+| 2026-07-04 | `20260704-federated-fips-offer-recovery` | complete | PR #33; master CI run `28713678271`; Browser transfer smoke passed |
 
 ## Active Quick Task
 
-- `20260704-federated-fips-offer-recovery` - repair master red `Browser transfer smoke` caused by stale local-offer
-  m-line errors in federated FIPS WebRTC negotiation.
+- None. Next work should start from the highest-risk remaining target-status gap.
 
 ---
 *Initialized: 2026-07-04 from goal objective.*
