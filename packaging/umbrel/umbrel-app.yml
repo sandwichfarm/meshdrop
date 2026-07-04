@@ -1,0 +1,23 @@
+manifestVersion: 1
+id: meshdrop
+category: files
+name: MeshDrop
+version: "__MESHDROP_VERSION__"
+tagline: Share files across WebRTC and Nostr-connected peers
+description: >-
+  MeshDrop is a browser-based file sharing service for local peers and Nostr-connected peers. The Umbrel package runs the
+  server-backed target with runtime feature negotiation, Nostr WebRTC discovery, optional admin settings by npub, and
+  Pollen transfer support.
+releaseNotes: >-
+  Alpha package scaffold for the Umbrel target. Device install UAT is still required before this target is complete.
+developer: Sandwich Farm
+website: https://github.com/sandwichfarm/meshdrop
+repo: https://github.com/sandwichfarm/meshdrop
+support: https://github.com/sandwichfarm/meshdrop/issues
+port: 3000
+gallery: []
+path: "/"
+dependencies: []
+deterministicPassword: false
+torOnly: false
+submitter: Sandwich Farm

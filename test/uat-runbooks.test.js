@@ -8,6 +8,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     const requiredDocs = [
         "docs/uat/spa.md",
         "docs/uat/docker.md",
+        "docs/uat/umbrel.md",
         "docs/uat/release-target-images.md",
         "docs/uat/target-status.md",
     ];
@@ -20,11 +21,19 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_ADMIN_NPUB/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DISCOVERY_NPUBS/);
 
+    const umbrel = readDoc("docs/uat/umbrel.md");
+    assert.match(umbrel, /npm run build:umbrel/);
+    assert.match(umbrel, /MESHDROP_TARGET=umbrel/);
+    assert.match(umbrel, /MESHDROP_DISCOVERY_NPUBS/);
+    assert.match(umbrel, /MESHDROP_ADMIN_NPUB/);
+    assert.match(umbrel, /Not Proven/);
+
     const releaseTargets = readDoc("docs/uat/release-target-images.md");
     for (const target of ["standalone", "start9", "umbrel"]) {
         assert.match(releaseTargets, new RegExp(`MESHDROP_TARGET=${target}`));
         assert.match(releaseTargets, new RegExp(`:${target}`));
     }
+    assert.match(releaseTargets, /Umbrel package tarball/);
     assert.match(releaseTargets, /Not proven/);
 
     const targetStatus = readDoc("docs/uat/target-status.md");
