@@ -4,6 +4,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 
 import {sanitizeArtifactPart} from "./build-spa-artifact.mjs";
+import {writeNativeSource} from "./mobile-native-source.mjs";
 import {cacheVersionFromEnv, updateServiceWorkerVersion} from "./set-service-worker-version.mjs";
 
 const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -14,7 +15,8 @@ export function parseArgs(argv) {
     const args = {
         version: packageJson.version,
         outDir: path.join(repoRoot, "dist"),
-        target: ""
+        target: "",
+        nativeSource: false
     };
 
     for (let i = 0; i < argv.length; i += 1) {
@@ -30,6 +32,9 @@ export function parseArgs(argv) {
             args.target = argv[i + 1];
             i += 1;
         }
+        else if (argv[i] === "--native-source") {
+            args.nativeSource = true;
+        }
         else {
             throw new Error(`Unknown argument: ${argv[i]}`);
         }
@@ -39,11 +44,26 @@ export function parseArgs(argv) {
 }
 
 export async function buildMobilePackage(options = {}) {
+    return buildMobileArtifact({
+        ...options,
+        nativeSource: false
+    });
+}
+
+export async function buildMobileNativeSourcePackage(options = {}) {
+    return buildMobileArtifact({
+        ...options,
+        nativeSource: true
+    });
+}
+
+async function buildMobileArtifact(options = {}) {
     const target = normalizeTarget(options.target);
+    const nativeSource = options.nativeSource === true;
     const version = sanitizeArtifactPart(options.version || packageJson.version);
     const outDir = path.resolve(options.outDir || path.join(repoRoot, "dist"));
-    const prefix = `meshdrop-${target}-${version}`;
-    const stageRoot = path.join(outDir, `.${target}-stage`);
+    const prefix = nativeSource ? `meshdrop-${target}-native-source-${version}` : `meshdrop-${target}-${version}`;
+    const stageRoot = path.join(outDir, nativeSource ? `.${target}-native-source-stage` : `.${target}-stage`);
     const stageDir = path.join(stageRoot, prefix);
     const appDir = path.join(stageDir, "app");
     const artifactPath = path.join(outDir, `${prefix}.tar.gz`);
@@ -51,15 +71,19 @@ export async function buildMobilePackage(options = {}) {
     await fs.rm(stageRoot, {recursive: true, force: true});
     await fs.mkdir(stageDir, {recursive: true});
     await fs.cp(path.join(repoRoot, "public"), appDir, {recursive: true});
-    await writeTargetManifest(stageDir, target, version);
-    await writeMobileReadme(stageDir, target, version);
+    const manifest = createTargetManifest(target, version, nativeSource);
+    await writeTargetManifest(stageDir, manifest);
+    await writeMobileReadme(stageDir, target, version, nativeSource);
     await fs.copyFile(path.join(repoRoot, "docs", "uat", "mobile.md"), path.join(stageDir, "UAT-MOBILE.md"));
     await stampServiceWorker(appDir, target, version, options.env || process.env);
+    if (nativeSource) {
+        await writeNativeSource(stageDir, target, manifest);
+    }
     await fs.rm(artifactPath, {force: true});
     await tarCreate(artifactPath, stageRoot, prefix);
     await fs.rm(stageRoot, {recursive: true, force: true});
 
-    return {artifactPath, prefix, target, version};
+    return {artifactPath, prefix, target, version, nativeSource};
 }
 
 export async function listTarEntries(artifactPath) {
@@ -79,15 +103,16 @@ function normalizeTarget(target) {
     return target;
 }
 
-async function writeTargetManifest(stageDir, target, version) {
+function createTargetManifest(target, version, nativeSource) {
     const manifest = {
         schemaVersion: 1,
-        name: `meshdrop-${target}`,
+        name: nativeSource ? `meshdrop-${target}-native-source` : `meshdrop-${target}`,
         version,
         target,
         appRoot: "app",
         entrypoint: "app/index.html",
         nativeShellBuilt: false,
+        nativeShellSourceBuilt: nativeSource,
         uatRunbook: "UAT-MOBILE.md",
         runtime: {
             target,
@@ -97,40 +122,69 @@ async function writeTargetManifest(stageDir, target, version) {
         },
         transports: {
             localDiscovery: false,
-            webrtc: true,
-            nostr: true,
+            webrtc: !nativeSource,
+            nostr: !nativeSource,
             blossom: true,
             hashtree: true,
             pollen: false,
             fips: false,
             bluetooth: false
         },
-        remainingProof: [
-            "native mobile shell build",
-            "native mobile WebRTC transfer UAT",
-            "mobile file picker and share sheet",
-            "Bluetooth transport negotiation"
-        ]
+        remainingProof: nativeSource
+            ? [
+                "native mobile app package build",
+                "native mobile WebRTC transfer UAT",
+                "mobile file picker and share sheet",
+                "Bluetooth transport negotiation"
+            ]
+            : [
+                "native mobile shell source artifact",
+                "native mobile app package build",
+                "native mobile WebRTC transfer UAT",
+                "mobile file picker and share sheet",
+                "Bluetooth transport negotiation"
+            ]
     };
 
+    if (nativeSource) {
+        manifest.nativeSource = {
+            platform: target,
+            wrapper: target === "ios" ? "wkwebview" : "android-webview",
+            sourceRoot: `native/${target}`,
+            appAssets: "app"
+        };
+    }
+
+    return manifest;
+}
+
+async function writeTargetManifest(stageDir, manifest) {
     await fs.writeFile(path.join(stageDir, "meshdrop-target.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-async function writeMobileReadme(stageDir, target, version) {
+async function writeMobileReadme(stageDir, target, version, nativeSource) {
     const platform = target === "ios" ? "iOS" : "Android";
+    const title = nativeSource ? `MeshDrop ${platform} Native Source Artifact` : `MeshDrop ${platform} Source Artifact`;
+    const description = nativeSource
+        ? `This artifact packages MeshDrop app assets with ${platform} native WebView wrapper source.`
+        : `This artifact packages MeshDrop app assets and target metadata for a future ${platform} native shell.`;
+    const packageNote = nativeSource
+        ? "It is not a signed app, app-store package, APK, or IPA."
+        : "It is not a signed mobile app, app-store package, or native executable.";
     const text = [
-        `# MeshDrop ${platform} Source Artifact`,
+        `# ${title}`,
         "",
         `Version: ${version}`,
         "",
-        `This artifact packages MeshDrop app assets and target metadata for a future ${platform} native shell.`,
-        "It is not a signed mobile app, app-store package, or native executable.",
+        description,
+        packageNote,
         "",
         "Current entrypoint: `app/index.html`",
         "Target manifest: `meshdrop-target.json`",
         "UAT runbook: `UAT-MOBILE.md`",
+        nativeSource ? `Native source: \`native/${target}/\`` : "",
         ""
-    ].join("\n");
+    ].filter(line => line !== "").join("\n");
 
     await fs.writeFile(path.join(stageDir, `README-${target.toUpperCase()}.md`), text);
 }
@@ -175,6 +229,10 @@ function run(command, args) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-    const result = await buildMobilePackage(parseArgs(process.argv.slice(2)));
-    console.log(`${result.target} source package: ${result.artifactPath}`);
+    const args = parseArgs(process.argv.slice(2));
+    const result = args.nativeSource
+        ? await buildMobileNativeSourcePackage(args)
+        : await buildMobilePackage(args);
+    const kind = args.nativeSource ? "native source package" : "source package";
+    console.log(`${result.target} ${kind}: ${result.artifactPath}`);
 }

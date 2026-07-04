@@ -1,14 +1,19 @@
 # Mobile UAT Runbook
 
 Use this runbook for the dependency-free mobile source artifacts built by `npm run build:ios` and
-`npm run build:android`.
+`npm run build:android`, plus the native wrapper source artifacts built by `npm run build:ios:native-source` and
+`npm run build:android:native-source`.
 
 ## Build
 
 1. Run `npm run build:ios -- --version <version>`.
 2. Run `npm run build:android -- --version <version>`.
-3. Confirm `dist/meshdrop-ios-<version>.tar.gz` and `dist/meshdrop-android-<version>.tar.gz` exist.
-4. Confirm each archive contains `app/index.html`, `meshdrop-target.json`, a target README, and `UAT-MOBILE.md`.
+3. Run `npm run build:ios:native-source -- --version <version>`.
+4. Run `npm run build:android:native-source -- --version <version>`.
+5. Confirm `dist/meshdrop-ios-<version>.tar.gz` and `dist/meshdrop-android-<version>.tar.gz` exist.
+6. Confirm `dist/meshdrop-ios-native-source-<version>.tar.gz` and
+   `dist/meshdrop-android-native-source-<version>.tar.gz` exist.
+7. Confirm each archive contains `app/index.html`, `meshdrop-target.json`, a target README, and `UAT-MOBILE.md`.
 
 ## Artifact Acceptance
 
@@ -16,13 +21,26 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 2. Confirm `meshdrop-target.json` reports `runtime.platform` as `mobile`.
 3. Confirm `meshdrop-target.json` reports `runtime.hasBackend` as `false` and `runtime.sharedInstance` as `false`.
 4. Confirm `meshdrop-target.json` reports `nativeShellBuilt` as `false`.
-5. Confirm backend-only transports are not claimed: `localDiscovery`, `pollen`, and `fips` are `false`.
-6. Confirm `bluetooth` is `false` until a real mobile Bluetooth transport is implemented and tested.
-7. Confirm browser-backed transports are available for a future shell: `webrtc`, `nostr`, `blossom`, and `hashtree` are `true`.
+5. For source artifacts, confirm `nativeShellSourceBuilt` is `false`.
+6. For native-source artifacts, confirm `nativeShellSourceBuilt` is `true` and `nativeSource.sourceRoot` is present.
+7. Confirm backend-only transports are not claimed: `localDiscovery`, `pollen`, and `fips` are `false`.
+8. Confirm `bluetooth` is `false` until a real mobile Bluetooth transport is implemented and tested.
+9. Confirm browser-backed source artifacts report `webrtc`, `nostr`, `blossom`, and `hashtree` as `true`.
+10. Confirm native-source artifacts do not claim unproven native transfer paths: `webrtc` and `nostr` are `false`.
+
+## Native Source Acceptance
+
+1. Confirm the iOS native-source artifact contains `native/ios/MeshDrop/MeshDropViewController.swift`.
+2. Confirm the iOS native-source artifact contains `native/ios/MeshDrop/Resources/meshdrop/index.html`.
+3. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
+4. Confirm the Android native-source artifact contains
+   `native/android/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`.
+5. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
+6. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
 
 ## Native Mobile Acceptance
 
-1. Build a native iOS or Android shell from the matching source artifact.
+1. Build a native iOS or Android app package from the matching native-source artifact.
 2. Install the app on a physical device or emulator that supports WebRTC.
 3. Confirm the app reads `meshdrop-target.json` and exposes `capabilities.runtime.target` as `ios` or `android`.
 4. Configure a Nostr identity and transfer a small file over Nostr WebRTC to another MeshDrop peer.
@@ -37,16 +55,18 @@ Run:
 ```sh
 npm run build:ios -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
+npm run build:ios:native-source -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
+npm run build:android:native-source -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 node --test test/mobile-package.test.js
 npm run test:target-artifacts
 ```
 
-This smoke proves source artifact shape, target metadata, runtime capability metadata, and real Nostr WebRTC transfers
-between two browser peers served from the generated iOS and Android source artifacts.
+This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
+and real Nostr WebRTC transfers between two browser peers served from the generated iOS and Android source artifacts.
 
 ## Not Proven
 
-- These source artifacts do not prove native iOS or Android shells exist.
-- These source artifacts do not prove signed app-store packages or installable mobile binaries.
-- These source artifacts do not prove native mobile WebRTC transfer UAT.
-- These source artifacts do not prove Bluetooth transport support.
+- These artifacts do not prove signed app-store packages, APKs, IPAs, or installable mobile binaries.
+- These artifacts do not prove native mobile WebRTC transfer UAT on iOS or Android devices.
+- These artifacts do not prove native mobile file-picker or share-sheet integration.
+- These artifacts do not prove Bluetooth transport support.
