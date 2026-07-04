@@ -71,11 +71,14 @@ async function main() {
             const browser = await launchBrowser(browserType);
             const strategy = webkitTransferStrategies[Math.min(attempt - 1, webkitTransferStrategies.length - 1)];
             try {
-                await runRuntimeCapabilityProof(browser, server.port, relayUrls);
+                if (!webkitTransferRequested || browserTypeName !== "webkit") {
+                    await runRuntimeCapabilityProof(browser, server.port, relayUrls);
+                }
                 if (runsBackendFreeTransferProof) {
                     await runBackendFreeTransferProof(browser, server.port, relayUrls, {
                         peerBPort: peerBServer?.port,
                         singleBrowserContext: strategy.singleBrowserContext,
+                        sequentialSetup: browserTypeName === "webkit",
                         strategyName: strategy.name
                     });
                 } else {
@@ -172,21 +175,36 @@ async function runBackendFreeTransferProof(browser, port, relayUrls, options = {
     ];
 
     try {
-        await Promise.all([
-            installProofSigner(pageA, identities.a),
-            installProofSigner(pageB, identities.b)
-        ]);
-        await Promise.all([
-            addSpaInitScript(pageA, identities.a, relayUrls),
-            addSpaInitScript(pageB, identities.b, relayUrls)
-        ]);
-        await Promise.all([
-            pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
-            pageB.goto(`http://127.0.0.1:${options.peerBPort || port}`, {waitUntil: "domcontentloaded"})
-        ]);
-        await Promise.all([waitForSpaHydration(pageA, "sender"), waitForSpaHydration(pageB, "receiver")]);
-        await Promise.all([connectNostr(pageA), connectNostr(pageB)]);
-        await Promise.all([setFollowList(pageA), setFollowList(pageB)]);
+        if (options.sequentialSetup) {
+            await installProofSigner(pageA, identities.a);
+            await installProofSigner(pageB, identities.b);
+            await addSpaInitScript(pageA, identities.a, relayUrls);
+            await addSpaInitScript(pageB, identities.b, relayUrls);
+            await pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"});
+            await waitForSpaHydration(pageA, "sender");
+            await pageB.goto(`http://127.0.0.1:${options.peerBPort || port}`, {waitUntil: "domcontentloaded"});
+            await waitForSpaHydration(pageB, "receiver");
+            await connectNostr(pageA);
+            await connectNostr(pageB);
+            await setFollowList(pageA);
+            await setFollowList(pageB);
+        } else {
+            await Promise.all([
+                installProofSigner(pageA, identities.a),
+                installProofSigner(pageB, identities.b)
+            ]);
+            await Promise.all([
+                addSpaInitScript(pageA, identities.a, relayUrls),
+                addSpaInitScript(pageB, identities.b, relayUrls)
+            ]);
+            await Promise.all([
+                pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
+                pageB.goto(`http://127.0.0.1:${options.peerBPort || port}`, {waitUntil: "domcontentloaded"})
+            ]);
+            await Promise.all([waitForSpaHydration(pageA, "sender"), waitForSpaHydration(pageB, "receiver")]);
+            await Promise.all([connectNostr(pageA), connectNostr(pageB)]);
+            await Promise.all([setFollowList(pageA), setFollowList(pageB)]);
+        }
         await Promise.all([
             pageA.evaluate(() => globalThis.meshdropNostrMesh.connect()),
             pageB.evaluate(() => globalThis.meshdropNostrMesh.connect())

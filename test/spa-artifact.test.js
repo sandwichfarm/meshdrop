@@ -59,7 +59,10 @@ test("SPA artifact smoke proves runtime support plus browser-backed WebRTC trans
     assert.match(smoke, /MESHDROP_SPA_WEBKIT_TRANSFER/);
     assert.match(smoke, /runsBackendFreeTransferProof = browserTypeName !== "webkit" \|\| webkitTransferRequested/);
     assert.match(smoke, /set MESHDROP_SPA_WEBKIT_TRANSFER=1 to attempt WebKit transfer UAT/);
+    assert.match(smoke, /!webkitTransferRequested \|\| browserTypeName !== "webkit"/);
     assert.match(smoke, /singleBrowserContext: strategy\.singleBrowserContext/);
+    assert.match(smoke, /sequentialSetup: browserTypeName === "webkit"/);
+    assert.match(smoke, /if \(options\.sequentialSetup\)/);
     assert.match(smoke, /one-context-two-origins/);
     assert.match(smoke, /two-contexts-two-origins/);
     assert.match(smoke, /retrySmoke/);
