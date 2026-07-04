@@ -27,7 +27,8 @@ const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
 const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
 const smokeAttempts = browserTypeName === "webkit" ? 3 : 1;
-const runsBackendFreeTransferProof = browserTypeName !== "webkit";
+const webkitTransferRequested = process.env.MESHDROP_SPA_WEBKIT_TRANSFER === "1";
+const runsBackendFreeTransferProof = browserTypeName !== "webkit" || webkitTransferRequested;
 const publicRelayUrls = parseRelayUrls(process.env.MESHDROP_SPA_PUBLIC_RELAY_URLS || "");
 
 async function main() {
@@ -64,7 +65,10 @@ async function main() {
                 if (runsBackendFreeTransferProof) {
                     await runBackendFreeTransferProof(browser, server.port, relayUrls);
                 } else {
-                    console.log(`Proof backend-free-spa-runtime:${browserTypeName}: packaged SPA boots without backend transports`);
+                    console.log(
+                        `Proof backend-free-spa-runtime:${browserTypeName}: packaged SPA boots without backend transports; `
+                        + "set MESHDROP_SPA_WEBKIT_TRANSFER=1 to attempt WebKit transfer UAT"
+                    );
                 }
             }
             finally {

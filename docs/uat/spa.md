@@ -41,6 +41,15 @@ only because Playwright WebKit crashes during the two-page WebRTC transfer proof
 CI runs the `SPA browser matrix` job for Chromium, Firefox, and WebKit. Treat the Chromium and Firefox legs as transfer
 proof and the WebKit leg as no-backend packaged-runtime proof.
 
+To attempt the missing WebKit transfer UAT explicitly, run:
+
+```sh
+MESHDROP_SPA_WEBKIT_TRANSFER=1 PLAYWRIGHT_MODULE_PATH= PLAYWRIGHT_BROWSER=webkit npm run test:spa-artifact
+```
+
+Passing output must include `Proof backend-free-spa-nostr-webrtc:webkit: nostr delivered meshdrop-spa-proof.txt`.
+Until that proof passes, WebKit remains runtime-only and the SPA target remains incomplete for WebKit transfer.
+
 ## Public Relay UAT
 
 The default automated smoke uses an in-process relay so CI remains deterministic. To prove the backend-free SPA path
@@ -62,3 +71,12 @@ does not run on normal PR or push events.
 
 Current public relay proof: manual CI run `28713488687` passed the Chromium and Firefox `SPA public relay UAT` jobs
 against `wss://bucket.coracle.social` and both logs include `meshdrop-spa-proof.txt` delivery.
+
+## WebKit Transfer UAT
+
+The normal CI WebKit leg is intentionally runtime-only because historical GitHub-hosted Playwright WebKit runs crashed
+during the two-page transfer proof. To retry that proof in GitHub Actions without making every PR flaky, dispatch the
+`CI` workflow manually with `spa_webkit_transfer` set to `true`.
+
+Passing output must include `Proof backend-free-spa-nostr-webrtc:webkit: nostr delivered meshdrop-spa-proof.txt`.
+No current WebKit transfer proof is recorded.
