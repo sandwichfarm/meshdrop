@@ -27,12 +27,16 @@ test("Start9 package builder creates SDK source artifact", async () => {
             "Makefile",
             "s9pk.mk",
             "package.json",
+            "icon.png",
+            "LICENSE",
             "instructions.md",
             "README.md",
             "UAT-START9.md",
             "meshdrop-target.json",
             "assets/ABOUT.md",
             "startos/manifest/index.ts",
+            "startos/versions/current.ts",
+            "startos/versions/index.ts",
             "startos/main.ts",
             "startos/interfaces.ts"
         ]) {
@@ -46,10 +50,23 @@ test("Start9 package builder creates SDK source artifact", async () => {
         const makefile = await readTarEntry(result.artifactPath, `${prefix}/Makefile`);
         assert.match(makefile, /include s9pk\.mk/);
 
+        const s9pkMakefile = await readTarEntry(result.artifactPath, `${prefix}/s9pk.mk`);
+        assert.match(s9pkMakefile, /\$\(BASE_NAME\)\.s9pk: javascript\/index\.js/);
+        assert.match(s9pkMakefile, /\$\(BASE_NAME\)_%\.s9pk: javascript\/index\.js/);
+
+        const tsconfig = await readTarEntry(result.artifactPath, `${prefix}/tsconfig.json`);
+        assert.match(tsconfig, /"outDir": "javascript"/);
+
         const manifest = await readTarEntry(result.artifactPath, `${prefix}/startos/manifest/index.ts`);
         assert.match(manifest, /id: "meshdrop"/);
+        assert.match(manifest, /license: "GPL-3\.0"/);
+        assert.match(manifest, /buildManifest\(versionGraph, staticManifest\)/);
         assert.match(manifest, /dockerTag: "ghcr\.io\/sandwichfarm\/meshdrop:v0\.0\.0-start9"/);
         assert.match(manifest, /arch: \["x86_64", "aarch64"\]/);
+
+        const version = await readTarEntry(result.artifactPath, `${prefix}/startos/versions/current.ts`);
+        assert.match(version, /version: "0\.0\.0-test:0"/);
+        assert.match(version, /down: IMPOSSIBLE/);
 
         const main = await readTarEntry(result.artifactPath, `${prefix}/startos/main.ts`);
         assert.match(main, /MESHDROP_TARGET: "start9"/);
@@ -83,6 +100,8 @@ test("Start9 generated package source typechecks against declared SDK dependency
         await run("tar", ["-xzf", result.artifactPath, "-C", tempDir]);
         await run("npm", ["install", "--ignore-scripts", "--no-audit", "--fund=false"], {cwd: packageDir});
         await run("npm", ["run", "check"], {cwd: packageDir});
+        await run("npm", ["run", "build"], {cwd: packageDir});
+        await fs.access(path.join(packageDir, "javascript", "index.js"));
     }
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});

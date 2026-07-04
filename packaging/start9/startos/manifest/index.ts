@@ -1,11 +1,12 @@
-import { setupManifest } from "@start9labs/start-sdk";
+import { buildManifest, setupManifest } from "@start9labs/start-sdk";
 
 import { short, long } from "./i18n.js";
+import { versionGraph } from "../versions/index.js";
 
-export const manifest = setupManifest({
+export const staticManifest = setupManifest({
   id: "meshdrop",
   title: "MeshDrop",
-  license: "ISC",
+  license: "GPL-3.0",
   packageRepo: "https://github.com/sandwichfarm/meshdrop",
   upstreamRepo: "https://github.com/sandwichfarm/meshdrop",
   marketingUrl: "https://github.com/sandwichfarm/meshdrop",
@@ -22,3 +23,5 @@ export const manifest = setupManifest({
   },
   dependencies: {}
 });
+
+export const manifest = buildManifest(versionGraph, staticManifest);
