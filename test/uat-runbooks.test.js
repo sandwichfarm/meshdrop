@@ -46,6 +46,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /docker buildx imagetools inspect/);
     assert.match(releaseTargets, /release-verify\.yml/);
     assert.match(releaseTargets, /readback runs with GitHub Actions package permissions/);
+    assert.match(releaseTargets, /v0\.1\.0` is proven by release run `28711136765`/);
+    assert.match(releaseTargets, /release verification workflow: https:\/\/github\.com\/sandwichfarm\/meshdrop\/actions\/runs\/28711452622/i);
+    assert.match(releaseTargets, /meshdrop-spa-0\.1\.0\.tar\.gz/);
+    assert.match(releaseTargets, /v0\.1\.0-standalone/);
     assert.match(releaseTargets, /Start9 source tarball/);
     assert.match(releaseTargets, /Umbrel package tarball/);
     assert.match(releaseTargets, /Not proven/);
@@ -54,7 +58,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     for (const target of ["SPA", "Docker", "Start9", "Umbrel", "Desktop Native", "iOS", "Android", "Release Images"]) {
         assert.match(targetStatus, new RegExp(`\\| ${target} \\|`));
     }
-    assert.match(targetStatus, /\| Release Images \| Multi-arch workflow configured \|/);
+    assert.match(targetStatus, /\| Release Images \| `v0\.1\.0` verified \|/);
     assert.match(targetStatus, /\| Desktop Native \| Not implemented \|/);
     assert.match(targetStatus, /\| iOS \| Not implemented \|/);
     assert.match(targetStatus, /\| Android \| Not implemented \|/);

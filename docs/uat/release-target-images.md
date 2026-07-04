@@ -71,9 +71,24 @@ Repeat with `target=start9` and `target=umbrel`.
 
 ## Not proven
 
-- No release is proven until a real `v0.*.*` tag runs and the GitHub release plus GHCR tags are read back.
+- `v0.1.0` is proven by release run `28711136765` and release verification run `28711452622`.
+- A future release is not proven until its real `v0.*.*` tag runs and the GitHub release plus GHCR tags are read back.
 - The release workflow is configured for multi-architecture GHCR manifests, but no multi-arch release is proven until
   `docker buildx imagetools inspect` confirms the published tags. If the local token lacks `read:packages`, use
   `release-verify.yml` for that readback.
 - The Start9 package-source artifact is not complete until `.s9pk` build, device install, and transfer UAT pass.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
+
+## Current Verified Release
+
+`v0.1.0` was published on 2026-07-04 and verified with these readbacks:
+
+- GitHub release: https://github.com/sandwichfarm/meshdrop/releases/tag/v0.1.0
+- Release workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28711136765
+- Release verification workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28711452622
+- Assets: `meshdrop-node-0.1.0.tar.gz`, `meshdrop-source-0.1.0.tar.gz`, `meshdrop-spa-0.1.0.tar.gz`,
+  `meshdrop-start9-0.1.0.tar.gz`, `meshdrop-umbrel-0.1.0.tar.gz`, and `SHA256SUMS`.
+- GHCR tags checked by `release-verify.yml`: `v0.1.0-standalone`, `0.1.0-standalone`, `v0.1.0-start9`,
+  `0.1.0-start9`, `v0.1.0-umbrel`, and `0.1.0-umbrel`.
+- `release-verify.yml` confirmed `linux/amd64` and `linux/arm64` manifests, pulled target metadata, and
+  `npm run test:docker` against `ghcr.io/sandwichfarm/meshdrop:v0.1.0-standalone`.
