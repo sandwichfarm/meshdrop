@@ -60,6 +60,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(umbrel, /MESHDROP_TARGET=umbrel/);
     assert.match(umbrel, /MESHDROP_DISCOVERY_NPUBS/);
     assert.match(umbrel, /MESHDROP_ADMIN_NPUB/);
+    assert.match(umbrel, /npm run test:umbrel-package/);
+    assert.match(umbrel, /local WebRTC and Pollen WebRTC/);
     assert.match(umbrel, /Not Proven/);
 
     const desktop = readDoc("docs/uat/desktop.md");
@@ -128,6 +130,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Desktop Native \| Source artifact transfer smoke exists; native shell not built \|/);
     assert.match(targetStatus, /`npm run build:desktop`; `node --test test\/desktop-package\.test\.js`; `npm run test:target-artifacts`/);
     assert.match(targetStatus, /Native shell build, installer\/binary, and native desktop transfer UAT/);
+    assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke exists; real Umbrel node UAT open \|/);
+    assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
+    assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);
     assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke exists; native shell not built \|/);
     assert.match(targetStatus, /\| Android \| Source artifact transfer smoke exists; native shell not built \|/);
     assert.match(targetStatus, /`npm run build:ios`; `node --test test\/mobile-package\.test\.js`/);

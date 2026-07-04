@@ -1,7 +1,15 @@
 const DEFAULT_RUNTIME_TARGET = "standalone";
 
+export function createServerRuntimeConfig(env = process.env) {
+    return {
+        target: env.MESHDROP_TARGET || DEFAULT_RUNTIME_TARGET,
+        platform: "server",
+        hasBackend: true
+    };
+}
+
 export function createRuntimeCapabilities(conf = {}) {
-    const runtime = conf.runtime || {};
+    const runtime = conf.runtime || createServerRuntimeConfig();
     const hasBackend = runtime.hasBackend !== false;
     const fipsSupported = hasBackend && !!conf.fips?.enabled;
     const pollenSupported = hasBackend && !!conf.pollen?.enabled;

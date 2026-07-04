@@ -32,6 +32,16 @@ Use this runbook for the Umbrel app package artifact built from `packaging/umbre
 Run:
 
 ```sh
+npm run test:umbrel-package
+```
+
+This smoke builds the local `meshdrop:umbrel-smoke` image with `MESHDROP_TARGET=umbrel`, builds and unpacks the
+Umbrel package, runs the rendered package `docker-compose.yml`, confirms `/config` reports
+`capabilities.runtime.target` as `umbrel`, and initiates browser transfers over local WebRTC and Pollen WebRTC.
+
+For a package-shape-only check, run:
+
+```sh
 npm run build:umbrel -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-umbrel-smoke
 node --test test/umbrel-package.test.js
 ```
@@ -42,5 +52,5 @@ admin-npub environment, and the absence of legacy static room environment variab
 ## Not Proven
 
 - This package smoke does not prove installation on a real Umbrel node.
-- This package smoke does not prove browser transfer UAT on Umbrel.
+- This package smoke does not prove browser transfer UAT through a real Umbrel node UI.
 - FIPS is disabled by default in the Umbrel package until the target has a tested FIPS binary and device-network path.

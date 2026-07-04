@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -42,4 +43,10 @@ test("Umbrel package builder creates app manifest and compose artifact", async (
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});
     }
+});
+
+test("Umbrel package smoke command runs the rendered compose package", () => {
+    const packageJson = JSON.parse(fsSync.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    assert.equal(packageJson.scripts["test:umbrel-package"], "node scripts/umbrel-package-smoke.mjs");
+    assert.equal(fsSync.existsSync(new URL("../scripts/umbrel-package-smoke.mjs", import.meta.url)), true);
 });
