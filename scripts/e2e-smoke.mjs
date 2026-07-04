@@ -222,9 +222,10 @@ async function runProofTransferScenario(browser, baseUrl, options) {
         if (options.setupReceiver) await options.setupReceiver(pageB);
 
         const peerId = await waitForConnectedPeer(pageA, options.roomType);
+        await waitForConnectedPeer(pageB, options.roomType);
         await sendProofIcon(pageA, peerId, options.transportId);
 
-        const received = await waitForReceivedFiles(pageB, 1);
+        const received = await waitForReceivedFiles(pageB, 1, options.name);
         assertReceived({
             name: options.name,
             fileName: "meshdrop-proof-icon.svg",
@@ -642,12 +643,18 @@ async function sendProofIcon(page, peerId, transportId) {
     });
 }
 
-async function waitForReceivedFiles(page, expectedCount) {
-    const handle = await page.waitForFunction(count => {
-        const batch = globalThis.__meshdropE2E.received.at(-1);
-        if (!batch || batch.files.length !== count) return null;
-        return batch.files;
-    }, expectedCount, {timeout: 30000});
+async function waitForReceivedFiles(page, expectedCount, name = "transfer") {
+    let handle;
+    try {
+        handle = await page.waitForFunction(count => {
+            const batch = globalThis.__meshdropE2E.received.at(-1);
+            if (!batch || batch.files.length !== count) return null;
+            return batch.files;
+        }, expectedCount, {timeout: 45000});
+    } catch (error) {
+        const state = await debugPageState(page);
+        throw new Error(`${name}: ${error.message}\nstate=${JSON.stringify(state)}`);
+    }
 
     return handle.jsonValue();
 }
