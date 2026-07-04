@@ -63,7 +63,10 @@ async function main() {
             try {
                 await runRuntimeCapabilityProof(browser, server.port, relayUrls);
                 if (runsBackendFreeTransferProof) {
-                    await runBackendFreeTransferProof(browser, server.port, relayUrls);
+                    await runBackendFreeTransferProof(browser, server.port, relayUrls, {
+                        browserType,
+                        separateBrowserProcesses: browserTypeName === "webkit" && webkitTransferRequested
+                    });
                 } else {
                     console.log(
                         `Proof backend-free-spa-runtime:${browserTypeName}: packaged SPA boots without backend transports; `
@@ -141,9 +144,14 @@ async function runRuntimeCapabilityProof(browser, port, relayUrls) {
     }
 }
 
-async function runBackendFreeTransferProof(browser, port, relayUrls) {
+async function runBackendFreeTransferProof(browser, port, relayUrls, options = {}) {
+    const peerBBrowser = options.separateBrowserProcesses ? await launchBrowser(options.browserType) : browser;
+    if (options.separateBrowserProcesses) {
+        console.log("WebKit transfer UAT: using separate browser processes for sender and receiver");
+    }
+
     const contextA = await browser.newContext({serviceWorkers: "block"});
-    const contextB = await browser.newContext({serviceWorkers: "block"});
+    const contextB = await peerBBrowser.newContext({serviceWorkers: "block"});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const identities = createProofIdentityPair();
@@ -190,6 +198,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrls) {
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close()]);
+        if (peerBBrowser !== browser) await peerBBrowser.close();
     }
 }
 
