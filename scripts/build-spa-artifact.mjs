@@ -50,6 +50,7 @@ export async function buildSpaArtifact(options = {}) {
     await fs.rm(stageRoot, {recursive: true, force: true});
     await fs.mkdir(outDir, {recursive: true});
     await fs.cp(path.join(repoRoot, "public"), stageDir, {recursive: true});
+    await removeSpaOnlyDeadAssets(stageDir);
     await writeTargetManifest(stageDir, version);
     await fs.copyFile(path.join(repoRoot, "docs", "uat", "spa.md"), path.join(stageDir, "UAT-SPA.md"));
     await stampServiceWorker(stageDir, version, options.env || process.env);
@@ -58,6 +59,16 @@ export async function buildSpaArtifact(options = {}) {
     await fs.rm(stageRoot, {recursive: true, force: true});
 
     return {artifactPath, prefix, version};
+}
+
+async function removeSpaOnlyDeadAssets(stageDir) {
+    const heicScript = '            "scripts/libs/heic2any.min.js",\n';
+    const mainPath = path.join(stageDir, "scripts", "main.js");
+    const source = await fs.readFile(mainPath, "utf8");
+    if (!source.includes(heicScript)) throw new Error("Expected HEIC boot script reference in SPA staged main.js");
+
+    await fs.writeFile(mainPath, source.replace(heicScript, ""));
+    await fs.rm(path.join(stageDir, "scripts", "libs", "heic2any.min.js"), {force: true});
 }
 
 async function writeTargetManifest(stageDir, version) {

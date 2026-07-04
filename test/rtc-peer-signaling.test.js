@@ -280,6 +280,22 @@ test("RTC signaling does not remove peers on transient disconnected state", () =
     assert.equal(warnings.length, 1);
 });
 
+test("channel open tolerates missing SDP fingerprints", async () => {
+    const {RTCPeer, connections, errors, fired} = createHarness();
+
+    new RTCPeer({send() {}}, true, "peer-a", "nostr", "room", {});
+    await flushPromises();
+
+    const channel = connections[0].dataChannels[0];
+    channel.readyState = "open";
+    channel.onopen({target: channel});
+
+    assert.deepEqual(errors, []);
+    assert.equal(fired.at(-1).type, "peer-connected");
+    assert.equal(fired.at(-1).detail.peerId, "peer-a");
+    assert.equal(fired.at(-1).detail.connectionHash, "");
+});
+
 test("caller reconnects a closed RTC data channel with a fresh peer connection", async () => {
     const {RTCPeer, connections} = createHarness();
     const sent = [];

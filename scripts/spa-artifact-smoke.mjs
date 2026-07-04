@@ -10,9 +10,19 @@ import {startFakeRelay} from "./fake-nostr-relay.mjs";
 
 const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/node_modules/playwright/index.mjs";
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
+const browserTypeName = process.env.PLAYWRIGHT_BROWSER || "chromium";
+const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
+const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
+const smokeAttempts = browserTypeName === "webkit" ? 3 : 1;
+const runsBackendFreeTransferProof = browserTypeName !== "webkit";
 
 async function main() {
+    assert(
+        supportedBrowserTypes.includes(browserTypeName),
+        `PLAYWRIGHT_BROWSER must be one of ${supportedBrowserTypes.join(", ")}`
+    );
+
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-spa-artifact-"));
     const result = await buildSpaArtifact({
         version: process.env.MESHDROP_SMOKE_VERSION || "0.0.0-smoke",
@@ -29,20 +39,65 @@ async function main() {
     const root = path.join(unpackDir, result.prefix);
     const server = await startStaticServer(root);
     const relay = await startFakeRelay();
-    let browser = null;
 
     try {
-        const {chromium} = await loadPlaywright();
-        const launchOptions = {headless: true};
-        if (chromiumPath) launchOptions.executablePath = chromiumPath;
-        browser = await chromium.launch(launchOptions);
-        const page = await browser.newPage();
-        const pageErrors = watchPage("spa-runtime", page);
-        await addSpaInitScript(page, "runtime", relay.url);
+        const playwright = await loadPlaywright();
+        const browserType = playwright[browserTypeName];
+        await retrySmoke(async () => {
+            const browser = await launchBrowser(browserType);
+            try {
+                await runRuntimeCapabilityProof(browser, server.port, relay.url);
+                if (runsBackendFreeTransferProof) {
+                    await runBackendFreeTransferProof(browser, server.port, relay.url);
+                } else {
+                    console.log(`Proof backend-free-spa-runtime:${browserTypeName}: packaged SPA boots without backend transports`);
+                }
+            }
+            finally {
+                await browser.close();
+            }
+        });
 
-        await page.goto(`http://127.0.0.1:${server.port}`, {waitUntil: "domcontentloaded"});
-        await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager);
-        await page.waitForFunction(() => globalThis.__meshdropE2E?.configLoaded);
+        console.log(`SPA artifact smoke passed for ${browserTypeName}: ${result.artifactPath}`);
+    }
+    finally {
+        await new Promise(resolve => relay.close(resolve));
+        await new Promise(resolve => server.close(resolve));
+        await fs.rm(tempDir, {recursive: true, force: true});
+    }
+}
+
+async function launchBrowser(browserType) {
+    const launchOptions = {headless: true};
+    if (browserTypeName === "chromium" && chromiumPath) launchOptions.executablePath = chromiumPath;
+    return browserType.launch(launchOptions);
+}
+
+async function retrySmoke(run) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= smokeAttempts; attempt++) {
+        try {
+            return await run();
+        } catch (error) {
+            lastError = error;
+            if (attempt === smokeAttempts) break;
+            console.warn(`${browserTypeName} SPA smoke attempt ${attempt} failed, retrying: ${error.message}`);
+            await delay(1000);
+        }
+    }
+
+    throw lastError;
+}
+
+async function runRuntimeCapabilityProof(browser, port, relayUrl) {
+    const context = await browser.newContext({serviceWorkers: "block"});
+    const page = await context.newPage();
+    const pageErrors = watchPage(`spa-runtime:${browserTypeName}`, page);
+
+    try {
+        await addSpaInitScript(page, "runtime", relayUrl);
+        await page.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"});
+        await waitForInitialSpaState(page, pageErrors);
 
         const state = await page.evaluate(() => ({
             target: globalThis.__meshdropE2E.config.capabilities.runtime.target,
@@ -60,16 +115,9 @@ async function main() {
         assert(state.pollenHidden === true, "Pollen transfer control must be hidden");
         assert(state.serverSettings === false, "Server settings must be unsupported");
         assert(pageErrors.length === 0, `SPA smoke page errors:\n${pageErrors.join("\n")}`);
-
-        await runBackendFreeTransferProof(browser, server.port, relay.url);
-
-        console.log(`SPA artifact smoke passed for ${result.artifactPath}`);
     }
     finally {
-        await browser?.close();
-        await new Promise(resolve => relay.close(resolve));
-        await new Promise(resolve => server.close(resolve));
-        await fs.rm(tempDir, {recursive: true, force: true});
+        await context.close();
     }
 }
 
@@ -79,8 +127,8 @@ async function runBackendFreeTransferProof(browser, port, relayUrl) {
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const pageErrors = [
-        ...watchPage("backend-free-spa-nostr-webrtc:a", pageA),
-        ...watchPage("backend-free-spa-nostr-webrtc:b", pageB)
+        ...watchPage(`backend-free-spa-nostr-webrtc:${browserTypeName}:a`, pageA),
+        ...watchPage(`backend-free-spa-nostr-webrtc:${browserTypeName}:b`, pageB)
     ];
 
     try {
@@ -92,7 +140,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrl) {
             pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
             pageB.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"})
         ]);
-        await Promise.all([waitForSpaHydration(pageA), waitForSpaHydration(pageB)]);
+        await Promise.all([waitForSpaHydration(pageA, "sender"), waitForSpaHydration(pageB, "receiver")]);
         await Promise.all([connectNostr(pageA), connectNostr(pageB)]);
         await Promise.all([setFollowList(pageA), setFollowList(pageB)]);
         await Promise.all([
@@ -112,7 +160,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrl) {
         assert(received[0]?.name.startsWith("meshdrop-spa-proof"), "SPA transfer delivered unexpected file");
         assert(received[0]?.text === proofText, "SPA transfer delivered unexpected contents");
         assert(pageErrors.length === 0, `SPA backend-free transfer page errors:\n${pageErrors.join("\n")}`);
-        console.log("Proof backend-free-spa-nostr-webrtc: nostr delivered meshdrop-spa-proof.txt");
+        console.log(`Proof backend-free-spa-nostr-webrtc:${browserTypeName}: nostr delivered meshdrop-spa-proof.txt`);
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close()]);
@@ -196,6 +244,8 @@ async function addSpaInitScript(page, identityName, relayUrl) {
 
 function watchPage(name, page) {
     const pageErrors = [];
+    page.on("crash", () => pageErrors.push(`${name}: page crashed`));
+    page.on("close", () => pageErrors.push(`${name}: page closed before smoke completed`));
     page.on("pageerror", error => pageErrors.push(`${name}: ${error.stack || error.message}`));
     page.on("console", message => {
         if (message.type() !== "error") return;
@@ -206,13 +256,28 @@ function watchPage(name, page) {
     return pageErrors;
 }
 
-async function waitForSpaHydration(page) {
-    await page.waitForFunction(() => (
-        globalThis.__meshdropE2E?.configLoaded
-        && globalThis.__meshdropE2E?.peersManager
-        && globalThis.meshdropNostrIdentity
-        && globalThis.meshdropNostrMesh
-    ));
+async function waitForInitialSpaState(page, pageErrors) {
+    try {
+        await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager, undefined, {timeout: spaHydrationTimeoutMs});
+        await page.waitForFunction(() => globalThis.__meshdropE2E?.configLoaded, undefined, {timeout: spaHydrationTimeoutMs});
+    } catch (error) {
+        throw new Error(`${error.message}\n${pageErrors.join("\n")}`, {cause: error});
+    }
+}
+
+async function waitForSpaHydration(page, role) {
+    try {
+        await page.waitForFunction(() => (
+            globalThis.__meshdropE2E?.configLoaded
+            && globalThis.__meshdropE2E?.peersManager
+            && globalThis.meshdropNostrIdentity
+            && globalThis.meshdropNostrMesh
+        ), undefined, {timeout: spaHydrationTimeoutMs});
+    } catch (error) {
+        throw new Error(`${role} SPA hydration failed: ${error.message}\n${JSON.stringify(await safeDebugPageState(page), null, 2)}`, {
+            cause: error
+        });
+    }
 }
 
 async function connectNostr(page) {
@@ -242,7 +307,7 @@ async function waitForConnectedPeer(page, roomType) {
         }, roomType, {timeout: 30000});
         return handle.jsonValue();
     } catch (error) {
-        throw new Error(`${error.message}\n${JSON.stringify(await debugPageState(page), null, 2)}`, {cause: error});
+        throw new Error(`${error.message}\n${JSON.stringify(await safeDebugPageState(page), null, 2)}`, {cause: error});
     }
 }
 
@@ -259,10 +324,10 @@ async function waitForReceivedFiles(page) {
             const batch = globalThis.__meshdropE2E.received.at(-1);
             if (!batch || batch.files.length !== 1) return null;
             return batch.files;
-        }, {timeout: 45000});
+        }, undefined, {timeout: 45000});
         return handle.jsonValue();
     } catch (error) {
-        throw new Error(`${error.message}\n${JSON.stringify(await debugPageState(page), null, 2)}`, {cause: error});
+        throw new Error(`${error.message}\n${JSON.stringify(await safeDebugPageState(page), null, 2)}`, {cause: error});
     }
 }
 
@@ -294,6 +359,17 @@ async function debugPageState(page) {
             signalSessionId: peer._signalSessionId || ""
         }))
     }));
+}
+
+async function safeDebugPageState(page) {
+    try {
+        return await debugPageState(page);
+    } catch (error) {
+        return {
+            closed: page.isClosed(),
+            error: error.message
+        };
+    }
 }
 
 async function loadPlaywright() {
@@ -368,6 +444,10 @@ function run(command, args) {
             resolve({stdout, stderr});
         });
     });
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function assert(condition, message) {

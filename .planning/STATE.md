@@ -34,7 +34,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 
 ## Active Quick Task
 
-- None
+- `20260704-spa-browser-matrix`
 
 ---
 *Initialized: 2026-07-04 from goal objective.*
