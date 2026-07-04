@@ -149,3 +149,13 @@ jobs:
           tags: |
             ${{ steps.image.outputs.image }}:${{ steps.image.outputs.tag }}-${{ steps.image.outputs.target }}
             ${{ steps.image.outputs.image }}:${{ steps.image.outputs.version }}-${{ steps.image.outputs.target }}
+
+  verify-release:
+    name: Release readback
+    needs: container-images
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/release-verify.yml
+    with:
+      tag: ${{ github.ref_name }}
