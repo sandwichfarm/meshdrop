@@ -17,7 +17,9 @@ const FipsDiscoveryProtocol = {
     },
 
     enabledFromConfig(config) {
-        return !!config?.fips?.enabled;
+        return globalThis.RuntimeCapabilities
+            ? globalThis.RuntimeCapabilities.transportSupported(config, "fips", !!config?.fips?.enabled)
+            : !!config?.fips?.enabled;
     },
 
     summarizeStatus(status) {

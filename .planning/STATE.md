@@ -16,6 +16,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-fix-browser-ci-local-disable` | complete | e2e transfer proof; `npm test`; `git diff --check` |
 | 2026-07-04 | `20260704-fix-browser-ci-bidirectional-ready` | complete | e2e transfer proof; `npm test`; changed-code slop exit 0 |
 | 2026-07-04 | `20260704-release-ceremony-baseline` | complete | actionlint; release artifact smoke; `npm test`; `npm run test:docker`; diff/slop gates |
+| 2026-07-04 | `20260704-runtime-capability-contract` | complete | focused red/green tests; `npm test`; e2e transfer proof; Docker smoke; diff/slop gates |
 
 ## Active Quick Task
 

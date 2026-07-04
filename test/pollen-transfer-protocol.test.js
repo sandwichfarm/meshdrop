@@ -14,6 +14,7 @@ globalThis.localStorage = {
 globalThis.$ = () => null;
 globalThis.Events = {on() {}, fire() {}};
 
+await import("../public/scripts/runtime-capabilities.js");
 await import("../public/scripts/pollen-transfer.js");
 
 const protocol = globalThis.PollenTransferProtocol;
@@ -26,6 +27,13 @@ test("Pollen protocol persists enabled state and reads config", () => {
 
     assert.equal(protocol.enabledFromConfig({pollen: {enabled: true}}), true);
     assert.equal(protocol.enabledFromConfig({pollen: {enabled: false}}), false);
+    assert.equal(
+        protocol.enabledFromConfig({
+            pollen: {enabled: true},
+            capabilities: {transports: {pollen: {supported: false}}}
+        }),
+        false
+    );
 });
 
 test("Pollen protocol validates descriptors", () => {

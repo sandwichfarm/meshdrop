@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+
 const PollenTransferProtocol = {
     statusPath: "pollen/status",
     uploadPath: "pollen/upload",
@@ -14,7 +16,9 @@ const PollenTransferProtocol = {
     },
 
     enabledFromConfig(config) {
-        return !!config?.pollen?.enabled;
+        return globalThis.RuntimeCapabilities
+            ? globalThis.RuntimeCapabilities.transportSupported(config, "pollen", !!config?.pollen?.enabled)
+            : !!config?.pollen?.enabled;
     },
 
     summarizeStatus(status) {
