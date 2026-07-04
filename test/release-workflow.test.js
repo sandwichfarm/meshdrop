@@ -16,6 +16,8 @@ test("release workflow publishes GHCR images for alpha target packages", () => {
     assert.match(releaseWorkflow, /--build-arg MESHDROP_TARGET="\$\{target\}"/);
     assert.match(releaseWorkflow, /docker push "\$\{image\}:\$\{tag\}-\$\{target\}"/);
     assert.match(releaseWorkflow, /docker push "\$\{image\}:\$\{version\}-\$\{target\}"/);
+    assert.match(releaseWorkflow, /npm run build:start9 -- --version "\$\{version\}"/);
+    assert.match(releaseWorkflow, /--image "\$\{image\}:\$\{GITHUB_REF_NAME\}-start9"/);
     assert.match(releaseWorkflow, /npm run build:umbrel -- --version "\$\{version\}"/);
     assert.match(releaseWorkflow, /--image "\$\{image\}:\$\{GITHUB_REF_NAME\}-umbrel"/);
 });

@@ -34,7 +34,8 @@ Repeat with `target=start9` and `target=umbrel`.
 
 1. Push an alpha tag that matches `v0.*.*`.
 2. Wait for the `Release` workflow to finish.
-3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Umbrel package tarball, and `SHA256SUMS` artifacts.
+3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Start9 source tarball, Umbrel package tarball,
+   and `SHA256SUMS` artifacts.
 4. Confirm GHCR has both tag-preserving and version-only tags for each target:
    - `v0.x.y-standalone` and `0.x.y-standalone`.
    - `v0.x.y-start9` and `0.x.y-start9`.
@@ -56,6 +57,6 @@ Repeat with `target=start9` and `target=umbrel`.
 ## Not proven
 
 - No release is proven until a real `v0.*.*` tag runs and the GitHub release plus GHCR tags are read back.
-- `start9` currently identifies target images only. Real Start9 package manifests are not implemented.
+- The Start9 package-source artifact is not complete until `.s9pk` build, device install, and transfer UAT pass.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
 - Multi-architecture publication is not implemented.

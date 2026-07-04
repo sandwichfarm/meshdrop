@@ -1,0 +1,14 @@
+{
+  "name": "meshdrop-startos",
+  "version": "__MESHDROP_VERSION__",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@start9labs/start-sdk": "1.5.3",
+    "typescript": "5.8.3"
+  }
+}

@@ -6,7 +6,7 @@ This ledger prevents release or UAT notes from overstating platform support.
 |--------|--------|---------------|---------------------------------|
 | SPA | Backend-free transfer smoke exists | `npm run test:spa-artifact` | Public relay and browser-matrix UAT |
 | Docker | Container admin, local, and Pollen smoke exists | `npm run test:docker` | Real deployed-admin UAT and two-host relay UAT |
-| Start9 | Target image metadata only | `MESHDROP_TARGET=start9` image tags | Start9 package and device UAT |
+| Start9 | Package source smoke exists | `npm run build:start9`; package test | `.s9pk` build, device install, and transfer UAT |
 | Umbrel | Package artifact smoke exists | `npm run build:umbrel`; package test | Umbrel device install and transfer UAT |
 | Desktop Native | Not implemented | None | Native shell selection, build target, runtime capability manifest, and transfer UAT |
 | iOS | Not implemented | None | Mobile runtime design, build target, platform transport negotiation, and transfer UAT |
