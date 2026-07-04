@@ -34,8 +34,8 @@ Repeat with `target=start9` and `target=umbrel`.
 
 1. Push an alpha tag that matches `v0.*.*`.
 2. Wait for the `Release` workflow to finish.
-3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Start9 source tarball, Umbrel package tarball,
-   and `SHA256SUMS` artifacts.
+3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Desktop Native source tarball, iOS source
+   tarball, Android source tarball, Start9 source tarball, Umbrel package tarball, and `SHA256SUMS` artifacts.
 4. Confirm GHCR has both tag-preserving and version-only tags for each target:
    - `v0.x.y-standalone` and `0.x.y-standalone`.
    - `v0.x.y-start9` and `0.x.y-start9`.
@@ -80,6 +80,8 @@ Repeat with `target=start9` and `target=umbrel`.
 - The release workflow is configured for multi-architecture GHCR manifests, but no multi-arch release is proven until
   `docker buildx imagetools inspect` confirms the published tags. If the local token lacks `read:packages`, use
   `release-verify.yml` for that readback.
+- The Desktop Native, iOS, and Android source artifacts are not complete native targets until native shells, installable
+  packages, and transfer UAT pass.
 - The Start9 package-source artifact is not complete until `.s9pk` build, device install, and transfer UAT pass.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
 
@@ -92,6 +94,9 @@ Repeat with `target=start9` and `target=umbrel`.
 - Release verification workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28711452622
 - Assets: `meshdrop-node-0.1.0.tar.gz`, `meshdrop-source-0.1.0.tar.gz`, `meshdrop-spa-0.1.0.tar.gz`,
   `meshdrop-start9-0.1.0.tar.gz`, `meshdrop-umbrel-0.1.0.tar.gz`, and `SHA256SUMS`.
+- Desktop Native, iOS, and Android source artifacts were added after `v0.1.0`; the next release verification must
+  include `meshdrop-desktop-<version>.tar.gz`, `meshdrop-ios-<version>.tar.gz`, and
+  `meshdrop-android-<version>.tar.gz`.
 - GHCR tags checked by `release-verify.yml`: `v0.1.0-standalone`, `0.1.0-standalone`, `v0.1.0-start9`,
   `0.1.0-start9`, `v0.1.0-umbrel`, and `0.1.0-umbrel`.
 - `release-verify.yml` confirmed `linux/amd64` and `linux/arm64` manifests with GitHub Actions package permissions,
