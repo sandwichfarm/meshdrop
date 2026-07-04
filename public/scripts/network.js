@@ -1303,6 +1303,7 @@ class RTCPeer extends Peer {
     }
 
     _connect() {
+        if (this._shouldRefreshOfferConnection()) this._dropConnection();
         if (!this._conn || this._conn.signalingState === "closed") this._openConnection();
 
         if (this._isCaller) {
@@ -1311,6 +1312,12 @@ class RTCPeer extends Peer {
         else {
             this._conn.ondatachannel = e => this._onChannelOpened(e);
         }
+    }
+
+    _shouldRefreshOfferConnection() {
+        if (!this._isCaller || !this._conn || this._conn.signalingState === "closed") return false;
+        if (this._isConnected() || this._isConnecting()) return false;
+        return !!(this._conn.localDescription || this._conn.remoteDescription);
     }
 
     _openConnection() {
