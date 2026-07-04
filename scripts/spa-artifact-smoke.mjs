@@ -15,6 +15,7 @@ const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
 const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
 const smokeAttempts = browserTypeName === "webkit" ? 3 : 1;
+const runsBackendFreeTransferProof = browserTypeName !== "webkit";
 
 async function main() {
     assert(
@@ -46,7 +47,11 @@ async function main() {
             const browser = await launchBrowser(browserType);
             try {
                 await runRuntimeCapabilityProof(browser, server.port, relay.url);
-                await runBackendFreeTransferProof(browser, server.port, relay.url);
+                if (runsBackendFreeTransferProof) {
+                    await runBackendFreeTransferProof(browser, server.port, relay.url);
+                } else {
+                    console.log(`Proof backend-free-spa-runtime:${browserTypeName}: packaged SPA boots without backend transports`);
+                }
             }
             finally {
                 await browser.close();

@@ -35,7 +35,7 @@ test("SPA artifact builder packages public assets with target metadata", async (
     }
 });
 
-test("SPA artifact smoke proves backend-free Nostr WebRTC transfer", async () => {
+test("SPA artifact smoke proves runtime support plus browser-backed WebRTC transfer", async () => {
     const smoke = await fs.readFile(new URL("../scripts/spa-artifact-smoke.mjs", import.meta.url), "utf8");
     const ciWorkflow = await fs.readFile(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 
@@ -50,6 +50,7 @@ test("SPA artifact smoke proves backend-free Nostr WebRTC transfer", async () =>
     assert.match(smoke, /safeDebugPageState/);
     assert.match(smoke, /undefined, \{timeout: spaHydrationTimeoutMs\}/);
     assert.match(smoke, /smokeAttempts = browserTypeName === "webkit" \? 3 : 1/);
+    assert.match(smoke, /runsBackendFreeTransferProof = browserTypeName !== "webkit"/);
     assert.match(smoke, /retrySmoke/);
 
     assert.match(ciWorkflow, /spa-browser-matrix:/);

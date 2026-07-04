@@ -4,7 +4,7 @@ This ledger prevents release or UAT notes from overstating platform support.
 
 | Target | Status | Current proof | Remaining proof before complete |
 |--------|--------|---------------|---------------------------------|
-| SPA | Browser-matrix backend-free transfer smoke exists | `SPA browser matrix` CI job; `npm run test:spa-artifact` | Public relay UAT |
+| SPA | Chromium/Firefox backend-free transfer smoke exists; WebKit runtime smoke exists | `SPA browser matrix` CI job; `npm run test:spa-artifact` | WebKit transfer UAT; public relay UAT |
 | Docker | Container admin, local, and Pollen smoke exists | `npm run test:docker` | Real deployed-admin UAT and two-host relay UAT |
 | Start9 | Package source smoke exists | `npm run build:start9`; package test | `.s9pk` build, device install, and transfer UAT |
 | Umbrel | Package artifact smoke exists | `npm run build:umbrel`; package test | Umbrel device install and transfer UAT |
