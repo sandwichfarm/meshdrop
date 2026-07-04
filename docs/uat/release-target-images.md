@@ -81,39 +81,31 @@ Repeat with `target=start9` and `target=umbrel`.
 
 ## Not proven
 
-- `v0.1.0` authenticated release artifacts are proven by release run `28711136765` and release verification run
-  `28711452622`.
-- Anonymous local readback is not proven for `v0.1.0`: `docker manifest inspect
-  ghcr.io/sandwichfarm/meshdrop:v0.1.0-start9` returned `denied` on 2026-07-04.
-- Anonymous local readback is still not proven after adding the local verifier: with an empty temporary Docker config,
-  `npm run verify:ghcr-anonymous -- v0.1.0` returns `unauthorized` for
-  `ghcr.io/sandwichfarm/meshdrop:v0.1.0-standalone`. The local GitHub token also lacks `read:packages`, so this
-  session cannot inspect or change package visibility through the Packages REST API.
-- A future release is not proven until its real `v0.*.*` tag runs and the GitHub release plus GHCR tags are read back.
-- The release workflow is configured for multi-architecture GHCR manifests, but no multi-arch release is proven until
-  `docker buildx imagetools inspect` confirms the published tags. If the local token lacks `read:packages`, use
-  `release-verify.yml` for that readback.
+- Anonymous local readback is not proven for `v0.1.2`: the release readback job failed at anonymous GHCR after Docker
+  smoke passed, and `npm run verify:ghcr-anonymous -- v0.1.2` currently fails with GHCR `unauthorized` for
+  `ghcr.io/sandwichfarm/meshdrop:v0.1.2-standalone`.
+- The local GitHub token lacks `read:packages`, so this session cannot inspect package visibility through the Packages
+  REST API. Making `ghcr.io/sandwichfarm/meshdrop` public is still required before anonymous manifest readback can pass.
 - The Desktop Native, iOS, and Android source artifacts are not complete native targets until native shells, installable
   packages, and transfer UAT pass.
-- The Start9 package-source artifact is not complete until `.s9pk` build, device install, and transfer UAT pass.
+- The Start9 package is not complete until device install and transfer UAT pass on StartOS.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
 
 ## Current Verified Release
 
-`v0.1.0` was published on 2026-07-04 and verified with these readbacks:
+`v0.1.2` release assets and authenticated GHCR readback are proven by release run `28721154277`. It was published on
+2026-07-04 and verified with these readbacks before the strict anonymous GHCR gate failed:
 
-- GitHub release: https://github.com/sandwichfarm/meshdrop/releases/tag/v0.1.0
-- Release workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28711136765
-- Release verification workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28711452622
-- Assets: `meshdrop-node-0.1.0.tar.gz`, `meshdrop-source-0.1.0.tar.gz`, `meshdrop-spa-0.1.0.tar.gz`,
-  `meshdrop-start9-0.1.0.tar.gz`, `meshdrop-umbrel-0.1.0.tar.gz`, and `SHA256SUMS`.
-- Desktop Native, iOS, and Android source artifacts were added after `v0.1.0`; the next release verification must
-  include `meshdrop-desktop-<version>.tar.gz`, `meshdrop-ios-<version>.tar.gz`, and
-  `meshdrop-android-<version>.tar.gz`.
-- GHCR tags checked by `release-verify.yml`: `v0.1.0-standalone`, `0.1.0-standalone`, `v0.1.0-start9`,
-  `0.1.0-start9`, `v0.1.0-umbrel`, and `0.1.0-umbrel`.
+- GitHub release: https://github.com/sandwichfarm/meshdrop/releases/tag/v0.1.2
+- Release workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28721154277
+- Assets: `meshdrop-android-0.1.2.tar.gz`, `meshdrop-desktop-0.1.2.tar.gz`,
+  `meshdrop-ios-0.1.2.tar.gz`, `meshdrop-node-0.1.2.tar.gz`, `meshdrop-source-0.1.2.tar.gz`,
+  `meshdrop-spa-0.1.2.tar.gz`, `meshdrop-start9-0.1.2.tar.gz`, `meshdrop-umbrel-0.1.2.tar.gz`,
+  and `SHA256SUMS`.
+- GHCR target image jobs passed for `start9`, `standalone`, and `umbrel`.
+- GHCR tags checked by `release-verify.yml`: `v0.1.2-standalone`, `0.1.2-standalone`, `v0.1.2-start9`,
+  `0.1.2-start9`, `v0.1.2-umbrel`, and `0.1.2-umbrel`.
 - `release-verify.yml` confirmed `linux/amd64` and `linux/arm64` manifests with GitHub Actions package permissions,
-  pulled target metadata, and `npm run test:docker` against `ghcr.io/sandwichfarm/meshdrop:v0.1.0-standalone`.
-- Anonymous GHCR manifest readback was added after the `v0.1.0` release and is required for the next release proof.
-- Local anonymous readback command: `npm run verify:ghcr-anonymous -- v0.1.0` currently fails with GHCR `unauthorized`
-  until the `ghcr.io/sandwichfarm/meshdrop` package is public or a newer release proves public visibility.
+  pulled target metadata, and Docker smoke passed for `ghcr.io/sandwichfarm/meshdrop:v0.1.2-standalone`.
+- The same release readback failed at anonymous GHCR manifest readback with `unauthorized`, so the release image target
+  remains incomplete until `ghcr.io/sandwichfarm/meshdrop` is public and anonymous readback passes.
