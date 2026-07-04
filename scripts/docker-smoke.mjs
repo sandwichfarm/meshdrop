@@ -82,6 +82,10 @@ async function main() {
             "Runtime capabilities script was not served"
         );
 
+        await run("node", ["scripts/docker-browser-transfer-smoke.mjs"], {
+            env: {MESHDROP_DOCKER_TRANSFER_BASE_URL: baseUrl}
+        });
+
         console.log(`Docker smoke passed for ${image} on ${baseUrl}`);
     }
     finally {
@@ -93,6 +97,7 @@ function run(command, args, options = {}) {
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
             cwd: new URL("..", import.meta.url),
+            env: {...process.env, ...options.env},
             stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit"
         });
         let stdout = "";
