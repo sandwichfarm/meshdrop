@@ -73,6 +73,7 @@ jobs:
             echo "meshdrop-android-${version}.tar.gz"
             echo "meshdrop-android-native-source-${version}.tar.gz"
             echo "meshdrop-desktop-${version}.tar.gz"
+            echo "meshdrop-desktop-chromium-${version}.tar.gz"
             echo "meshdrop-desktop-linux-${version}.tar.gz"
             echo "meshdrop-ios-${version}.tar.gz"
             echo "meshdrop-ios-native-source-${version}.tar.gz"

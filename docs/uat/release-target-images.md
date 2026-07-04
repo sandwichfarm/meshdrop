@@ -35,8 +35,8 @@ Repeat with `target=start9` and `target=umbrel`.
 1. Push an alpha tag that matches `v0.*.*`.
 2. Wait for the `Release` workflow to finish.
 3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Desktop Native source tarball, Desktop Native
-   Linux shell tarball, iOS source tarball, iOS native-source tarball, Android source tarball, Android native-source
-   tarball, Start9 source tarball, Umbrel package tarball, and `SHA256SUMS` artifacts.
+   Linux shell tarball, Desktop Chromium shell tarball, iOS source tarball, iOS native-source tarball, Android source
+   tarball, Android native-source tarball, Start9 source tarball, Umbrel package tarball, and `SHA256SUMS` artifacts.
 4. Confirm GHCR has both tag-preserving and version-only tags for each target:
    - `v0.x.y-standalone` and `0.x.y-standalone`.
    - `v0.x.y-start9` and `0.x.y-start9`.
@@ -106,6 +106,8 @@ Repeat with `target=start9` and `target=umbrel`.
   and `SHA256SUMS`.
 - Desktop Native Linux shell artifacts are added after `v0.1.2`; the next release verification must include
   `meshdrop-desktop-linux-<version>.tar.gz`.
+- Desktop Chromium shell artifacts are added after `v0.1.2`; the next release verification must include
+  `meshdrop-desktop-chromium-<version>.tar.gz`.
 - iOS and Android native-source artifacts are added after `v0.1.2`; the next release verification must include
   `meshdrop-ios-native-source-<version>.tar.gz` and `meshdrop-android-native-source-<version>.tar.gz`.
 - GHCR target image jobs passed for `start9`, `standalone`, and `umbrel`.
