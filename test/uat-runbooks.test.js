@@ -34,8 +34,12 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(spa, /No current WebKit transfer proof is recorded/);
 
     assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker/);
+    assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker:two-host/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_ADMIN_NPUB/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DISCOVERY_NPUBS/);
+    assert.match(readDoc("docs/uat/docker.md"), /Proof docker-two-host-nostr-webrtc/);
+    assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DOCKER_PUBLIC_RELAY_URLS=wss:\/\/bucket\.coracle\.social/);
+    assert.match(readDoc("docs/uat/docker.md"), /Proof docker-public-relay-two-host-webrtc/);
 
     const start9 = readDoc("docs/uat/start9.md");
     assert.match(start9, /npm run build:start9/);
@@ -80,6 +84,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     );
     assert.match(targetStatus, /manual run `28713488687` public relay jobs/);
     assert.match(targetStatus, /WebKit transfer UAT via `MESHDROP_SPA_WEBKIT_TRANSFER=1`/);
+    assert.match(targetStatus, /deterministic two-host relay smoke exists/);
+    assert.match(targetStatus, /public relay two-host UAT/);
     assert.match(targetStatus, /\| Desktop Native \| Not implemented \|/);
     assert.match(targetStatus, /\| iOS \| Not implemented \|/);
     assert.match(targetStatus, /\| Android \| Not implemented \|/);
