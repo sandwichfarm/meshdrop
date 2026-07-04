@@ -1,6 +1,12 @@
 name: Release Verification
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Alpha release tag to verify, for example v0.1.0
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:

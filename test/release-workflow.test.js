@@ -47,12 +47,18 @@ test("Dockerfile records the image target inside released containers", () => {
 
 test("release tags use one workflow for GitHub release artifacts and GHCR images", () => {
     assert.equal(fs.existsSync(duplicateGhcrWorkflow), false);
+    assert.match(releaseWorkflow, /verify-release:/);
+    assert.match(releaseWorkflow, /needs: container-images/);
+    assert.match(releaseWorkflow, /uses: \.\/\.github\/workflows\/release-verify\.yml/);
+    assert.match(releaseWorkflow, /tag: \$\{\{ github\.ref_name \}\}/);
 });
 
 test("release verification workflow reads back assets, manifests, and pulled standalone smoke", () => {
     assert.equal(fs.existsSync(releaseVerifyWorkflowUrl), true);
 
     const releaseVerifyWorkflow = fs.readFileSync(releaseVerifyWorkflowUrl, "utf8");
+    assert.match(releaseVerifyWorkflow, /workflow_call:/);
+    assert.match(releaseVerifyWorkflow, /type: string/);
     assert.match(releaseVerifyWorkflow, /workflow_dispatch:/);
     assert.match(releaseVerifyWorkflow, /tag:/);
     assert.match(releaseVerifyWorkflow, /permissions:\n  contents: read\n  packages: read/);
