@@ -48,6 +48,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `260704-mob-mobile-source-artifacts` | complete | iOS/Android source artifact builds/tests; `npm test`; archive manifest readback; diff/slop gates; native shells, Bluetooth, and mobile transfer UAT remain open |
 | 2026-07-04 | `260704-rat-release-all-target-artifacts` | complete | Release workflow now builds/verifies Desktop/iOS/Android source tarballs; focused tests, actionlint, YAML parse, `npm test`, diff/slop gates |
 | 2026-07-04 | `260704-vcs-artifact-transfer-smoke` | complete | Desktop/iOS/Android source artifacts read target manifests and transfer proof files over Nostr WebRTC; `npm test`; target-artifact smoke; diff/slop gates |
+| 2026-07-04 | `260704-vlf-target-artifact-ci` | complete | CI runs target-artifact transfer smoke after unit tests; red/green workflow guard; actionlint; target-artifact smoke; `npm test`; diff/slop gates |
 
 ## Active Quick Task
 
