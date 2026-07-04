@@ -11,7 +11,7 @@ This ledger prevents release or UAT notes from overstating platform support.
 | Desktop Native | Not implemented | None | Native shell selection, build target, runtime capability manifest, and transfer UAT |
 | iOS | Not implemented | None | Mobile runtime design, build target, platform transport negotiation, and transfer UAT |
 | Android | Not implemented | None | Mobile runtime design, build target, platform transport negotiation, and transfer UAT |
-| Release Images | `v0.1.0` verified | Release run `28711136765`; release verification run `28711452622` | Repeat release verification for each new `v0.*.*` tag |
+| Release Images | `v0.1.0` authenticated readback verified | Release run `28711136765`; release verification run `28711452622`; local anonymous `docker manifest inspect ghcr.io/sandwichfarm/meshdrop:v0.1.0-start9` returned `denied` | Anonymous GHCR manifest readback and full release verification for each new `v0.*.*` tag |
 
 ## Rules
 

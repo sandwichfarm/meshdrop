@@ -62,7 +62,8 @@ Repeat with `target=start9` and `target=umbrel`.
    MESHDROP_DOCKER_IMAGE=ghcr.io/sandwichfarm/meshdrop:v0.x.y-standalone npm run test:docker
    ```
 
-8. Dispatch the repo-owned release verification workflow so GHCR readback runs with GitHub Actions package permissions:
+8. Dispatch the repo-owned release verification workflow so authenticated readback runs with GitHub Actions package
+   permissions and anonymous GHCR manifest readback is checked after `docker logout ghcr.io`:
 
    ```sh
    gh workflow run release-verify.yml --repo sandwichfarm/meshdrop --ref master -f tag=v0.x.y
@@ -71,7 +72,10 @@ Repeat with `target=start9` and `target=umbrel`.
 
 ## Not proven
 
-- `v0.1.0` is proven by release run `28711136765` and release verification run `28711452622`.
+- `v0.1.0` authenticated release artifacts are proven by release run `28711136765` and release verification run
+  `28711452622`.
+- Anonymous local readback is not proven for `v0.1.0`: `docker manifest inspect
+  ghcr.io/sandwichfarm/meshdrop:v0.1.0-start9` returned `denied` on 2026-07-04.
 - A future release is not proven until its real `v0.*.*` tag runs and the GitHub release plus GHCR tags are read back.
 - The release workflow is configured for multi-architecture GHCR manifests, but no multi-arch release is proven until
   `docker buildx imagetools inspect` confirms the published tags. If the local token lacks `read:packages`, use
@@ -90,5 +94,6 @@ Repeat with `target=start9` and `target=umbrel`.
   `meshdrop-start9-0.1.0.tar.gz`, `meshdrop-umbrel-0.1.0.tar.gz`, and `SHA256SUMS`.
 - GHCR tags checked by `release-verify.yml`: `v0.1.0-standalone`, `0.1.0-standalone`, `v0.1.0-start9`,
   `0.1.0-start9`, `v0.1.0-umbrel`, and `0.1.0-umbrel`.
-- `release-verify.yml` confirmed `linux/amd64` and `linux/arm64` manifests, pulled target metadata, and
-  `npm run test:docker` against `ghcr.io/sandwichfarm/meshdrop:v0.1.0-standalone`.
+- `release-verify.yml` confirmed `linux/amd64` and `linux/arm64` manifests with GitHub Actions package permissions,
+  pulled target metadata, and `npm run test:docker` against `ghcr.io/sandwichfarm/meshdrop:v0.1.0-standalone`.
+- Anonymous GHCR manifest readback was added after the `v0.1.0` release and is required for the next release proof.

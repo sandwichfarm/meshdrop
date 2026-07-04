@@ -51,6 +51,9 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /ref: \$\{\{ inputs\.tag \}\}/);
     assert.match(releaseVerifyWorkflow, /gh release view "\$\{tag\}"/);
     assert.match(releaseVerifyWorkflow, /docker buildx imagetools inspect "\$\{image\}"/);
+    assert.match(releaseVerifyWorkflow, /Verify anonymous GHCR manifests/);
+    assert.match(releaseVerifyWorkflow, /docker logout ghcr\.io/);
+    assert.match(releaseVerifyWorkflow, /without GHCR login/);
     assert.match(releaseVerifyWorkflow, /linux\/amd64/);
     assert.match(releaseVerifyWorkflow, /linux\/arm64/);
     assert.match(releaseVerifyWorkflow, /MESHDROP_DOCKER_IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}:\$\{\{ inputs\.tag \}\}-standalone/);

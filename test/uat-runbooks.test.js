@@ -68,8 +68,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /multi-architecture manifests for `linux\/amd64` and `linux\/arm64`/);
     assert.match(releaseTargets, /docker buildx imagetools inspect/);
     assert.match(releaseTargets, /release-verify\.yml/);
-    assert.match(releaseTargets, /readback runs with GitHub Actions package permissions/);
-    assert.match(releaseTargets, /v0\.1\.0` is proven by release run `28711136765`/);
+    assert.match(releaseTargets, /authenticated readback runs with GitHub Actions package/);
+    assert.match(releaseTargets, /permissions and anonymous GHCR manifest readback/);
+    assert.match(releaseTargets, /anonymous GHCR manifest readback/);
+    assert.match(releaseTargets, /v0\.1\.0` authenticated release artifacts are proven by release run `28711136765`/);
     assert.match(releaseTargets, /release verification workflow: https:\/\/github\.com\/sandwichfarm\/meshdrop\/actions\/runs\/28711452622/i);
     assert.match(releaseTargets, /meshdrop-spa-0\.1\.0\.tar\.gz/);
     assert.match(releaseTargets, /v0\.1\.0-standalone/);
@@ -81,7 +83,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     for (const target of ["SPA", "Docker", "Start9", "Umbrel", "Desktop Native", "iOS", "Android", "Release Images"]) {
         assert.match(targetStatus, new RegExp(`\\| ${target} \\|`));
     }
-    assert.match(targetStatus, /\| Release Images \| `v0\.1\.0` verified \|/);
+    assert.match(targetStatus, /\| Release Images \| `v0\.1\.0` authenticated readback verified \|/);
+    assert.match(targetStatus, /local anonymous `docker manifest inspect ghcr\.io\/sandwichfarm\/meshdrop:v0\.1\.0-start9` returned `denied`/);
     assert.match(
         targetStatus,
         /\| SPA \| Chromium\/Firefox\/WebKit backend-free transfer smoke exists; Chromium\/Firefox public relay UAT exists \|/
