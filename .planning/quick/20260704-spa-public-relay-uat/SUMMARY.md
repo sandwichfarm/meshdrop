@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress.
+Complete.
 
 ## Implemented
 
@@ -20,8 +20,11 @@ In progress.
 - Workflow YAML parsed with Ruby.
 - Local Chromium public relay proof passed against `wss://bucket.coracle.social`:
   `Proof public-spa-nostr-webrtc:chromium: nostr delivered meshdrop-spa-proof.txt`.
+- PR #32 merged at `89205cb`.
+- Manual CI run `28713488687` public relay UAT jobs passed for Chromium and Firefox:
+  - Chromium: `Proof public-spa-nostr-webrtc:chromium: nostr delivered meshdrop-spa-proof.txt`.
+  - Firefox: `Proof public-spa-nostr-webrtc:firefox: nostr delivered meshdrop-spa-proof.txt`.
 
 ## Remaining
 
-- GitHub-hosted manual public relay workflow readback for Firefox.
 - WebKit transfer UAT remains open.
