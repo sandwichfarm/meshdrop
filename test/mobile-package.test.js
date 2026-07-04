@@ -9,7 +9,7 @@ import {buildMobilePackage, listTarEntries, parseArgs, readTarEntry} from "../sc
 const packageJson = JSON.parse(await fs.readFile(new URL("../package.json", import.meta.url), "utf8"));
 const expectedRemainingProof = [
     "native mobile shell build",
-    "mobile WebRTC transfer UAT",
+    "native mobile WebRTC transfer UAT",
     "mobile file picker and share sheet",
     "Bluetooth transport negotiation"
 ];

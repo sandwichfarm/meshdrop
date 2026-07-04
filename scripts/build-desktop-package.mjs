@@ -92,7 +92,7 @@ async function writeTargetManifest(stageDir, version) {
         },
         remainingProof: [
             "native shell build",
-            "desktop WebRTC transfer UAT",
+            "native desktop WebRTC transfer UAT",
             "desktop installer or signed binary"
         ]
     };
