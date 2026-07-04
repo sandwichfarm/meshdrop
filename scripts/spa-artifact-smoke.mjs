@@ -3,10 +3,11 @@ import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import {pathToFileURL} from "node:url";
 
 import {buildSpaArtifact} from "./build-spa-artifact.mjs";
 
-const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH || "/usr/lib/node_modules/playwright/index.mjs";
+const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/node_modules/playwright/index.mjs";
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 
 async function main() {
@@ -28,7 +29,7 @@ async function main() {
     let browser = null;
 
     try {
-        const {chromium} = await import(playwrightModulePath);
+        const {chromium} = await loadPlaywright();
         const launchOptions = {headless: true};
         if (chromiumPath) launchOptions.executablePath = chromiumPath;
         browser = await chromium.launch(launchOptions);
@@ -77,6 +78,21 @@ async function main() {
         await new Promise(resolve => server.close(resolve));
         await fs.rm(tempDir, {recursive: true, force: true});
     }
+}
+
+async function loadPlaywright() {
+    if (playwrightModulePath) {
+        try {
+            await fs.access(playwrightModulePath);
+            return import(pathToFileURL(playwrightModulePath).href);
+        } catch (error) {
+            if (process.env.PLAYWRIGHT_MODULE_PATH) {
+                throw new Error(`PLAYWRIGHT_MODULE_PATH is not readable: ${playwrightModulePath}\n${error.message}`);
+            }
+        }
+    }
+
+    return import("playwright");
 }
 
 function startStaticServer(root) {
