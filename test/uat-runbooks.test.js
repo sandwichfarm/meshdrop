@@ -42,6 +42,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DOCKER_PUBLIC_RELAY_ATTEMPTS/);
     assert.match(readDoc("docs/uat/docker.md"), /Proof docker-public-relay-two-host-webrtc/);
     assert.match(readDoc("docs/uat/docker.md"), /manual run `28715209725`/);
+    assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker:admin/);
+    assert.match(readDoc("docs/uat/docker.md"), /Proof docker-deployed-admin-settings/);
 
     const start9 = readDoc("docs/uat/start9.md");
     assert.match(start9, /npm run build:start9/);
@@ -86,9 +88,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     );
     assert.match(targetStatus, /manual run `28713488687` public relay jobs/);
     assert.match(targetStatus, /WebKit transfer UAT via `MESHDROP_SPA_WEBKIT_TRANSFER=1`/);
-    assert.match(targetStatus, /deterministic two-host relay, and public relay two-host UAT exists/);
+    assert.match(targetStatus, /deterministic two-host relay, public relay two-host UAT, and deployed-admin UAT exists/);
     assert.match(targetStatus, /manual run `28715209725` Docker public relay UAT/);
-    assert.match(targetStatus, /\| Docker \|[^|]+public relay two-host UAT exists[^|]+\|[^|]+\| Real deployed-admin UAT \|/);
+    assert.match(targetStatus, /\| Docker \|[^|]+deployed-admin UAT exists[^|]+\|[^|]+\| None recorded for Docker \|/);
     assert.match(targetStatus, /\| Desktop Native \| Not implemented \|/);
     assert.match(targetStatus, /\| iOS \| Not implemented \|/);
     assert.match(targetStatus, /\| Android \| Not implemented \|/);

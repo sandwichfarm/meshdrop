@@ -95,7 +95,7 @@ export default class FipsControlClient {
         for (const peer of normalizedPeers) {
             for (const address of peer.addresses) {
                 connections.push(await this.request("connect", {
-                    peer: peer.npub,
+                    npub: peer.npub,
                     address: address.addr,
                     transport: address.transport
                 }));

@@ -265,7 +265,7 @@ test("FIPS control client saves peers then requests a server restart", async () 
             {
                 command: "connect",
                 params: {
-                    peer: "npub1peer",
+                    npub: "npub1peer",
                     address: "203.0.113.9:2121",
                     transport: "tcp"
                 }
