@@ -26,8 +26,16 @@ const browserExecutablePaths = {
 const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
 const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
-const smokeAttempts = browserTypeName === "webkit" ? 3 : 1;
 const webkitTransferRequested = process.env.MESHDROP_SPA_WEBKIT_TRANSFER === "1";
+const defaultSmokeAttempts = browserTypeName === "webkit" ? 3 : 1;
+const webkitTransferStrategies = webkitTransferRequested && browserTypeName === "webkit"
+    ? [
+        {name: "one-context-two-origins", singleBrowserContext: true},
+        {name: "two-contexts-two-origins", singleBrowserContext: false},
+        {name: "two-browsers-two-origins", separateBrowsers: true, singleBrowserContext: false}
+    ]
+    : Array.from({length: defaultSmokeAttempts}, () => ({name: "default", singleBrowserContext: false}));
+const smokeAttempts = webkitTransferStrategies.length;
 const runsBackendFreeTransferProof = browserTypeName !== "webkit" || webkitTransferRequested;
 const publicRelayUrls = parseRelayUrls(process.env.MESHDROP_SPA_PUBLIC_RELAY_URLS || "");
 
@@ -59,14 +67,21 @@ async function main() {
     try {
         const playwright = await loadPlaywright(playwrightModulePath);
         const browserType = playwright[browserTypeName];
-        await retrySmoke(async () => {
+        await retrySmoke(async attempt => {
             const browser = await launchBrowser(browserType);
+            const strategy = webkitTransferStrategies[Math.min(attempt - 1, webkitTransferStrategies.length - 1)];
             try {
-                await runRuntimeCapabilityProof(browser, server.port, relayUrls);
+                if (!webkitTransferRequested || browserTypeName !== "webkit") {
+                    await runRuntimeCapabilityProof(browser, server.port, relayUrls);
+                }
                 if (runsBackendFreeTransferProof) {
                     await runBackendFreeTransferProof(browser, server.port, relayUrls, {
                         peerBPort: peerBServer?.port,
-                        singleBrowserContext: browserTypeName === "webkit" && webkitTransferRequested
+                        browserType,
+                        singleBrowserContext: strategy.singleBrowserContext,
+                        separateBrowsers: strategy.separateBrowsers,
+                        sequentialSetup: browserTypeName === "webkit",
+                        strategyName: strategy.name
                     });
                 } else {
                     console.log(
@@ -100,7 +115,7 @@ async function retrySmoke(run) {
     let lastError = null;
     for (let attempt = 1; attempt <= smokeAttempts; attempt++) {
         try {
-            return await run();
+            return await run(attempt);
         } catch (error) {
             lastError = error;
             if (attempt === smokeAttempts) break;
@@ -147,12 +162,13 @@ async function runRuntimeCapabilityProof(browser, port, relayUrls) {
 }
 
 async function runBackendFreeTransferProof(browser, port, relayUrls, options = {}) {
-    if (options.singleBrowserContext) {
-        console.log("WebKit transfer UAT: using one browser context with two static origins");
+    if (options.strategyName && options.strategyName !== "default") {
+        console.log(`WebKit transfer UAT strategy: ${options.strategyName}`);
     }
 
+    const browserB = options.separateBrowsers ? await launchBrowser(options.browserType) : browser;
     const contextA = await browser.newContext({serviceWorkers: "block"});
-    const contextB = options.singleBrowserContext ? contextA : await browser.newContext({serviceWorkers: "block"});
+    const contextB = options.singleBrowserContext ? contextA : await browserB.newContext({serviceWorkers: "block"});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const identities = createProofIdentityPair();
@@ -162,21 +178,36 @@ async function runBackendFreeTransferProof(browser, port, relayUrls, options = {
     ];
 
     try {
-        await Promise.all([
-            installProofSigner(pageA, identities.a),
-            installProofSigner(pageB, identities.b)
-        ]);
-        await Promise.all([
-            addSpaInitScript(pageA, identities.a, relayUrls),
-            addSpaInitScript(pageB, identities.b, relayUrls)
-        ]);
-        await Promise.all([
-            pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
-            pageB.goto(`http://127.0.0.1:${options.peerBPort || port}`, {waitUntil: "domcontentloaded"})
-        ]);
-        await Promise.all([waitForSpaHydration(pageA, "sender"), waitForSpaHydration(pageB, "receiver")]);
-        await Promise.all([connectNostr(pageA), connectNostr(pageB)]);
-        await Promise.all([setFollowList(pageA), setFollowList(pageB)]);
+        if (options.sequentialSetup) {
+            await installProofSigner(pageA, identities.a);
+            await installProofSigner(pageB, identities.b);
+            await addSpaInitScript(pageA, identities.a, relayUrls);
+            await addSpaInitScript(pageB, identities.b, relayUrls);
+            await pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"});
+            await waitForSpaHydration(pageA, "sender");
+            await pageB.goto(`http://127.0.0.1:${options.peerBPort || port}`, {waitUntil: "domcontentloaded"});
+            await waitForSpaHydration(pageB, "receiver");
+            await connectNostr(pageA);
+            await connectNostr(pageB);
+            await setFollowList(pageA);
+            await setFollowList(pageB);
+        } else {
+            await Promise.all([
+                installProofSigner(pageA, identities.a),
+                installProofSigner(pageB, identities.b)
+            ]);
+            await Promise.all([
+                addSpaInitScript(pageA, identities.a, relayUrls),
+                addSpaInitScript(pageB, identities.b, relayUrls)
+            ]);
+            await Promise.all([
+                pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
+                pageB.goto(`http://127.0.0.1:${options.peerBPort || port}`, {waitUntil: "domcontentloaded"})
+            ]);
+            await Promise.all([waitForSpaHydration(pageA, "sender"), waitForSpaHydration(pageB, "receiver")]);
+            await Promise.all([connectNostr(pageA), connectNostr(pageB)]);
+            await Promise.all([setFollowList(pageA), setFollowList(pageB)]);
+        }
         await Promise.all([
             pageA.evaluate(() => globalThis.meshdropNostrMesh.connect()),
             pageB.evaluate(() => globalThis.meshdropNostrMesh.connect())
@@ -199,6 +230,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrls, options = {
     }
     finally {
         await Promise.allSettled(contextA === contextB ? [contextA.close()] : [contextA.close(), contextB.close()]);
+        if (browserB !== browser) await browserB.close();
     }
 }
 

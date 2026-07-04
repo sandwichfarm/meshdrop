@@ -54,12 +54,20 @@ test("SPA artifact smoke proves runtime support plus browser-backed WebRTC trans
     assert.match(smoke, /meshdrop-spa-proof\.txt/);
     assert.match(smoke, /safeDebugPageState/);
     assert.match(smoke, /undefined, \{timeout: spaHydrationTimeoutMs\}/);
-    assert.match(smoke, /smokeAttempts = browserTypeName === "webkit" \? 3 : 1/);
+    assert.match(smoke, /defaultSmokeAttempts = browserTypeName === "webkit" \? 3 : 1/);
+    assert.match(smoke, /smokeAttempts = webkitTransferStrategies\.length/);
     assert.match(smoke, /MESHDROP_SPA_WEBKIT_TRANSFER/);
     assert.match(smoke, /runsBackendFreeTransferProof = browserTypeName !== "webkit" \|\| webkitTransferRequested/);
     assert.match(smoke, /set MESHDROP_SPA_WEBKIT_TRANSFER=1 to attempt WebKit transfer UAT/);
-    assert.match(smoke, /singleBrowserContext: browserTypeName === "webkit" && webkitTransferRequested/);
-    assert.match(smoke, /using one browser context with two static origins/);
+    assert.match(smoke, /!webkitTransferRequested \|\| browserTypeName !== "webkit"/);
+    assert.match(smoke, /singleBrowserContext: strategy\.singleBrowserContext/);
+    assert.match(smoke, /separateBrowsers: strategy\.separateBrowsers/);
+    assert.match(smoke, /browserB = options\.separateBrowsers \? await launchBrowser\(options\.browserType\) : browser/);
+    assert.match(smoke, /sequentialSetup: browserTypeName === "webkit"/);
+    assert.match(smoke, /if \(options\.sequentialSetup\)/);
+    assert.match(smoke, /one-context-two-origins/);
+    assert.match(smoke, /two-contexts-two-origins/);
+    assert.match(smoke, /two-browsers-two-origins/);
     assert.match(smoke, /retrySmoke/);
 
     assert.match(support, /finalizeEvent/);

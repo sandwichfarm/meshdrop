@@ -24,14 +24,14 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(spa, /PLAYWRIGHT_BROWSER=webkit/);
     assert.match(spa, /SPA browser matrix/);
     assert.match(spa, /Chromium and Firefox also connect two Nostr identities/);
-    assert.match(spa, /WebKit currently proves packaged runtime compatibility\s+only/);
+    assert.match(spa, /WebKit transfer proof runs in the manual-only/);
     assert.match(spa, /MESHDROP_SPA_WEBKIT_TRANSFER=1/);
     assert.match(spa, /Proof backend-free-spa-nostr-webrtc:webkit/);
+    assert.match(spa, /manual CI run `28716511864` passed the `SPA WebKit transfer UAT`/);
     assert.match(spa, /MESHDROP_SPA_PUBLIC_RELAY_URLS=wss:\/\/bucket\.coracle\.social/);
     assert.match(spa, /Proof public-spa-nostr-webrtc:<browser>/);
     assert.match(spa, /manual-only `SPA public relay UAT` job runs Chromium and Firefox/);
     assert.match(spa, /manual CI run `28713488687` passed the Chromium and Firefox/);
-    assert.match(spa, /No current WebKit transfer proof is recorded/);
 
     assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker/);
     assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker:two-host/);
@@ -84,10 +84,11 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Release Images \| `v0\.1\.0` verified \|/);
     assert.match(
         targetStatus,
-        /\| SPA \| Chromium\/Firefox backend-free transfer smoke exists; WebKit runtime smoke exists; Chromium\/Firefox public relay UAT exists \|/
+        /\| SPA \| Chromium\/Firefox\/WebKit backend-free transfer smoke exists; Chromium\/Firefox public relay UAT exists \|/
     );
     assert.match(targetStatus, /manual run `28713488687` public relay jobs/);
-    assert.match(targetStatus, /WebKit transfer UAT via `MESHDROP_SPA_WEBKIT_TRANSFER=1`/);
+    assert.match(targetStatus, /manual run `28716511864` WebKit transfer UAT/);
+    assert.match(targetStatus, /\| SPA \|[^|]+\|[^|]+\| None recorded for current SPA runbook \|/);
     assert.match(targetStatus, /deterministic two-host relay, public relay two-host UAT, and deployed-admin UAT exists/);
     assert.match(targetStatus, /manual run `28715209725` Docker public relay UAT/);
     assert.match(targetStatus, /\| Docker \|[^|]+deployed-admin UAT exists[^|]+\|[^|]+\| None recorded for Docker \|/);
