@@ -74,6 +74,8 @@ MESHDROP_DOCKER_PUBLIC_RELAY_URLS=wss://bucket.coracle.social npm run test:docke
 ```
 
 Passing output must include `Proof docker-public-relay-two-host-webrtc: nostr delivered meshdrop-proof-icon.svg between two Docker instances`.
+The public relay path retries up to three transfer attempts by default because it depends on external relay delivery;
+set `MESHDROP_DOCKER_PUBLIC_RELAY_ATTEMPTS` to override that UAT retry count.
 
 For GitHub-hosted proof, dispatch the `CI` workflow manually with `docker_public_relay_urls` set to one or more relay
 URLs. The manual-only `Docker public relay UAT` job installs Chromium, builds the Docker image, starts two containers,

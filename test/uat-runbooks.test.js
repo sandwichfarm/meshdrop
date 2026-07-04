@@ -39,6 +39,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DISCOVERY_NPUBS/);
     assert.match(readDoc("docs/uat/docker.md"), /Proof docker-two-host-nostr-webrtc/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DOCKER_PUBLIC_RELAY_URLS=wss:\/\/bucket\.coracle\.social/);
+    assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DOCKER_PUBLIC_RELAY_ATTEMPTS/);
     assert.match(readDoc("docs/uat/docker.md"), /Proof docker-public-relay-two-host-webrtc/);
 
     const start9 = readDoc("docs/uat/start9.md");
