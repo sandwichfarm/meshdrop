@@ -25,6 +25,7 @@ test("SPA artifact builder packages public assets with target metadata", async (
         assert(entries.includes("meshdrop-spa-0.0.0-test/service-worker.js"));
         assert(entries.includes("meshdrop-spa-0.0.0-test/meshdrop-target.json"));
         assert(entries.includes("meshdrop-spa-0.0.0-test/UAT-SPA.md"));
+        assert(!entries.includes("meshdrop-spa-0.0.0-test/scripts/libs/heic2any.min.js"));
         assert(!entries.some(entry => entry.includes("/server/")));
         assert(!entries.some(entry => entry.includes("/node_modules/")));
         assert(!entries.some(entry => entry.endsWith("/package.json")));
