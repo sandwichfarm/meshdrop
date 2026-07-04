@@ -29,6 +29,9 @@ test("release workflow publishes GHCR images for alpha target packages", () => {
     assert.match(releaseWorkflow, /--image "\$\{image\}:\$\{GITHUB_REF_NAME\}-start9"/);
     assert.match(releaseWorkflow, /npm run build:umbrel -- --version "\$\{version\}"/);
     assert.match(releaseWorkflow, /--image "\$\{image\}:\$\{GITHUB_REF_NAME\}-umbrel"/);
+    assert.match(releaseWorkflow, /npm run build:desktop -- --version "\$\{version\}" --out-dir dist/);
+    assert.match(releaseWorkflow, /npm run build:ios -- --version "\$\{version\}" --out-dir dist/);
+    assert.match(releaseWorkflow, /npm run build:android -- --version "\$\{version\}" --out-dir dist/);
 });
 
 test("Dockerfile records the image target inside released containers", () => {
@@ -50,6 +53,9 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /permissions:\n  contents: read\n  packages: read/);
     assert.match(releaseVerifyWorkflow, /ref: \$\{\{ inputs\.tag \}\}/);
     assert.match(releaseVerifyWorkflow, /gh release view "\$\{tag\}"/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-desktop-\$\{version\}\.tar\.gz/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-ios-\$\{version\}\.tar\.gz/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-android-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /docker buildx imagetools inspect "\$\{image\}"/);
     assert.match(releaseVerifyWorkflow, /Verify anonymous GHCR manifests/);
     assert.match(releaseVerifyWorkflow, /docker logout ghcr\.io/);

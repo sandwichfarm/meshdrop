@@ -95,6 +95,12 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /v0\.1\.0` authenticated release artifacts are proven by release run `28711136765`/);
     assert.match(releaseTargets, /release verification workflow: https:\/\/github\.com\/sandwichfarm\/meshdrop\/actions\/runs\/28711452622/i);
     assert.match(releaseTargets, /meshdrop-spa-0\.1\.0\.tar\.gz/);
+    assert.match(releaseTargets, /Desktop Native source tarball/);
+    assert.match(releaseTargets, /iOS source/);
+    assert.match(releaseTargets, /Android source/);
+    assert.match(releaseTargets, /meshdrop-desktop-<version>\.tar\.gz/);
+    assert.match(releaseTargets, /meshdrop-ios-<version>\.tar\.gz/);
+    assert.match(releaseTargets, /meshdrop-android-<version>\.tar\.gz/);
     assert.match(releaseTargets, /v0\.1\.0-standalone/);
     assert.match(releaseTargets, /Start9 source tarball/);
     assert.match(releaseTargets, /Umbrel package tarball/);

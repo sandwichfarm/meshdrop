@@ -46,6 +46,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `260704-u4g-prove-start9-s9pk-packaging-with-tar2sqf` | complete | Generated `bin/tar2sqfs` fallback plus isolated `start-cli 0.4.0-beta.10` produced `meshdrop_x86_64.s9pk`; SHA-256 `4a166eb17d1b51e09f38b63980dcf3a05acb1b889069d00bcc34ff4c043e91a1`; device install and transfer UAT remain open |
 | 2026-07-04 | `260704-dnt-desktop-native-source-artifact` | complete | Desktop source artifact build/test; `npm test`; archive manifest readback; diff/slop gates; native shell and transfer UAT remain open |
 | 2026-07-04 | `260704-mob-mobile-source-artifacts` | complete | iOS/Android source artifact builds/tests; `npm test`; archive manifest readback; diff/slop gates; native shells, Bluetooth, and mobile transfer UAT remain open |
+| 2026-07-04 | `260704-rat-release-all-target-artifacts` | complete | Release workflow now builds/verifies Desktop/iOS/Android source tarballs; focused tests, actionlint, YAML parse, `npm test`, diff/slop gates |
 
 ## Active Quick Task
 
