@@ -13,13 +13,34 @@ globalThis.localStorage = {
 await import("../public/scripts/nostr-relays.js");
 await import("../public/scripts/nostr-mesh.js");
 
-test("Nostr mesh protocol uses NIP-100 draft kind and configured room", () => {
+test("Nostr mesh protocol uses NIP-100 draft kind and a local identity network id", () => {
     assert.equal(globalThis.NostrMeshProtocol.kind, 25050);
     assert.equal(globalThis.NostrMeshProtocol.presenceHeartbeatMs, 25000);
     assert.equal(
-        globalThis.NostrMeshProtocol.roomFromConfig({nostrMesh: {room: "mesh"}}),
-        "mesh:meshdrop.test"
+        globalThis.NostrMeshProtocol.networkId({pubkey: "a".repeat(64)}),
+        `nostr:${"a".repeat(64)}`
     );
+});
+
+test("Nostr mesh presence targets followed npubs instead of a static room", async () => {
+    const signedEvents = [];
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+    mesh._identity = {
+        pubkey: "1".repeat(64),
+        displayName: "Alice",
+        followListStatus: "found",
+        followPubkeys: ["2".repeat(64), "3".repeat(64), "2".repeat(64), "1".repeat(64)]
+    };
+    mesh._publishEvent = event => signedEvents.push(event);
+    mesh._signEvent = async event => ({...event, id: "event-id", sig: "sig", pubkey: mesh._identity.pubkey});
+
+    await mesh._publishPresence("connect");
+
+    assert.deepEqual(
+        signedEvents[0].tags.filter(tag => tag[0] === "p").map(tag => tag[1]),
+        ["2".repeat(64), "3".repeat(64)]
+    );
+    assert.equal(signedEvents[0].tags.some(tag => tag[0] === "r"), false);
 });
 
 test("Nostr mesh protocol uses bucket relay by default and trims configured relays", () => {
@@ -92,7 +113,6 @@ test("Nostr mesh only handles events from followed pubkeys", () => {
     const stranger = "b".repeat(64);
     const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
     mesh._seenEvents = new Set();
-    mesh._room = "mesh:meshdrop.test";
     mesh._identity = {
         pubkey: "c".repeat(64),
         followListStatus: "found",
@@ -105,12 +125,33 @@ test("Nostr mesh only handles events from followed pubkeys", () => {
         pubkey,
         tags: [
             ["type", "connect"],
-            ["r", "mesh:meshdrop.test"]
+            ["p", mesh._identity.pubkey]
         ]
     });
 
     assert.equal(mesh._shouldHandleEvent(event(followed)), true);
     assert.equal(mesh._shouldHandleEvent(event(stranger)), false);
+});
+
+test("Nostr mesh ignores presence that is not addressed to this npub", () => {
+    const followed = "a".repeat(64);
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+    mesh._seenEvents = new Set();
+    mesh._identity = {
+        pubkey: "c".repeat(64),
+        followListStatus: "found",
+        followPubkeys: [followed]
+    };
+
+    assert.equal(mesh._shouldHandleEvent({
+        id: "event-id",
+        kind: globalThis.NostrMeshProtocol.kind,
+        pubkey: followed,
+        tags: [
+            ["type", "connect"],
+            ["p", "d".repeat(64)]
+        ]
+    }), false);
 });
 
 test("Nostr mesh republishes ephemeral WEB-RTC presence on a heartbeat", () => {
