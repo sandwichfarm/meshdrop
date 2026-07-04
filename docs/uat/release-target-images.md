@@ -4,7 +4,7 @@ Use this runbook for alpha `v0.*.*` release images published by `.github/workflo
 
 ## Targets
 
-The release workflow builds and pushes these GHCR image targets:
+The release workflow builds and pushes these GHCR image targets as multi-architecture manifests for `linux/amd64` and `linux/arm64`:
 
 | Target | Expected image metadata |
 |--------|--------------------------|
@@ -40,7 +40,15 @@ Repeat with `target=start9` and `target=umbrel`.
    - `v0.x.y-standalone` and `0.x.y-standalone`.
    - `v0.x.y-start9` and `0.x.y-start9`.
    - `v0.x.y-umbrel` and `0.x.y-umbrel`.
-5. Pull each image and confirm its target metadata:
+5. Confirm each tag is a multi-architecture manifest with `linux/amd64` and `linux/arm64` entries:
+
+   ```sh
+   docker buildx imagetools inspect ghcr.io/sandwichfarm/meshdrop:v0.x.y-standalone
+   docker buildx imagetools inspect ghcr.io/sandwichfarm/meshdrop:v0.x.y-start9
+   docker buildx imagetools inspect ghcr.io/sandwichfarm/meshdrop:v0.x.y-umbrel
+   ```
+
+6. Pull each image and confirm its target metadata:
 
    ```sh
    docker pull ghcr.io/sandwichfarm/meshdrop:v0.x.y-standalone
@@ -48,7 +56,7 @@ Repeat with `target=start9` and `target=umbrel`.
      --format '{{ index .Config.Labels "farm.sandwich.meshdrop.target" }}'
    ```
 
-6. Run `npm run test:docker` against the pulled standalone image:
+7. Run `npm run test:docker` against the pulled standalone image:
 
    ```sh
    MESHDROP_DOCKER_IMAGE=ghcr.io/sandwichfarm/meshdrop:v0.x.y-standalone npm run test:docker
@@ -57,6 +65,7 @@ Repeat with `target=start9` and `target=umbrel`.
 ## Not proven
 
 - No release is proven until a real `v0.*.*` tag runs and the GitHub release plus GHCR tags are read back.
+- The release workflow is configured for multi-architecture GHCR manifests, but no multi-arch release is proven until
+  `docker buildx imagetools inspect` confirms the published tags.
 - The Start9 package-source artifact is not complete until `.s9pk` build, device install, and transfer UAT pass.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
-- Multi-architecture publication is not implemented.
