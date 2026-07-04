@@ -50,6 +50,17 @@ Use this runbook for the StartOS package source artifact built from `packaging/s
 Run:
 
 ```sh
+npm run test:start9-package
+```
+
+This smoke builds the local `meshdrop:start9-smoke` image with `MESHDROP_TARGET=start9`, builds and unpacks the Start9
+package source artifact, reads the generated `startos/main.ts` environment plus `startos/utils.ts` port, runs the target
+image with that generated Start9 environment, confirms `/config` reports `capabilities.runtime.target` as `start9`, and
+initiates browser transfers over local WebRTC and Pollen WebRTC.
+
+For package-source shape and typecheck coverage, run:
+
+```sh
 npm run build:start9 -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-start9-smoke
 node --test test/start9-package.test.js
 ```
@@ -93,5 +104,5 @@ Current artifact evidence:
 ## Not Proven
 
 - This package-source smoke does not prove installation on a real StartOS device.
-- This package-source smoke does not prove browser transfer UAT on StartOS.
+- This package-source smoke does not prove browser transfer UAT through a real StartOS device UI.
 - FIPS is disabled by default until the target has a tested FIPS binary and device-network path.
