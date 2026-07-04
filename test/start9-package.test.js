@@ -29,6 +29,7 @@ test("Start9 package builder creates SDK source artifact", async () => {
             "package.json",
             "icon.png",
             "LICENSE",
+            "bin/tar2sqfs",
             "instructions.md",
             "README.md",
             "UAT-START9.md",
@@ -51,6 +52,7 @@ test("Start9 package builder creates SDK source artifact", async () => {
         assert.match(makefile, /include s9pk\.mk/);
 
         const s9pkMakefile = await readTarEntry(result.artifactPath, `${prefix}/s9pk.mk`);
+        assert.match(s9pkMakefile, /export PATH := \$\(CURDIR\)\/bin:\$\(PATH\)/);
         assert.match(s9pkMakefile, /\$\(BASE_NAME\)\.s9pk: javascript\/index\.js/);
         assert.match(s9pkMakefile, /\$\(BASE_NAME\)_%\.s9pk: javascript\/index\.js/);
 
@@ -102,6 +104,7 @@ test("Start9 generated package source typechecks against declared SDK dependency
         await run("npm", ["run", "check"], {cwd: packageDir});
         await run("npm", ["run", "build"], {cwd: packageDir});
         await fs.access(path.join(packageDir, "javascript", "index.js"));
+        await fs.access(path.join(packageDir, "bin", "tar2sqfs"), fs.constants.X_OK);
     }
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});

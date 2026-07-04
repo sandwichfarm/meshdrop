@@ -1,0 +1,50 @@
+#!/usr/bin/env sh
+set -eu
+
+self_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+
+find_native_tar2sqfs() {
+  old_ifs=$IFS
+  IFS=:
+  for dir in $PATH; do
+    IFS=$old_ifs
+    [ -n "$dir" ] || dir=.
+    candidate_dir=$(CDPATH= cd -- "$dir" 2>/dev/null && pwd -P || true)
+    if [ -n "$candidate_dir" ] && [ "$candidate_dir" != "$self_dir" ] && [ -x "$candidate_dir/tar2sqfs" ]; then
+      printf '%s/tar2sqfs\n' "$candidate_dir"
+      return 0
+    fi
+    IFS=:
+  done
+  IFS=$old_ifs
+  return 1
+}
+
+if native=$(find_native_tar2sqfs); then
+  exec "$native" "$@"
+fi
+
+quiet=false
+if [ "${1:-}" = "-q" ]; then
+  quiet=true
+  shift
+fi
+
+if [ "$#" -ne 1 ]; then
+  echo "tar2sqfs fallback expected: tar2sqfs [-q] <output.squashfs>" >&2
+  exit 64
+fi
+
+if ! command -v mksquashfs >/dev/null 2>&1; then
+  echo "tar2sqfs not found, and mksquashfs fallback is unavailable" >&2
+  exit 127
+fi
+
+output=$1
+mkdir -p "$(dirname "$output")"
+
+if [ "$quiet" = true ]; then
+  exec mksquashfs - "$output" -tar -quiet -no-progress -noappend -numeric-owner
+fi
+
+exec mksquashfs - "$output" -tar -no-progress -noappend -numeric-owner

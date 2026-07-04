@@ -9,7 +9,9 @@ server-backed MeshDrop image with runtime feature negotiation.
 - Generated source typechecks against `@start9labs/start-sdk@1.5.3`.
 - The package includes the StartOS `s9pk.mk` make plumbing, package icon, and generated JavaScript entrypoint expected by
   `start-cli s9pk pack`.
-- `make` requires a StartOS packaging workspace, git metadata, Docker access to the configured image, and `tar2sqfs`.
+- The package includes a `bin/tar2sqfs` fallback that defers to native `tar2sqfs` when present and otherwise uses
+  `mksquashfs -tar`.
+- `make x86` has produced a local `meshdrop_x86_64.s9pk` with isolated `start-cli 0.4.0-beta.10`.
 - The package points at the `__MESHDROP_IMAGE__` image.
 - The package exposes the web UI on port 3000.
 - Pollen is enabled by default for backend-capable transfer testing.
@@ -17,6 +19,5 @@ server-backed MeshDrop image with runtime feature negotiation.
 
 ## Not Complete
 
-- `.s9pk` build proof with `start-cli` and `tar2sqfs` is still required.
 - StartOS device install UAT is still required.
 - WebRTC and Pollen transfer UAT from a StartOS device are still required.

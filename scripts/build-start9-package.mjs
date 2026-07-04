@@ -82,12 +82,14 @@ async function copyRenderedDirectory(sourceDir, destinationDir, values) {
             await copyRenderedDirectory(sourcePath, destinationPath, values);
         }
         else if (entry.isFile()) {
+            const stat = await fs.stat(sourcePath);
             const source = await fs.readFile(sourcePath, "utf8");
             const rendered = source
                 .replaceAll("__MESHDROP_VERSION__", values.version)
                 .replaceAll("__MESHDROP_EXVER__", values.exver)
                 .replaceAll("__MESHDROP_IMAGE__", values.image);
             await fs.writeFile(destinationPath, rendered);
+            await fs.chmod(destinationPath, stat.mode & 0o777);
         }
     }
 }

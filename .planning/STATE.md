@@ -43,6 +43,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-docker-deployed-admin-uat` | complete | Isolated compose deployed-admin proof; signed admin GUI saved FIPS peers against real FIPS control; local and Pollen browser transfers passed |
 | 2026-07-04 | `20260704-start9-package-typecheck` | complete | Generated Start9 source `npm run check` passed; `make` reached `start-cli s9pk pack` and is blocked by missing local `start-cli`; `.s9pk` and device UAT remain open |
 | 2026-07-04 | `20260704-start9-s9pk-pack` | complete | Generated Start9 source `npm run build` emits `javascript/index.js`; isolated `start-cli 0.4.0-beta.10` pack reaches squashfs packaging and is blocked by missing local `tar2sqfs`; `.s9pk` and device UAT remain open |
+| 2026-07-04 | `260704-u4g-prove-start9-s9pk-packaging-with-tar2sqf` | complete | Generated `bin/tar2sqfs` fallback plus isolated `start-cli 0.4.0-beta.10` produced `meshdrop_x86_64.s9pk`; SHA-256 `4a166eb17d1b51e09f38b63980dcf3a05acb1b889069d00bcc34ff4c043e91a1`; device install and transfer UAT remain open |
 
 ## Active Quick Task
 
