@@ -1,6 +1,10 @@
+/* eslint-disable no-undef */
+
 const AdminSettingsProtocol = {
     pubkeyRegex: /^[0-9a-f]{64}$/i,
     config: {},
+    _observerBound: false,
+    _rendering: false,
 
     normalizePubkey(pubkey) {
         return this.pubkeyRegex.test(pubkey || "") ? pubkey.toLowerCase() : "";
@@ -19,6 +23,7 @@ const AdminSettingsProtocol = {
     setConfig(config) {
         this.config = config || {};
         this.renderServerSettings();
+        setTimeout(() => this.renderServerSettings(), 0);
     },
 
     getIdentity() {
@@ -48,6 +53,7 @@ const AdminSettingsProtocol = {
     },
 
     renderServerSettings() {
+        this._rendering = true;
         const canManage = this.canManageCurrentServerSettings();
         const fipsTab = globalThis.document?.querySelector?.('[data-settings-tab="fips"]');
         const fipsPanel = globalThis.document?.querySelector?.('[data-settings-panel="fips"]');
@@ -56,6 +62,26 @@ const AdminSettingsProtocol = {
         fipsTab?.toggleAttribute("hidden", !canManage);
         if (!canManage && fipsTab?.classList?.contains("selected")) blossomTab?.click?.();
         fipsPanel?.toggleAttribute("hidden", !canManage || !fipsTab?.classList?.contains("selected"));
+        this._rendering = false;
+    },
+
+    observeServerSettings() {
+        if (this._observerBound) return;
+
+        const fipsTab = globalThis.document?.querySelector?.('[data-settings-tab="fips"]');
+        if (!fipsTab) {
+            const timer = setTimeout(() => this.observeServerSettings(), 0);
+            if (timer.unref) timer.unref();
+            return;
+        }
+
+        const MutationObserver = globalThis.MutationObserver;
+        if (!MutationObserver) return;
+
+        this._observerBound = true;
+        new MutationObserver(() => {
+            if (!this._rendering) this.renderServerSettings();
+        }).observe(fipsTab, {attributes: true, attributeFilter: ["hidden", "class"]});
     }
 };
 
@@ -100,12 +126,19 @@ function parseJson(value) {
 }
 
 function bindAdminSettingsEvents() {
-    if (!globalThis.Events) {
+    const events = appEvents();
+    if (!events) {
         const timer = setTimeout(bindAdminSettingsEvents, 0);
         if (timer.unref) timer.unref();
         return;
     }
 
-    globalThis.Events.on("config", event => AdminSettingsProtocol.setConfig(event.detail || {}));
-    globalThis.Events.on("nostr-identity-changed", () => AdminSettingsProtocol.renderServerSettings());
+    events.on("config", event => AdminSettingsProtocol.setConfig(event.detail || {}));
+    events.on("nostr-identity-changed", () => AdminSettingsProtocol.renderServerSettings());
+    AdminSettingsProtocol.observeServerSettings();
+}
+
+function appEvents() {
+    if (typeof Events !== "undefined") return Events;
+    return globalThis.Events || null;
 }

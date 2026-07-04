@@ -125,31 +125,50 @@ class ServerConnection {
             let xhr = new XMLHttpRequest();
             xhr.addEventListener("load", () => {
                 if (xhr.status === 200) {
-                    // Config received
-                    let config = JSON.parse(xhr.responseText);
+                    let config;
+                    try {
+                        config = JSON.parse(xhr.responseText);
+                    } catch {
+                        resolveStaticConfig(resolve);
+                        return;
+                    }
+
                     console.log("Config loaded:", config)
                     this._config = config;
                     Events.fire('config', config);
                     resolve()
+                } else if (xhr.status === 0 || xhr.status === 404) {
+                    resolveStaticConfig(resolve);
                 } else if (xhr.status < 200 || xhr.status >= 300) {
-                    retry(xhr);
+                    retry();
                 }
             })
 
             xhr.addEventListener("error", _ => {
-                retry(xhr);
+                resolveStaticConfig(resolve);
             });
-
-            function retry(request) {
-                setTimeout(function () {
-                    openAndSend(request)
-                }, 1000)
-            }
 
             function openAndSend() {
                 xhr.open('GET', 'config');
                 xhr.send();
             }
+
+            function retry() {
+                setTimeout(openAndSend, 1000);
+            }
+
+            const resolveStaticConfig = resolve => {
+                if (!globalThis.RuntimeCapabilities?.staticConfig) {
+                    retry();
+                    return;
+                }
+
+                const config = globalThis.RuntimeCapabilities.staticConfig();
+                console.log("Static SPA config loaded:", config);
+                this._config = config;
+                Events.fire('config', config);
+                resolve();
+            };
 
             openAndSend(xhr);
         })
@@ -164,6 +183,13 @@ class ServerConnection {
         clearTimeout(this._reconnectTimer);
         if (!this._config) return;
         if (this._isConnected() || this._isConnecting() || this._isOffline()) return;
+        if (globalThis.RuntimeCapabilities?.hasBackend?.(this._config) === false) {
+            this._setWsConfig(this._config.wsConfig || {
+                rtcConfig: globalThis.RuntimeCapabilities.staticRtcConfig,
+                wsFallback: false
+            });
+            return;
+        }
         this._serverIdentityKey = ServerConnectionIdentityProtocol.storedKey();
         if (this._isReconnect) {
             Events.fire('notify-user', {

@@ -305,6 +305,34 @@ test("Local discovery disable always asks the server to leave the IP room", () =
     }
 });
 
+test("Local discovery hides and disables itself when runtime has no backend", () => {
+    resetUi();
+    const fired = [];
+    const originalFire = globalThis.Events.fire;
+    globalThis.Events.fire = (type, detail = {}) => {
+        fired.push(type);
+        originalFire(type, detail);
+    };
+
+    try {
+        const controller = new globalThis.LocalDiscoveryController();
+
+        globalThis.Events.fire("config", {
+            capabilities: {
+                transports: {
+                    localDiscovery: {supported: false}
+                }
+            }
+        });
+
+        assert.equal(controller.isEnabled(), false);
+        assert.equal(buttons.get("local-discovery").hasAttribute("hidden"), true);
+        assert.equal(fired.includes("leave-ip-room"), true);
+    } finally {
+        globalThis.Events.fire = originalFire;
+    }
+});
+
 test("Nostr mesh selection is restored after refresh", async () => {
     resetUi();
     const pubkey = "a".repeat(64);

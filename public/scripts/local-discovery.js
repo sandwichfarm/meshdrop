@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+
 const LocalDiscoveryProtocol = {
     storageKey: "meshdrop_local_discovery_enabled",
 
@@ -8,6 +10,12 @@ const LocalDiscoveryProtocol = {
 
     writeEnabled(enabled, storage = globalThis.localStorage) {
         storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
+    },
+
+    enabledFromConfig(config) {
+        return globalThis.RuntimeCapabilities
+            ? globalThis.RuntimeCapabilities.transportSupported(config, "localDiscovery", true)
+            : true;
     }
 };
 
@@ -18,6 +26,7 @@ class LocalDiscoveryController {
     constructor() {
         this.$button = $("local-discovery");
         this._enabled = LocalDiscoveryProtocol.readEnabled();
+        this._supported = true;
         this._joined = false;
 
         if (this.$button) {
@@ -26,6 +35,7 @@ class LocalDiscoveryController {
         }
 
         Events.on("display-name", _ => this._onServerReady());
+        Events.on("config", e => this._onConfig(e.detail || {}));
         Events.on("ws-connected", _ => {
             this._joined = false;
             this._render();
@@ -38,7 +48,7 @@ class LocalDiscoveryController {
     }
 
     isEnabled() {
-        return this._enabled;
+        return this._supported && this._enabled;
     }
 
     toggle() {
@@ -60,7 +70,7 @@ class LocalDiscoveryController {
     }
 
     join() {
-        if (!this._enabled || this._joined) return;
+        if (!this.isEnabled() || this._joined) return;
         this._joined = true;
         Events.fire("join-ip-room");
     }
@@ -71,16 +81,24 @@ class LocalDiscoveryController {
     }
 
     _onServerReady() {
-        if (!this._enabled) return;
+        if (!this.isEnabled()) return;
         this.join();
+    }
+
+    _onConfig(config) {
+        const wasSupported = this._supported;
+        this._supported = LocalDiscoveryProtocol.enabledFromConfig(config);
+        if (wasSupported && !this._supported) this.leave();
+        this._render();
     }
 
     _render() {
         if (!this.$button) return;
 
-        this.$button.classList.toggle("selected", this._enabled);
-        this.$button.setAttribute("aria-pressed", String(this._enabled));
-        this.$button.title = this._enabled
+        this.$button.toggleAttribute("hidden", !this._supported);
+        this.$button.classList.toggle("selected", this.isEnabled());
+        this.$button.setAttribute("aria-pressed", String(this.isEnabled()));
+        this.$button.title = this.isEnabled()
             ? "Local network discovery enabled"
             : "Local network discovery disabled";
         Events.fire("footer-discovery-changed");
