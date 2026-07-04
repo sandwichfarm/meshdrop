@@ -31,6 +31,10 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerTwoHostRelay, /docker-two-host-nostr-webrtc/);
     assert.match(dockerTwoHostRelay, /docker-public-relay-two-host-webrtc/);
     assert.match(dockerTwoHostRelay, /MESHDROP_DOCKER_PUBLIC_RELAY_URLS/);
+    assert.match(dockerTwoHostRelay, /MESHDROP_DOCKER_PUBLIC_RELAY_ATTEMPTS/);
+    assert.match(dockerTwoHostRelay, /file-transfer-accepted/);
+    assert.match(dockerTwoHostRelay, /files-sent/);
+    assert.match(dockerTwoHostRelay, /waitForOpenRtcPeer/);
     assert.match(dockerTwoHostRelay, /meshdrop-proof-icon\.svg between two Docker instances/);
     assert.match(packageJson, /"test:docker:two-host": "node scripts\/docker-two-host-relay-smoke\.mjs"/);
     assert.match(e2eSmoke, /retryScenario\(\s*"federated-fips-webrtc"/);

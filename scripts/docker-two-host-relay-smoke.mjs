@@ -1,5 +1,10 @@
-import {spawn} from "node:child_process";
-
+import {
+    launchOptions,
+    mappedPort,
+    run,
+    waitForHealth,
+    waitForHttp
+} from "./docker-two-host-support.mjs";
 import {startFakeRelay} from "./fake-nostr-relay.mjs";
 import {
     assert,
@@ -12,8 +17,8 @@ import {
 
 const image = process.env.MESHDROP_DOCKER_IMAGE || "meshdrop:smoke";
 const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/node_modules/playwright/index.mjs";
-const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const publicRelayUrls = parseRelayUrls(process.env.MESHDROP_DOCKER_PUBLIC_RELAY_URLS || "");
+const publicRelayAttempts = parsePositiveInteger(process.env.MESHDROP_DOCKER_PUBLIC_RELAY_ATTEMPTS || "3");
 const containers = [
     `meshdrop-two-host-a-${process.pid}`,
     `meshdrop-two-host-b-${process.pid}`
@@ -67,7 +72,27 @@ async function startContainer(name, relayUrls) {
     ]);
 }
 
-async function runTwoHostTransfer([baseUrlA, baseUrlB], relayUrls) {
+async function runTwoHostTransfer(baseUrls, relayUrls) {
+    const attempts = publicRelayUrls.length ? publicRelayAttempts : 1;
+    let lastError;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            await runTwoHostTransferAttempt(baseUrls, relayUrls, attempt);
+            return;
+        }
+        catch (error) {
+            lastError = error;
+            if (attempt === attempts) break;
+            console.warn(`Docker public relay transfer attempt ${attempt}/${attempts} failed: ${error.message.split("\n")[0]}`);
+            await delay(1000 * attempt);
+        }
+    }
+
+    throw lastError;
+}
+
+async function runTwoHostTransferAttempt([baseUrlA, baseUrlB], relayUrls, attempt) {
     const {chromium} = await loadPlaywright(playwrightModulePath);
     const browser = await chromium.launch(await launchOptions());
     const identities = createProofIdentityPair();
@@ -76,8 +101,8 @@ async function runTwoHostTransfer([baseUrlA, baseUrlB], relayUrls) {
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const pageErrors = [
-        ...watchPage("docker-two-host-nostr-webrtc:sender", pageA),
-        ...watchPage("docker-two-host-nostr-webrtc:receiver", pageB)
+        ...watchPage(`docker-two-host-nostr-webrtc:${attempt}:sender`, pageA),
+        ...watchPage(`docker-two-host-nostr-webrtc:${attempt}:receiver`, pageB)
     ];
 
     try {
@@ -105,15 +130,30 @@ async function runTwoHostTransfer([baseUrlA, baseUrlB], relayUrls) {
             pageB.waitForFunction(() => globalThis.meshdropNostrMesh._active)
         ]);
 
-        const peerId = await waitForConnectedPeer(pageA, "nostr");
-        await waitForConnectedPeer(pageB, "nostr");
-        await sendProofIcon(pageA, peerId);
+        const senderPeerId = await waitForConnectedPeer(pageA, "nostr");
+        const receiverPeerId = await waitForConnectedPeer(pageB, "nostr");
+        await Promise.all([
+            waitForOpenRtcPeer(pageA, senderPeerId, "sender"),
+            waitForOpenRtcPeer(pageB, receiverPeerId, "receiver")
+        ]);
+
+        await sendProofIcon(pageA, senderPeerId);
+        await waitForTransferAccepted(pageA, "sender");
         const received = await waitForReceivedFiles(pageB);
+        await waitForFilesSent(pageA, "sender");
 
         assertReceived(received);
         assert(!pageErrors.length, `Docker two-host relay page errors:\n${pageErrors.join("\n")}`);
         const proofName = publicRelayUrls.length ? "docker-public-relay-two-host-webrtc" : "docker-two-host-nostr-webrtc";
         console.log(`Proof ${proofName}: nostr delivered meshdrop-proof-icon.svg between two Docker instances`);
+    }
+    catch (error) {
+        throw new Error(
+            `Docker two-host relay attempt ${attempt} failed: ${error.message}\n`
+            + `sender=${JSON.stringify(await debugPageState(pageA))}\n`
+            + `receiver=${JSON.stringify(await debugPageState(pageB))}`,
+            {cause: error}
+        );
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close(), browser.close()]);
@@ -160,7 +200,10 @@ async function addNostrInitScript(page, identity, relayUrls) {
             configLoaded: false,
             connected: [],
             followPubkeys: proofIdentity.followPubkeys,
-            received: []
+            received: [],
+            requests: [],
+            accepted: 0,
+            sent: 0
         };
         globalThis.__meshdropE2E = {peersManager: null};
         window.addEventListener("config", () => globalThis.__meshdropDockerTwoHost.configLoaded = true);
@@ -168,9 +211,20 @@ async function addNostrInitScript(page, identity, relayUrls) {
             globalThis.__meshdropDockerTwoHost.connected.push(event.detail.peerId);
         });
         window.addEventListener("files-transfer-request", event => {
+            globalThis.__meshdropDockerTwoHost.requests.push({
+                peerId: event.detail.peerId,
+                header: event.detail.request?.header || [],
+                totalSize: event.detail.request?.totalSize || 0
+            });
             window.dispatchEvent(new CustomEvent("respond-to-files-transfer-request", {
                 detail: {to: event.detail.peerId, accepted: true}
             }));
+        });
+        window.addEventListener("file-transfer-accepted", () => {
+            globalThis.__meshdropDockerTwoHost.accepted += 1;
+        });
+        window.addEventListener("files-sent", () => {
+            globalThis.__meshdropDockerTwoHost.sent += 1;
         });
         window.addEventListener("files-received", async event => {
             const files = await Promise.all(event.detail.files.map(async file => ({
@@ -235,6 +289,17 @@ async function waitForConnectedPeer(page, roomType) {
     }
 }
 
+async function waitForOpenRtcPeer(page, peerId, role) {
+    try {
+        await page.waitForFunction(id => {
+            const peer = globalThis.__meshdropE2E?.peersManager?.peers?.[id];
+            return peer?._channel?.readyState === "open" && peer?._conn?.connectionState === "connected";
+        }, peerId, {timeout: 30000});
+    } catch (error) {
+        throw new Error(`${role} RTC peer ${peerId} did not become open: ${error.message}`, {cause: error});
+    }
+}
+
 async function sendProofIcon(page, peerId) {
     await page.evaluate(({to, icon}) => {
         const file = new File([icon], "meshdrop-proof-icon.svg", {type: "image/svg+xml"});
@@ -243,6 +308,22 @@ async function sendProofIcon(page, peerId) {
         if (!button) throw new Error("Missing Nostr relay transport option");
         button.click();
     }, {to: peerId, icon: proofIcon});
+}
+
+async function waitForTransferAccepted(page, role) {
+    try {
+        await page.waitForFunction(() => globalThis.__meshdropDockerTwoHost.accepted > 0, undefined, {timeout: 15000});
+    } catch (error) {
+        throw new Error(`${role} did not receive transfer acceptance: ${error.message}`, {cause: error});
+    }
+}
+
+async function waitForFilesSent(page, role) {
+    try {
+        await page.waitForFunction(() => globalThis.__meshdropDockerTwoHost.sent > 0, undefined, {timeout: 15000});
+    } catch (error) {
+        throw new Error(`${role} did not observe files-sent: ${error.message}`, {cause: error});
+    }
 }
 
 async function waitForReceivedFiles(page) {
@@ -280,6 +361,9 @@ function watchPage(name, page) {
 async function debugPageState(page) {
     return page.evaluate(() => ({
         connected: globalThis.__meshdropDockerTwoHost?.connected,
+        requests: globalThis.__meshdropDockerTwoHost?.requests,
+        accepted: globalThis.__meshdropDockerTwoHost?.accepted,
+        sent: globalThis.__meshdropDockerTwoHost?.sent,
         received: globalThis.__meshdropDockerTwoHost?.received,
         nostrMesh: {
             active: globalThis.meshdropNostrMesh?._active,
@@ -302,92 +386,9 @@ async function debugPageState(page) {
     }));
 }
 
-async function mappedPort(container) {
-    for (let i = 0; i < 30; i++) {
-        const output = await run("docker", ["port", container, "3000/tcp"], {capture: true});
-        const match = output.match(/127\.0\.0\.1:(\d+)/);
-        if (match) return match[1];
-        await delay(250);
-    }
-
-    throw new Error(`Docker did not publish ${container} port 3000`);
-}
-
-async function waitForHealth(container) {
-    for (let i = 0; i < 40; i++) {
-        const status = await run("docker", [
-            "inspect",
-            "--format",
-            "{{.State.Health.Status}}",
-            container
-        ], {capture: true});
-
-        if (status === "healthy") return;
-        if (status === "unhealthy") throw new Error(`${container} healthcheck failed`);
-        await delay(500);
-    }
-
-    throw new Error(`Timed out waiting for ${container} to become healthy`);
-}
-
-async function waitForHttp(url) {
-    for (let i = 0; i < 60; i++) {
-        try {
-            const response = await fetch(url);
-            if (response.ok) return;
-        } catch {
-            // Retry until the container finishes booting.
-        }
-
-        await delay(500);
-    }
-
-    throw new Error(`Timed out waiting for ${url}`);
-}
-
-async function launchOptions() {
-    const options = {headless: true};
-    const executablePath = await resolveChromiumPath();
-    if (executablePath) options.executablePath = executablePath;
-    return options;
-}
-
-async function resolveChromiumPath() {
-    if (chromiumPath !== undefined) return chromiumPath;
-
-    try {
-        await import("node:fs/promises").then(fs => fs.access("/usr/bin/chromium"));
-        return "/usr/bin/chromium";
-    } catch {
-        return "";
-    }
-}
-
-function run(command, args, options = {}) {
-    return new Promise((resolve, reject) => {
-        const child = spawn(command, args, {
-            cwd: new URL("..", import.meta.url),
-            env: {...process.env, ...options.env},
-            stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit"
-        });
-        let stdout = "";
-        let stderr = "";
-
-        if (options.capture) {
-            child.stdout.on("data", chunk => stdout += chunk.toString("utf8"));
-            child.stderr.on("data", chunk => stderr += chunk.toString("utf8"));
-        }
-
-        child.on("error", reject);
-        child.on("close", code => {
-            if (code === 0 || options.allowFailure) {
-                resolve(stdout.trim());
-            }
-            else {
-                reject(new Error(`${command} ${args.join(" ")} failed with ${code}\n${stderr}`));
-            }
-        });
-    });
+function parsePositiveInteger(value) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
 main().catch(error => {
