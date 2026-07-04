@@ -35,11 +35,11 @@ PLAYWRIGHT_MODULE_PATH= PLAYWRIGHT_BROWSER=webkit npm run test:spa-artifact
 
 The smoke builds the tarball, unpacks it, serves it as a static site, and proves each selected browser negotiates the
 no-backend SPA runtime. Chromium and Firefox also connect two Nostr identities through a test relay and transfer
-`meshdrop-spa-proof.txt` over WebRTC without backend endpoints. WebKit currently proves packaged runtime compatibility
-only because Playwright WebKit crashes during the two-page WebRTC transfer proof on GitHub Actions.
+`meshdrop-spa-proof.txt` over WebRTC without backend endpoints.
 
 CI runs the `SPA browser matrix` job for Chromium, Firefox, and WebKit. Treat the Chromium and Firefox legs as transfer
-proof and the WebKit leg as no-backend packaged-runtime proof.
+proof and the WebKit leg as no-backend packaged-runtime proof. WebKit transfer proof runs in the manual-only
+`SPA WebKit transfer UAT` job.
 
 To attempt the missing WebKit transfer UAT explicitly, run:
 
@@ -48,7 +48,10 @@ MESHDROP_SPA_WEBKIT_TRANSFER=1 PLAYWRIGHT_MODULE_PATH= PLAYWRIGHT_BROWSER=webkit
 ```
 
 Passing output must include `Proof backend-free-spa-nostr-webrtc:webkit: nostr delivered meshdrop-spa-proof.txt`.
-Until that proof passes, WebKit remains runtime-only and the SPA target remains incomplete for WebKit transfer.
+
+Current WebKit transfer proof: manual CI run `28716511864` passed the `SPA WebKit transfer UAT` job on commit
+`8d396c10a92466a6706b8cd3593cc469aca6253f`, and the job log includes
+`Proof backend-free-spa-nostr-webrtc:webkit: nostr delivered meshdrop-spa-proof.txt`.
 
 ## Public Relay UAT
 
@@ -74,14 +77,14 @@ against `wss://bucket.coracle.social` and both logs include `meshdrop-spa-proof.
 
 ## WebKit Transfer UAT
 
-The normal CI WebKit leg is intentionally runtime-only because historical GitHub-hosted Playwright WebKit runs crashed
-during the two-page transfer proof. To retry that proof in GitHub Actions without making every PR flaky, dispatch the
-`CI` workflow manually with `spa_webkit_transfer` set to `true`.
+The normal CI WebKit leg is intentionally runtime-only so every PR does not pay for the higher-cost two-peer WebKit
+transfer proof. To run the WebKit transfer proof in GitHub Actions, dispatch the `CI` workflow manually with
+`spa_webkit_transfer` set to `true`.
 
 Passing output must include `Proof backend-free-spa-nostr-webrtc:webkit: nostr delivered meshdrop-spa-proof.txt`.
-No current WebKit transfer proof is recorded.
+Current WebKit transfer proof: manual CI run `28716511864` passed.
 
-Current failed WebKit transfer attempts:
+Historical failed WebKit transfer attempts:
 
 - Manual CI run `28713995244` reached the forced WebKit transfer job after PR #35 and failed with WebKit page crashes
   and transfer wait timeouts.
@@ -90,5 +93,6 @@ Current failed WebKit transfer attempts:
 - Manual CI run `28714388605` retried with one WebKit context and two static origins after PR #37 and still crashed
   during sender or receiver hydration.
 
-In all three runs, the normal WebKit `SPA browser matrix` runtime smoke passed, so the open gap is the two-peer
-WebKit WebRTC transfer proof, not packaged SPA runtime boot.
+Later run `28716511864` passed after the manual UAT harness kept the low-cost WebKit runtime matrix separate from the
+forced transfer proof and retried the two-peer transfer with isolated WebKit browser processes when lighter isolation
+strategies were unstable.

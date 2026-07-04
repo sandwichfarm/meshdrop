@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: complete
 created: 2026-07-04
 slug: spa-webkit-transfer-strategy
 ---
@@ -27,6 +27,14 @@ proof.
 - Add a two-context two-origin fallback attempt inside the same manual UAT command.
 - Record the new CI run evidence in SPA UAT docs and target status only if it proves transfer or materially improves the
   failure evidence.
+
+## Result
+
+- Manual CI run `28716511864` passed on commit `8d396c10a92466a6706b8cd3593cc469aca6253f`.
+- The `SPA WebKit transfer UAT` log includes
+  `Proof backend-free-spa-nostr-webrtc:webkit: nostr delivered meshdrop-spa-proof.txt`.
+- The passing run also restored normal CI coverage: unit tests, Docker smoke, browser transfer smoke, and SPA browser
+  matrix for Chromium, Firefox, and WebKit all passed.
 
 ## Validation
 
