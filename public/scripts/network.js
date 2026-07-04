@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+
 const SignalingRoomPriority = {
     priority: {
         "ip": 0,
@@ -1314,6 +1316,8 @@ class RTCPeer extends Peer {
 
     _onDescription(description) {
         // description.sdp = description.sdp.replace('b=AS:30', 'b=AS:1638400');
+        if (description.type === 'answer' && this._conn.signalingState !== 'have-remote-offer') return;
+
         this._conn
             .setLocalDescription(description)
             .then(_ => this._sendSignal({ sdp: description }))

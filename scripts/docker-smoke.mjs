@@ -17,8 +17,6 @@ async function main() {
             "127.0.0.1::3000",
             "-e",
             "FIPS_DISCOVERY=true",
-            "-e",
-            "NOSTR_ROOM=docker-smoke",
             image
         ]);
         started = true;
@@ -30,10 +28,11 @@ async function main() {
         await waitForHealth();
 
         const config = await getJson(`${baseUrl}/config`);
-        assert(config.nostrMesh?.room === "docker-smoke", "Nostr mesh config was not exposed");
+        assert(Array.isArray(config.nostrMesh?.relays), "Nostr mesh relays were not exposed");
         assert(config.fips?.enabled === true, "FIPS config was not enabled in container");
+        assert((config.fips?.room || "").startsWith("npub-network:"), "FIPS config did not use npub network discovery");
         assert(config.pollen?.enabled === true, "Pollen config was not enabled in container");
-        assert(config.pollen?.room === "meshdrop-pollen", "Pollen federation room was not exposed");
+        assert((config.pollen?.room || "").startsWith("npub-network:"), "Pollen config did not use npub network discovery");
         assert(Array.isArray(config.blossom?.servers), "Blossom config was not exposed");
 
         const fipsStatus = await getJson(`${baseUrl}/fips/status`);

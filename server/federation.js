@@ -5,15 +5,23 @@ import path from "path";
 import {spawn} from "child_process";
 import {finalizeEvent, generateSecretKey, getPublicKey, utils} from "nostr-tools";
 import {WebSocket} from "ws";
+import {
+    createNpubDiscoveryNetwork,
+    parseNostrPubkeys,
+    pubkeyFromSecret
+} from "./npub-network.js";
 
 const FEDERATION_KIND = 25051;
-const DEFAULT_FIPS_ROOM = "meshdrop-fips";
-const DEFAULT_POLLEN_ROOM = "meshdrop-pollen";
 const SERVICE_PREFIX = "meshdrop-fed";
 
 export function createFederationConfig(env = process.env) {
     const enabled = env.MESHDROP_FEDERATION !== "false";
     const serverId = env.MESHDROP_SERVER_ID || loadOrCreateServerId(env.PLN_DIR || "/var/lib/meshdrop/pln");
+    const secretKey = loadOrCreateNostrKey(env.MESHDROP_NOSTR_SECRET_KEY, env.PLN_DIR || "/var/lib/meshdrop/pln");
+    const network = createNpubDiscoveryNetwork({
+        localPubkey: pubkeyFromSecret(secretKey),
+        peerPubkeys: parseNostrPubkeys(env.MESHDROP_DISCOVERY_NPUBS || env.MESHDROP_NPUBS || "")
+    });
 
     return {
         enabled,
@@ -23,13 +31,13 @@ export function createFederationConfig(env = process.env) {
         pollMs: Number.parseInt(env.MESHDROP_FEDERATION_POLL_MS || "", 10) || 15000,
         fips: {
             enabled: enabled && env.FIPS_DISCOVERY !== "false",
-            room: env.FIPS_ROOM || DEFAULT_FIPS_ROOM,
+            room: network.id,
             port: Number.parseInt(env.FIPS_FEDERATION_PORT || env.PORT || "3000", 10) || 3000,
             publicUrl: env.FIPS_FEDERATION_URL || env.MESHDROP_FEDERATION_PUBLIC_URL || ""
         },
         pollen: {
             enabled: enabled && env.POLLEN_TRANSFER !== "false",
-            room: env.POLLEN_ROOM || DEFAULT_POLLEN_ROOM,
+            room: network.id,
             command: env.PLN_BIN || "pln",
             dir: env.PLN_DIR || "/var/lib/meshdrop/pln",
             serviceName: env.POLLEN_FEDERATION_SERVICE || `${SERVICE_PREFIX}-${serverId.slice(0, 16)}`
@@ -40,8 +48,10 @@ export function createFederationConfig(env = process.env) {
                 .split(",")
                 .map(relay => relay.trim())
                 .filter(Boolean),
-            room: env.POLLEN_NOSTR_ROOM || env.NOSTR_ROOM || "meshdrop",
-            secretKey: loadOrCreateNostrKey(env.MESHDROP_NOSTR_SECRET_KEY, env.PLN_DIR || "/var/lib/meshdrop/pln")
+            pubkey: network.localPubkey,
+            recipientPubkeys: network.recipientPubkeys,
+            networkId: network.id,
+            secretKey
         },
         timeoutMs: Number.parseInt(env.MESHDROP_FEDERATION_TIMEOUT_MS || "", 10) || 2500
     };
@@ -378,7 +388,7 @@ export default class MeshFederation {
                 socket.send(JSON.stringify([
                     "REQ",
                     `meshdrop-fed-${this.config.serverId}`,
-                    {kinds: [FEDERATION_KIND], "#r": [this.config.nostr.room]}
+                    {kinds: [FEDERATION_KIND], "#p": [this.config.nostr.pubkey]}
                 ]));
                 this._announcePollenNostr(socket).catch(() => {});
             };
@@ -397,7 +407,8 @@ export default class MeshFederation {
             created_at: Math.floor(Date.now() / 1000),
             tags: [
                 ["type", "pollen-federation"],
-                ["r", this.config.nostr.room],
+                ...this.config.nostr.recipientPubkeys.map(pubkey => ["p", pubkey]),
+                ["network", this.config.nostr.networkId],
                 ["server", this.config.serverId],
                 ["service", this.config.pollen.serviceName],
                 ["room", this.config.pollen.room]
@@ -431,7 +442,7 @@ export default class MeshFederation {
 
         if (event.pubkey === getPublicKey(this.config.nostr.secretKey)) return;
         if (this._tag(event, "type") !== "pollen-federation") return;
-        if (this._tag(event, "r") !== this.config.nostr.room) return;
+        if (!this._hasTag(event, "p", this.config.nostr.pubkey)) return;
 
         const serverId = this._tag(event, "server");
         const serviceName = this._tag(event, "service");
@@ -476,6 +487,10 @@ export default class MeshFederation {
 
     _tag(event, name) {
         return event.tags?.find(tag => tag[0] === name)?.[1] || "";
+    }
+
+    _hasTag(event, name, value) {
+        return (event.tags || []).some(tag => tag[0] === name && tag[1] === value);
     }
 
     _isFederatedRoom(roomType) {

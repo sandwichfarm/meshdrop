@@ -62,8 +62,7 @@ conf.nostrMesh = {
     relays: (process.env.NOSTR_RELAYS || "wss://bucket.coracle.social")
         .split(",")
         .map(relay => relay.trim())
-        .filter(Boolean),
-    room: process.env.NOSTR_ROOM || "meshdrop"
+        .filter(Boolean)
 };
 
 conf.blossom = {
@@ -73,13 +72,15 @@ conf.blossom = {
         .filter(Boolean)
 };
 
-conf.fips = createFipsConfig();
-conf.fipsClient = new FipsControlClient(conf.fips);
-
 conf.pollen = createPollenConfig();
 conf.pollenClient = new PollenTransferClient(conf.pollen);
 
 conf.federation = createFederationConfig();
+conf.fips = {
+    ...createFipsConfig(),
+    room: conf.federation.fips.room
+};
+conf.fipsClient = new FipsControlClient(conf.fips);
 conf.federationClient = new MeshFederation(conf.federation, {
     fipsClient: conf.fipsClient,
     pollenClient: conf.pollenClient

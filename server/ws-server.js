@@ -132,9 +132,10 @@ export default class PairDropWsServer {
     }
 
     _signalAndRelay(sender, message) {
-        const room = message.roomType === 'ip'
+        const roomId = message.roomType === 'ip'
             ? sender.ip
             : message.roomId;
+        const room = this._roomStorageKey(message.roomType, roomId);
 
         if (message.to && Peer.isValidPeerId(message.to) && this._rooms[room]) {
             const recipient = this._rooms[room][message.to];
@@ -395,22 +396,23 @@ export default class PairDropWsServer {
 
     _joinRoom(peer, roomType, roomId) {
         // roomType: 'ip', 'secret' or 'public-id'
-        if (this._rooms[roomId] && this._rooms[roomId][peer.id]) {
-            if (this._rooms[roomId][peer.id] === peer) return;
+        const roomKey = this._roomStorageKey(roomType, roomId);
+        if (this._rooms[roomKey] && this._rooms[roomKey][peer.id]) {
+            if (this._rooms[roomKey][peer.id] === peer) return;
 
             // ensures that otherPeers never receive `peer-left` after `peer-joined` on reconnect.
-            delete this._rooms[roomId][peer.id];
+            delete this._rooms[roomKey][peer.id];
         }
 
         // if room doesn't exist, create it
-        if (!this._rooms[roomId]) {
-            this._rooms[roomId] = {};
+        if (!this._rooms[roomKey]) {
+            this._rooms[roomKey] = {};
         }
 
         this._notifyPeers(peer, roomType, roomId);
 
         // add peer to room
-        this._rooms[roomId][peer.id] = peer;
+        this._rooms[roomKey][peer.id] = peer;
         if (!peer.isRemoteFederation) {
             this._conf?.federationClient?.localPeerJoined(roomType, roomId, peer.getInfo());
         }
@@ -451,23 +453,24 @@ export default class PairDropWsServer {
     }
 
     _leaveRoom(peer, roomType, roomId, disconnect = false) {
-        if (!this._rooms[roomId] || !this._rooms[roomId][peer.id]) return;
+        const roomKey = this._roomStorageKey(roomType, roomId);
+        if (!this._rooms[roomKey] || !this._rooms[roomKey][peer.id]) return;
 
         // remove peer from room
-        delete this._rooms[roomId][peer.id];
+        delete this._rooms[roomKey][peer.id];
         if (!peer.isRemoteFederation) {
             this._conf?.federationClient?.localPeerLeft(roomType, roomId, peer.id);
         }
 
         // delete room if empty and abort
-        if (!Object.keys(this._rooms[roomId]).length) {
-            delete this._rooms[roomId];
+        if (!Object.keys(this._rooms[roomKey]).length) {
+            delete this._rooms[roomKey];
             return;
         }
 
         // notify all other peers that remain in room that peer left
-        for (const otherPeerId in this._rooms[roomId]) {
-            const otherPeer = this._rooms[roomId][otherPeerId];
+        for (const otherPeerId in this._rooms[roomKey]) {
+            const otherPeer = this._rooms[roomKey][otherPeerId];
             if (otherPeer.isRemoteFederation) continue;
 
             let msg = {
@@ -483,12 +486,13 @@ export default class PairDropWsServer {
     }
 
     _notifyPeers(peer, roomType, roomId) {
-        if (!this._rooms[roomId]) return;
+        const roomKey = this._roomStorageKey(roomType, roomId);
+        if (!this._rooms[roomKey]) return;
 
         // notify all other peers that peer joined
-        for (const otherPeerId in this._rooms[roomId]) {
+        for (const otherPeerId in this._rooms[roomKey]) {
             if (otherPeerId === peer.id) continue;
-            const otherPeer = this._rooms[roomId][otherPeerId];
+            const otherPeer = this._rooms[roomKey][otherPeerId];
             if (otherPeer.isRemoteFederation) continue;
 
             let msg = {
@@ -503,9 +507,9 @@ export default class PairDropWsServer {
 
         // notify peer about peers already in the room
         const otherPeers = [];
-        for (const otherPeerId in this._rooms[roomId]) {
+        for (const otherPeerId in this._rooms[roomKey]) {
             if (otherPeerId === peer.id) continue;
-            const otherPeer = this._rooms[roomId][otherPeerId];
+            const otherPeer = this._rooms[roomKey][otherPeerId];
             const info = otherPeer.getInfo();
             if (otherPeer.isRemoteFederation) {
                 info.isCaller = peer.id > otherPeer.id;
@@ -579,14 +583,15 @@ export default class PairDropWsServer {
 
     _onFederationPeerJoined(event) {
         if (!event.peer?.id || !event.roomType || !event.roomId) return;
-        if (!this._rooms[event.roomId]) this._rooms[event.roomId] = {};
+        const roomKey = this._roomStorageKey(event.roomType, event.roomId);
+        if (!this._rooms[roomKey]) this._rooms[roomKey] = {};
 
         const remotePeer = this._remoteFederationPeer(event);
-        this._rooms[event.roomId][remotePeer.id] = remotePeer;
+        this._rooms[roomKey][remotePeer.id] = remotePeer;
 
-        for (const peerId in this._rooms[event.roomId]) {
+        for (const peerId in this._rooms[roomKey]) {
             if (peerId === remotePeer.id) continue;
-            const peer = this._rooms[event.roomId][peerId];
+            const peer = this._rooms[roomKey][peerId];
             if (peer.isRemoteFederation) continue;
 
             this._send(peer, {
@@ -600,7 +605,7 @@ export default class PairDropWsServer {
     }
 
     _onFederationPeerLeft(event) {
-        const room = this._rooms[event.roomId];
+        const room = this._rooms[this._roomStorageKey(event.roomType, event.roomId)];
         if (!room?.[event.peerId]?.isRemoteFederation) return;
 
         delete room[event.peerId];
@@ -619,7 +624,7 @@ export default class PairDropWsServer {
     }
 
     _onFederationSignal(event) {
-        const recipient = this._rooms[event.roomId]?.[event.to];
+        const recipient = this._rooms[this._roomStorageKey(event.roomType, event.roomId)]?.[event.to];
         if (!recipient || recipient.isRemoteFederation) return;
 
         this._send(recipient, {
@@ -647,5 +652,11 @@ export default class PairDropWsServer {
                 return peerInfo;
             }
         };
+    }
+
+    _roomStorageKey(roomType, roomId) {
+        return roomType === 'fips' || roomType === 'pollen'
+            ? `${roomType}\n${roomId}`
+            : roomId;
     }
 }

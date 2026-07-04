@@ -188,6 +188,24 @@ test("RTC signaling buffers ICE until the matching remote offer is applied", asy
     assert.equal(sent[0].sessionId, "remote-session");
 });
 
+test("RTC signaling ignores late local answers after negotiation already settled", async () => {
+    const {RTCPeer, connections, errors} = createHarness();
+    const sent = [];
+    const peer = new RTCPeer({send: message => sent.push(message)}, false, "peer-a", "nostr", "room", {});
+
+    peer.onServerMessage({sessionId: "remote-session", sdp: {type: "offer", sdp: "offer-sdp"}});
+    await flushPromises();
+    connections[0].localDescription = null;
+    sent.length = 0;
+    connections[0].signalingState = "stable";
+    peer._onDescription({type: "answer", sdp: "late-answer"});
+    await flushPromises();
+
+    assert.equal(connections[0].localDescription, null);
+    assert.deepEqual(sent, []);
+    assert.deepEqual(errors, []);
+});
+
 test("RTC signaling drops buffered ICE from stale pre-offer sessions", async () => {
     const {RTCPeer, connections} = createHarness();
     const peer = new RTCPeer({send() {}}, false, "peer-a", "nostr", "room", {});

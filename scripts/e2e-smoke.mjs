@@ -359,10 +359,8 @@ async function runRouteChoiceScenario(browser, baseUrl) {
             pageA.evaluate(() => globalThis.meshdropPollenTransfer.enable()),
             pageB.evaluate(() => globalThis.meshdropPollenTransfer.enable())
         ]);
-        await Promise.all([
-            pageA.waitForFunction(() => document.querySelector("x-peer.type-fips")),
-            pageA.waitForFunction(() => document.querySelector("x-peer.type-pollen"))
-        ]);
+        await waitForPeerClass(pageA, "fips");
+        await waitForPeerClass(pageA, "pollen");
 
         const options = await pageA.evaluate(() => {
             const peer = document.querySelector("x-peer.type-fips.type-pollen");
@@ -560,6 +558,15 @@ async function waitForConnectedPeer(page, roomType) {
     }
 }
 
+async function waitForPeerClass(page, roomType) {
+    try {
+        await page.waitForFunction(type => document.querySelector(`x-peer.type-${type}`), roomType, {timeout: 20000});
+    } catch (error) {
+        const state = await debugPageState(page);
+        throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);
+    }
+}
+
 async function debugPageState(page) {
     return page.evaluate(() => ({
         selfPeerId: sessionStorage.getItem("peer_id"),
@@ -637,10 +644,10 @@ function startApp(port, relayPort, blossomPort, fipsPort, pollen, options = {}) 
             PORT: String(port),
             MESHDROP_SERVER_ID: options.serverId || `e2e-${port}`,
             NOSTR_RELAYS: `ws://127.0.0.1:${relayPort}`,
-            NOSTR_ROOM: "e2e",
+            MESHDROP_NOSTR_SECRET_KEY: options.nostrSecretKey
+                || "0000000000000000000000000000000000000000000000000000000000000001",
             BLOSSOM_SERVERS: `http://127.0.0.1:${blossomPort}`,
             FIPS_CONTROL_SOCKET: String(fipsPort),
-            FIPS_ROOM: "e2e-fips",
             FIPS_FEDERATION_PORT: String(options.fipsFederationPort || port),
             FIPS_FEDERATION_URL: options.fipsFederationUrl || "",
             MESHDROP_FEDERATION_POLL_MS: String(options.federationPollMs || 15000),
