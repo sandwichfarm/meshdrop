@@ -13,7 +13,7 @@ function flushPromises() {
     return new Promise(resolve => setTimeout(resolve, 0));
 }
 
-function createContext({responses}) {
+function createContext({responses, protocol = "https:"}) {
     const fired = [];
     const opened = [];
     const sockets = [];
@@ -62,7 +62,7 @@ function createContext({responses}) {
             isRtcSupported: true,
             visibilityChangeEvent: "visibilitychange"
         },
-        location: {protocol: "https:", host: "meshdrop.test", pathname: "/"},
+        location: {protocol, host: "meshdrop.test", pathname: "/"},
         navigator: {onLine: true},
         sessionStorage: {getItem: () => null, setItem() {}},
         localStorage: {getItem: () => null},
@@ -197,5 +197,92 @@ test("static config applies target manifest runtime metadata when present", asyn
     assert.equal(configEvent.detail.capabilities.transports.pollen.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.bluetooth.supported, false);
     assert.equal(configEvent.detail.capabilities.serverSettings.supported, false);
+    assert.deepEqual(sockets, []);
+});
+
+test("file-origin static config reads packaged target manifest beside app directory", async () => {
+    const {context, fired, opened, sockets} = createContext({
+        protocol: "file:",
+        responses: [
+            {status: 0, body: ""},
+            {
+                status: 0,
+                body: JSON.stringify({
+                    target: "desktop",
+                    runtime: {
+                        target: "desktop",
+                        platform: "desktop",
+                        hasBackend: false,
+                        sharedInstance: false
+                    },
+                    transports: {
+                        localDiscovery: false,
+                        webrtc: true,
+                        nostr: true,
+                        blossom: true,
+                        hashtree: true,
+                        pollen: false,
+                        fips: false,
+                        bluetooth: false
+                    }
+                })
+            }
+        ]
+    });
+
+    new context.__meshdropTest.ServerConnection();
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+
+    const configEvent = fired.find(event => event.type === "config");
+
+    assert.deepEqual(opened, [
+        {method: "GET", url: "config"},
+        {method: "GET", url: "../meshdrop-target.json"}
+    ]);
+    assert.equal(configEvent.detail.capabilities.runtime.target, "desktop");
+    assert.equal(configEvent.detail.capabilities.runtime.platform, "desktop");
+    assert.equal(configEvent.detail.capabilities.runtime.hasBackend, false);
+    assert.deepEqual(sockets, []);
+});
+
+test("static config uses native shell injected target manifest before xhr fallback", async () => {
+    const {context, fired, opened, sockets} = createContext({
+        responses: [
+            {status: 0, body: ""}
+        ]
+    });
+    context.__meshdropTargetManifest = {
+        target: "desktop",
+        runtime: {
+            target: "desktop",
+            platform: "desktop",
+            hasBackend: false,
+            sharedInstance: false
+        },
+        transports: {
+            localDiscovery: false,
+            webrtc: true,
+            nostr: true,
+            blossom: true,
+            hashtree: true,
+            pollen: false,
+            fips: false,
+            bluetooth: false
+        }
+    };
+
+    new context.__meshdropTest.ServerConnection();
+    await flushPromises();
+    await flushPromises();
+
+    const configEvent = fired.find(event => event.type === "config");
+
+    assert.deepEqual(opened, [
+        {method: "GET", url: "config"}
+    ]);
+    assert.equal(configEvent.detail.capabilities.runtime.target, "desktop");
+    assert.equal(configEvent.detail.capabilities.runtime.platform, "desktop");
     assert.deepEqual(sockets, []);
 });

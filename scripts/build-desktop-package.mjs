@@ -105,8 +105,8 @@ async function writeTargetManifest(stageDir, version, native) {
         },
         transports: {
             localDiscovery: false,
-            webrtc: true,
-            nostr: true,
+            webrtc: !native,
+            nostr: !native,
             blossom: true,
             hashtree: true,
             pollen: false,
@@ -115,6 +115,7 @@ async function writeTargetManifest(stageDir, version, native) {
         },
         remainingProof: native
             ? [
+                "native engine with RTCPeerConnection support",
                 "native desktop WebRTC transfer UAT",
                 "desktop installer or signed binary"
             ]
@@ -142,7 +143,7 @@ async function writeDesktopReadme(stageDir, version, native) {
         ? "This artifact packages MeshDrop app assets with a compiled Linux GTK/WebKit native shell."
         : "This artifact packages the MeshDrop app assets and target metadata for a future native desktop shell.";
     const nativeNote = native
-        ? "Launch command: `bin/meshdrop-desktop --app-dir app`"
+        ? "Launch command: `bin/meshdrop-desktop --app-dir app`. This GTK/WebKit shell does not claim WebRTC until native engine UAT proves `RTCPeerConnection` support."
         : "It is not a native installer or executable.";
     const text = [
         `# ${title}`,

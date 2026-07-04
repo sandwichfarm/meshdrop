@@ -143,9 +143,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     );
     assert.match(targetStatus, /`npm run test:start9-package` proves package build/);
     assert.match(targetStatus, /Real StartOS device install from UI and device transfer UAT/);
-    assert.match(targetStatus, /\| Desktop Native \| Source artifact transfer smoke and Linux native shell build exist; native transfer UAT open \|/);
+    assert.match(targetStatus, /\| Desktop Native \| Source artifact transfer smoke and Linux native shell runtime proof exist; native transfer UAT open \|/);
     assert.match(targetStatus, /`npm run build:desktop:native`; `node --test test\/desktop-package\.test\.js`/);
-    assert.match(targetStatus, /Signed installer and native desktop transfer UAT/);
+    assert.match(targetStatus, /`npm run test:desktop-native` proves the packaged GTK\/WebKit shell/);
+    assert.match(targetStatus, /WebRTC-capable native engine, signed installer, and native desktop transfer UAT/);
     assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke exists; real Umbrel node UAT open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);

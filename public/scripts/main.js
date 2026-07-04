@@ -78,7 +78,7 @@ class PairDrop {
     }
 
     registerServiceWorker() {
-        if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator && ["http:", "https:"].includes(location.protocol)) {
             const hadController = !!navigator.serviceWorker.controller;
             let refreshing = false;
             navigator.serviceWorker.addEventListener('controllerchange', () => {

@@ -33,7 +33,10 @@ export function startFakeRelay() {
     return new Promise(resolve => {
         wss.on("listening", () => {
             resolve({
-                close: callback => wss.close(callback),
+                close: callback => {
+                    for (const client of wss.clients) client.terminate();
+                    wss.close(callback);
+                },
                 url: `ws://127.0.0.1:${wss.address().port}`
             });
         });

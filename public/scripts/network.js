@@ -171,22 +171,41 @@ class ServerConnection {
                     resolve();
                 };
 
-                const manifestXhr = new XMLHttpRequest();
-                manifestXhr.addEventListener("load", () => {
-                    if (manifestXhr.status !== 200) {
+                if (globalThis.__meshdropTargetManifest) {
+                    finish(globalThis.__meshdropTargetManifest);
+                    return;
+                }
+
+                const manifestUrls = location.protocol === "file:"
+                    ? ["../meshdrop-target.json", "/meshdrop-target.json"]
+                    : ["/meshdrop-target.json"];
+                const loadManifest = index => {
+                    if (index >= manifestUrls.length) {
                         finish(null);
                         return;
                     }
 
-                    try {
-                        finish(JSON.parse(manifestXhr.responseText));
-                    } catch {
-                        finish(null);
-                    }
-                });
-                manifestXhr.addEventListener("error", () => finish(null));
-                manifestXhr.open('GET', '/meshdrop-target.json');
-                manifestXhr.send();
+                    const manifestXhr = new XMLHttpRequest();
+                    manifestXhr.addEventListener("load", () => {
+                        const loaded = manifestXhr.status === 200
+                            || (location.protocol === "file:" && manifestXhr.status === 0 && manifestXhr.responseText);
+                        if (!loaded) {
+                            loadManifest(index + 1);
+                            return;
+                        }
+
+                        try {
+                            finish(JSON.parse(manifestXhr.responseText));
+                        } catch {
+                            loadManifest(index + 1);
+                        }
+                    });
+                    manifestXhr.addEventListener("error", () => loadManifest(index + 1));
+                    manifestXhr.open('GET', manifestUrls[index]);
+                    manifestXhr.send();
+                };
+
+                loadManifest(0);
             };
 
             openAndSend(xhr);

@@ -98,9 +98,10 @@ test("Desktop native package builder compiles a Linux shell artifact", async () 
         assert.equal(manifest.runtime.hasBackend, false);
         assert.equal(manifest.nativeShell.executable, "bin/meshdrop-desktop");
         assert.equal(manifest.nativeShell.toolkit, "gtk4-webkitgtk");
-        assert.equal(manifest.transports.webrtc, true);
-        assert.equal(manifest.transports.nostr, true);
+        assert.equal(manifest.transports.webrtc, false);
+        assert.equal(manifest.transports.nostr, false);
         assert.deepEqual(manifest.remainingProof, [
+            "native engine with RTCPeerConnection support",
             "native desktop WebRTC transfer UAT",
             "desktop installer or signed binary"
         ]);
