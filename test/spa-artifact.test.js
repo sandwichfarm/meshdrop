@@ -36,11 +36,21 @@ test("SPA artifact builder packages public assets with target metadata", async (
 
 test("SPA artifact smoke proves backend-free Nostr WebRTC transfer", async () => {
     const smoke = await fs.readFile(new URL("../scripts/spa-artifact-smoke.mjs", import.meta.url), "utf8");
+    const ciWorkflow = await fs.readFile(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 
+    assert.match(smoke, /PLAYWRIGHT_BROWSER/);
+    assert.match(smoke, /browserTypeName/);
+    assert.match(smoke, /\[\"chromium\", "firefox", "webkit"\]/);
     assert.match(smoke, /backend-free-spa-nostr-webrtc/);
     assert.match(smoke, /startFakeRelay/);
     assert.match(smoke, /meshdropNostrMesh\.connect/);
     assert.match(smoke, /meshdrop-spa-proof\.txt/);
+
+    assert.match(ciWorkflow, /spa-browser-matrix:/);
+    assert.match(ciWorkflow, /browser: \[chromium, firefox, webkit\]/);
+    assert.match(ciWorkflow, /npx playwright install --with-deps \$\{\{ matrix\.browser \}\}/);
+    assert.match(ciWorkflow, /PLAYWRIGHT_BROWSER: \$\{\{ matrix\.browser \}\}/);
+    assert.match(ciWorkflow, /npm run test:spa-artifact/);
 });
 
 test("SPA artifact version sanitizer rejects empty versions", () => {

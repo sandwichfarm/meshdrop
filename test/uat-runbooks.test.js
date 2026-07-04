@@ -18,6 +18,12 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         assert.equal(fs.existsSync(new URL(`../${path}`, import.meta.url)), true, `${path} must exist`);
     }
 
+    const spa = readDoc("docs/uat/spa.md");
+    assert.match(spa, /PLAYWRIGHT_BROWSER=chromium/);
+    assert.match(spa, /PLAYWRIGHT_BROWSER=firefox/);
+    assert.match(spa, /PLAYWRIGHT_BROWSER=webkit/);
+    assert.match(spa, /SPA browser matrix/);
+
     assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_ADMIN_NPUB/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DISCOVERY_NPUBS/);
@@ -59,6 +65,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         assert.match(targetStatus, new RegExp(`\\| ${target} \\|`));
     }
     assert.match(targetStatus, /\| Release Images \| `v0\.1\.0` verified \|/);
+    assert.match(targetStatus, /\| SPA \| Browser-matrix backend-free transfer smoke exists \|/);
     assert.match(targetStatus, /\| Desktop Native \| Not implemented \|/);
     assert.match(targetStatus, /\| iOS \| Not implemented \|/);
     assert.match(targetStatus, /\| Android \| Not implemented \|/);

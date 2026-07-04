@@ -28,9 +28,13 @@ Use this runbook for the no-backend browser target shipped as `meshdrop-spa-<ver
 Run:
 
 ```sh
-PLAYWRIGHT_MODULE_PATH= PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium npm run test:spa-artifact
+PLAYWRIGHT_MODULE_PATH= PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium PLAYWRIGHT_BROWSER=chromium npm run test:spa-artifact
+PLAYWRIGHT_MODULE_PATH= PLAYWRIGHT_BROWSER=firefox npm run test:spa-artifact
+PLAYWRIGHT_MODULE_PATH= PLAYWRIGHT_BROWSER=webkit npm run test:spa-artifact
 ```
 
-The smoke builds the tarball, unpacks it, serves it as a static site, proves the browser negotiates the no-backend SPA
-runtime, connects two Nostr identities through a test relay, and transfers `meshdrop-spa-proof.txt` over WebRTC without
-backend endpoints.
+The smoke builds the tarball, unpacks it, serves it as a static site, proves each selected browser negotiates the
+no-backend SPA runtime, connects two Nostr identities through a test relay, and transfers `meshdrop-spa-proof.txt` over
+WebRTC without backend endpoints.
+
+CI runs the same backend-free transfer smoke as the `SPA browser matrix` job for Chromium, Firefox, and WebKit.

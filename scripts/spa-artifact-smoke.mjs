@@ -10,9 +10,16 @@ import {startFakeRelay} from "./fake-nostr-relay.mjs";
 
 const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/node_modules/playwright/index.mjs";
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
+const browserTypeName = process.env.PLAYWRIGHT_BROWSER || "chromium";
+const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
 
 async function main() {
+    assert(
+        supportedBrowserTypes.includes(browserTypeName),
+        `PLAYWRIGHT_BROWSER must be one of ${supportedBrowserTypes.join(", ")}`
+    );
+
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-spa-artifact-"));
     const result = await buildSpaArtifact({
         version: process.env.MESHDROP_SMOKE_VERSION || "0.0.0-smoke",
@@ -32,12 +39,13 @@ async function main() {
     let browser = null;
 
     try {
-        const {chromium} = await loadPlaywright();
+        const playwright = await loadPlaywright();
+        const browserType = playwright[browserTypeName];
         const launchOptions = {headless: true};
-        if (chromiumPath) launchOptions.executablePath = chromiumPath;
-        browser = await chromium.launch(launchOptions);
+        if (browserTypeName === "chromium" && chromiumPath) launchOptions.executablePath = chromiumPath;
+        browser = await browserType.launch(launchOptions);
         const page = await browser.newPage();
-        const pageErrors = watchPage("spa-runtime", page);
+        const pageErrors = watchPage(`spa-runtime:${browserTypeName}`, page);
         await addSpaInitScript(page, "runtime", relay.url);
 
         await page.goto(`http://127.0.0.1:${server.port}`, {waitUntil: "domcontentloaded"});
@@ -63,7 +71,7 @@ async function main() {
 
         await runBackendFreeTransferProof(browser, server.port, relay.url);
 
-        console.log(`SPA artifact smoke passed for ${result.artifactPath}`);
+        console.log(`SPA artifact smoke passed for ${browserTypeName}: ${result.artifactPath}`);
     }
     finally {
         await browser?.close();
@@ -79,8 +87,8 @@ async function runBackendFreeTransferProof(browser, port, relayUrl) {
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const pageErrors = [
-        ...watchPage("backend-free-spa-nostr-webrtc:a", pageA),
-        ...watchPage("backend-free-spa-nostr-webrtc:b", pageB)
+        ...watchPage(`backend-free-spa-nostr-webrtc:${browserTypeName}:a`, pageA),
+        ...watchPage(`backend-free-spa-nostr-webrtc:${browserTypeName}:b`, pageB)
     ];
 
     try {
@@ -112,7 +120,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrl) {
         assert(received[0]?.name.startsWith("meshdrop-spa-proof"), "SPA transfer delivered unexpected file");
         assert(received[0]?.text === proofText, "SPA transfer delivered unexpected contents");
         assert(pageErrors.length === 0, `SPA backend-free transfer page errors:\n${pageErrors.join("\n")}`);
-        console.log("Proof backend-free-spa-nostr-webrtc: nostr delivered meshdrop-spa-proof.txt");
+        console.log(`Proof backend-free-spa-nostr-webrtc:${browserTypeName}: nostr delivered meshdrop-spa-proof.txt`);
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close()]);
