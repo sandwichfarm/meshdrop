@@ -59,3 +59,6 @@ Passing output must include `Proof public-spa-nostr-webrtc:<browser>: nostr deli
 For GitHub-hosted proof, dispatch the `CI` workflow manually with `spa_public_relay_urls` set to one or more relay URLs.
 The manual-only `SPA public relay UAT` job runs Chromium and Firefox, installs the matching Playwright browser, and
 does not run on normal PR or push events.
+
+Current public relay proof: manual CI run `28713488687` passed the Chromium and Firefox `SPA public relay UAT` jobs
+against `wss://bucket.coracle.social` and both logs include `meshdrop-spa-proof.txt` delivery.

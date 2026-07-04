@@ -1297,6 +1297,7 @@ class RTCPeer extends Peer {
         this._signalSessionId = "";
         this._pendingIceCandidates = [];
         this._remoteOfferSdp = "";
+        this._localOfferRecoveryAttempts = 0;
 
         if (!this._isCaller) return; // we will listen for a caller
         this._connect();
@@ -1356,6 +1357,12 @@ class RTCPeer extends Peer {
             .then(_ => this._sendSignal({ sdp: description }))
             .catch(e => {
                 if (this._shouldIgnoreLocalDescriptionError(description, e)) return;
+                if (this._shouldRecoverLocalOfferError(description, e)) {
+                    this._localOfferRecoveryAttempts += 1;
+                    this._dropConnection();
+                    this._connect();
+                    return;
+                }
                 this._onError(e);
             });
     }
@@ -1370,6 +1377,13 @@ class RTCPeer extends Peer {
         if (error?.name !== 'InvalidStateError') return false;
         const message = `${error?.message || ''}`;
         return this._conn?.signalingState !== 'have-remote-offer' || message.includes('wrong state: stable');
+    }
+
+    _shouldRecoverLocalOfferError(description, error) {
+        if (description.type !== 'offer') return false;
+        if (this._localOfferRecoveryAttempts > 0) return false;
+        const message = `${error?.message || ''}`;
+        return error?.name === 'InvalidAccessError' && message.includes('m-lines');
     }
 
     onServerMessage(message) {

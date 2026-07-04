@@ -28,6 +28,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(spa, /MESHDROP_SPA_PUBLIC_RELAY_URLS=wss:\/\/bucket\.coracle\.social/);
     assert.match(spa, /Proof public-spa-nostr-webrtc:<browser>/);
     assert.match(spa, /manual-only `SPA public relay UAT` job runs Chromium and Firefox/);
+    assert.match(spa, /manual CI run `28713488687` passed the Chromium and Firefox/);
 
     assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_ADMIN_NPUB/);
@@ -72,9 +73,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Release Images \| `v0\.1\.0` verified \|/);
     assert.match(
         targetStatus,
-        /\| SPA \| Chromium\/Firefox backend-free transfer smoke exists; WebKit runtime smoke exists; Chromium public relay UAT exists \|/
+        /\| SPA \| Chromium\/Firefox backend-free transfer smoke exists; WebKit runtime smoke exists; Chromium\/Firefox public relay UAT exists \|/
     );
-    assert.match(targetStatus, /Firefox public relay UAT readback; WebKit transfer UAT/);
+    assert.match(targetStatus, /manual run `28713488687` public relay jobs/);
+    assert.match(targetStatus, /WebKit transfer UAT/);
     assert.match(targetStatus, /\| Desktop Native \| Not implemented \|/);
     assert.match(targetStatus, /\| iOS \| Not implemented \|/);
     assert.match(targetStatus, /\| Android \| Not implemented \|/);

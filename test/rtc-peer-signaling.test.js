@@ -343,6 +343,42 @@ test("caller refreshes a stale negotiated connection before creating a new offer
     assert.equal(sent.at(-1).sessionId, "session-2");
 });
 
+test("caller recovers from stale local-offer m-line errors with a fresh connection", async () => {
+    const {RTCPeer, connections, errors} = createHarness();
+    const sent = [];
+    const peer = new RTCPeer({send: message => sent.push(message)}, true, "peer-a", "fips", "room", {});
+
+    connections[0].setLocalDescription = description => {
+        if (description.type === "offer") {
+            const error = new Error(
+                "Failed to set local offer sdp: The order of m-lines in subsequent offer doesn't match order"
+            );
+            error.name = "InvalidAccessError";
+            return Promise.reject(error);
+        }
+        return Promise.resolve();
+    };
+    await flushPromises();
+    await flushPromises();
+
+    assert.equal(connections[0].signalingState, "closed");
+    assert.equal(connections.length, 2);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].sdp.type, "offer");
+    assert.equal(sent[0].sessionId, "session-2");
+    assert.deepEqual(errors, []);
+
+    connections[1].setLocalDescription = () => {
+        const error = new Error("Failed to set local offer sdp: The order of m-lines still doesn't match order");
+        error.name = "InvalidAccessError";
+        return Promise.reject(error);
+    };
+    peer._onDescription({type: "offer", sdp: "another-offer"});
+    await flushPromises();
+
+    assert.equal(errors.length, 1);
+});
+
 test("file transfer route selection resolves a Nostr pubkey alias to the visible RTC peer", async () => {
     const {PeersManager} = createHarness();
     const requests = [];
