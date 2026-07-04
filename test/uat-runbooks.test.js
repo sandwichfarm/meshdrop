@@ -10,6 +10,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         "docs/uat/docker.md",
         "docs/uat/start9.md",
         "docs/uat/umbrel.md",
+        "docs/uat/desktop.md",
         "docs/uat/release-target-images.md",
         "docs/uat/target-status.md",
     ];
@@ -60,6 +61,15 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(umbrel, /MESHDROP_ADMIN_NPUB/);
     assert.match(umbrel, /Not Proven/);
 
+    const desktop = readDoc("docs/uat/desktop.md");
+    assert.match(desktop, /npm run build:desktop/);
+    assert.match(desktop, /target` as `desktop`/);
+    assert.match(desktop, /runtime\.platform` as `desktop`/);
+    assert.match(desktop, /nativeShellBuilt` as `false`/);
+    assert.match(desktop, /backend-only transports are not claimed/);
+    assert.match(desktop, /Nostr WebRTC/);
+    assert.match(desktop, /Not Proven/);
+
     const releaseTargets = readDoc("docs/uat/release-target-images.md");
     for (const target of ["standalone", "start9", "umbrel"]) {
         assert.match(releaseTargets, new RegExp(`MESHDROP_TARGET=${target}`));
@@ -95,7 +105,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /deterministic two-host relay, public relay two-host UAT, and deployed-admin UAT exists/);
     assert.match(targetStatus, /manual run `28715209725` Docker public relay UAT/);
     assert.match(targetStatus, /\| Docker \|[^|]+deployed-admin UAT exists[^|]+\|[^|]+\| None recorded for Docker \|/);
-    assert.match(targetStatus, /\| Desktop Native \| Not implemented \|/);
+    assert.match(targetStatus, /\| Desktop Native \| Source artifact exists; native shell not built \|/);
+    assert.match(targetStatus, /`npm run build:desktop`; `node --test test\/desktop-package\.test\.js`/);
+    assert.match(targetStatus, /Native shell build, desktop runtime capability readback, installer\/binary, and desktop transfer UAT/);
     assert.match(targetStatus, /\| iOS \| Not implemented \|/);
     assert.match(targetStatus, /\| Android \| Not implemented \|/);
 });
