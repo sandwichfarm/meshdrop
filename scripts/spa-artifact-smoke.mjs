@@ -1,21 +1,34 @@
-import {execFile} from "node:child_process";
 import fs from "node:fs/promises";
-import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import {pathToFileURL} from "node:url";
 
 import {buildSpaArtifact} from "./build-spa-artifact.mjs";
 import {startFakeRelay} from "./fake-nostr-relay.mjs";
+import {
+    assert,
+    createProofIdentity,
+    createProofIdentityPair,
+    delay,
+    installProofSigner,
+    loadPlaywright,
+    parseRelayUrls,
+    run,
+    startStaticServer
+} from "./spa-smoke-support.mjs";
 
 const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/node_modules/playwright/index.mjs";
-const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const browserTypeName = process.env.PLAYWRIGHT_BROWSER || "chromium";
+const browserExecutablePaths = {
+    chromium: process.env.PLAYWRIGHT_CHROMIUM_PATH,
+    firefox: process.env.PLAYWRIGHT_FIREFOX_PATH,
+    webkit: process.env.PLAYWRIGHT_WEBKIT_PATH
+};
 const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
 const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
 const smokeAttempts = browserTypeName === "webkit" ? 3 : 1;
 const runsBackendFreeTransferProof = browserTypeName !== "webkit";
+const publicRelayUrls = parseRelayUrls(process.env.MESHDROP_SPA_PUBLIC_RELAY_URLS || "");
 
 async function main() {
     assert(
@@ -38,17 +51,18 @@ async function main() {
 
     const root = path.join(unpackDir, result.prefix);
     const server = await startStaticServer(root);
-    const relay = await startFakeRelay();
+    const relay = publicRelayUrls.length ? null : await startFakeRelay();
+    const relayUrls = publicRelayUrls.length ? publicRelayUrls : [relay.url];
 
     try {
-        const playwright = await loadPlaywright();
+        const playwright = await loadPlaywright(playwrightModulePath);
         const browserType = playwright[browserTypeName];
         await retrySmoke(async () => {
             const browser = await launchBrowser(browserType);
             try {
-                await runRuntimeCapabilityProof(browser, server.port, relay.url);
+                await runRuntimeCapabilityProof(browser, server.port, relayUrls);
                 if (runsBackendFreeTransferProof) {
-                    await runBackendFreeTransferProof(browser, server.port, relay.url);
+                    await runBackendFreeTransferProof(browser, server.port, relayUrls);
                 } else {
                     console.log(`Proof backend-free-spa-runtime:${browserTypeName}: packaged SPA boots without backend transports`);
                 }
@@ -61,7 +75,7 @@ async function main() {
         console.log(`SPA artifact smoke passed for ${browserTypeName}: ${result.artifactPath}`);
     }
     finally {
-        await new Promise(resolve => relay.close(resolve));
+        if (relay) await new Promise(resolve => relay.close(resolve));
         await new Promise(resolve => server.close(resolve));
         await fs.rm(tempDir, {recursive: true, force: true});
     }
@@ -69,7 +83,7 @@ async function main() {
 
 async function launchBrowser(browserType) {
     const launchOptions = {headless: true};
-    if (browserTypeName === "chromium" && chromiumPath) launchOptions.executablePath = chromiumPath;
+    if (browserExecutablePaths[browserTypeName]) launchOptions.executablePath = browserExecutablePaths[browserTypeName];
     return browserType.launch(launchOptions);
 }
 
@@ -89,13 +103,15 @@ async function retrySmoke(run) {
     throw lastError;
 }
 
-async function runRuntimeCapabilityProof(browser, port, relayUrl) {
+async function runRuntimeCapabilityProof(browser, port, relayUrls) {
     const context = await browser.newContext({serviceWorkers: "block"});
     const page = await context.newPage();
     const pageErrors = watchPage(`spa-runtime:${browserTypeName}`, page);
+    const identity = createProofIdentity("runtime");
 
     try {
-        await addSpaInitScript(page, "runtime", relayUrl);
+        await installProofSigner(page, identity);
+        await addSpaInitScript(page, identity, relayUrls);
         await page.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"});
         await waitForInitialSpaState(page, pageErrors);
 
@@ -121,11 +137,12 @@ async function runRuntimeCapabilityProof(browser, port, relayUrl) {
     }
 }
 
-async function runBackendFreeTransferProof(browser, port, relayUrl) {
+async function runBackendFreeTransferProof(browser, port, relayUrls) {
     const contextA = await browser.newContext({serviceWorkers: "block"});
     const contextB = await browser.newContext({serviceWorkers: "block"});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
+    const identities = createProofIdentityPair();
     const pageErrors = [
         ...watchPage(`backend-free-spa-nostr-webrtc:${browserTypeName}:a`, pageA),
         ...watchPage(`backend-free-spa-nostr-webrtc:${browserTypeName}:b`, pageB)
@@ -133,8 +150,12 @@ async function runBackendFreeTransferProof(browser, port, relayUrl) {
 
     try {
         await Promise.all([
-            addSpaInitScript(pageA, "a", relayUrl),
-            addSpaInitScript(pageB, "b", relayUrl)
+            installProofSigner(pageA, identities.a),
+            installProofSigner(pageB, identities.b)
+        ]);
+        await Promise.all([
+            addSpaInitScript(pageA, identities.a, relayUrls),
+            addSpaInitScript(pageB, identities.b, relayUrls)
         ]);
         await Promise.all([
             pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
@@ -160,53 +181,46 @@ async function runBackendFreeTransferProof(browser, port, relayUrl) {
         assert(received[0]?.name.startsWith("meshdrop-spa-proof"), "SPA transfer delivered unexpected file");
         assert(received[0]?.text === proofText, "SPA transfer delivered unexpected contents");
         assert(pageErrors.length === 0, `SPA backend-free transfer page errors:\n${pageErrors.join("\n")}`);
-        console.log(`Proof backend-free-spa-nostr-webrtc:${browserTypeName}: nostr delivered meshdrop-spa-proof.txt`);
+        const proofName = publicRelayUrls.length ? "public-spa-nostr-webrtc" : "backend-free-spa-nostr-webrtc";
+        console.log(`Proof ${proofName}:${browserTypeName}: nostr delivered meshdrop-spa-proof.txt`);
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close()]);
     }
 }
 
-async function addSpaInitScript(page, identityName, relayUrl) {
-    await page.addInitScript(({name, relay, payload}) => {
+async function addSpaInitScript(page, identity, relayUrls) {
+    await page.addInitScript(({identity: proofIdentity, relays, payload}) => {
         globalThis.__meshdropDisableNostrRelayNetwork = true;
-        const pubkey = name === "a" ? "1".repeat(64) : "2".repeat(64);
-        const displayName = `npub ${pubkey.slice(0, 8)}`;
-        let counter = 0;
 
         localStorage.setItem("meshdrop_relay_settings", JSON.stringify({
-            bootstrapRelays: [relay],
-            webRtcRelays: [relay],
-            inboxRelays: [relay],
-            outboxRelays: [relay]
+            bootstrapRelays: relays,
+            webRtcRelays: relays,
+            inboxRelays: relays,
+            outboxRelays: relays
         }));
         localStorage.setItem("meshdrop_nostr_identity", JSON.stringify({
-            pubkey,
-            displayName,
+            pubkey: proofIdentity.pubkey,
+            displayName: proofIdentity.displayName,
             picture: "",
-            relays: {read: [relay], write: [relay]},
-            followPubkeys: ["1".repeat(64), "2".repeat(64)],
+            relays: {read: relays, write: relays},
+            followPubkeys: proofIdentity.followPubkeys,
             followListStatus: "found",
             blossomServers: [],
             blossomServerListStatus: "missing",
             event: {
                 kind: 27235,
                 created_at: Math.floor(Date.now() / 1000),
-                tags: [["client", "meshdrop"], ["origin", location.origin], ["name", displayName]],
+                tags: [["client", "meshdrop"], ["origin", location.origin], ["name", proofIdentity.displayName]],
                 content: "MeshDrop Nostr identity",
-                pubkey,
-                id: `${pubkey.slice(0, 32)}${"0".repeat(32)}`,
+                pubkey: proofIdentity.pubkey,
+                id: `${proofIdentity.pubkey.slice(0, 32)}${"0".repeat(32)}`,
                 sig: "3".repeat(128)
             }
         }));
         globalThis.nostr = {
-            getPublicKey: async () => pubkey,
-            signEvent: async event => ({
-                ...event,
-                pubkey,
-                id: `${pubkey.slice(0, 32)}${String(++counter).padStart(32, "0")}`.slice(0, 64),
-                sig: "3".repeat(128)
-            }),
+            getPublicKey: async () => proofIdentity.pubkey,
+            signEvent: async event => globalThis.__meshdropSignEvent(event),
             nip04: {
                 encrypt: async (_pubkey, plaintext) => plaintext,
                 decrypt: async (_pubkey, ciphertext) => ciphertext
@@ -217,6 +231,7 @@ async function addSpaInitScript(page, identityName, relayUrl) {
             config: null,
             configLoaded: false,
             connected: [],
+            followPubkeys: proofIdentity.followPubkeys,
             received: [],
             proofText: payload
         };
@@ -239,7 +254,15 @@ async function addSpaInitScript(page, identityName, relayUrl) {
         window.addEventListener("peer-connected", event => {
             globalThis.__meshdropE2E.connected.push(event.detail.peerId);
         });
-    }, {name: identityName, relay: relayUrl, payload: proofText});
+    }, {
+        identity: {
+            pubkey: identity.pubkey,
+            displayName: identity.displayName,
+            followPubkeys: identity.followPubkeys
+        },
+        relays: relayUrls,
+        payload: proofText
+    });
 }
 
 function watchPage(name, page) {
@@ -291,7 +314,7 @@ async function connectNostr(page) {
 async function setFollowList(page) {
     await page.evaluate(() => {
         const identity = globalThis.meshdropNostrIdentity.getIdentity();
-        identity.followPubkeys = ["1".repeat(64), "2".repeat(64)];
+        identity.followPubkeys = globalThis.__meshdropE2E.followPubkeys;
         identity.followListStatus = "found";
         localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(identity));
     });
@@ -370,88 +393,6 @@ async function safeDebugPageState(page) {
             error: error.message
         };
     }
-}
-
-async function loadPlaywright() {
-    if (playwrightModulePath) {
-        try {
-            await fs.access(playwrightModulePath);
-            return import(pathToFileURL(playwrightModulePath).href);
-        } catch (error) {
-            if (process.env.PLAYWRIGHT_MODULE_PATH) {
-                throw new Error(`PLAYWRIGHT_MODULE_PATH is not readable: ${playwrightModulePath}\n${error.message}`);
-            }
-        }
-    }
-
-    return import("playwright");
-}
-
-function startStaticServer(root) {
-    const server = http.createServer(async (request, response) => {
-        const urlPath = new URL(request.url, "http://127.0.0.1").pathname;
-        const requested = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, "");
-        let filePath = path.join(root, requested === "/" ? "index.html" : requested);
-
-        if (path.relative(root, filePath).startsWith("..")) {
-            response.writeHead(403).end();
-            return;
-        }
-
-        try {
-            const stat = await fs.stat(filePath);
-            if (stat.isDirectory()) filePath = path.join(filePath, "index.html");
-            const body = await fs.readFile(filePath);
-            response.writeHead(200, {"content-type": contentType(filePath)});
-            response.end(body);
-        } catch {
-            const body = await fs.readFile(path.join(root, "index.html"));
-            response.writeHead(200, {"content-type": "text/html; charset=utf-8"});
-            response.end(body);
-        }
-    });
-
-    return new Promise(resolve => {
-        server.listen(0, "127.0.0.1", () => {
-            resolve({
-                close: callback => server.close(callback),
-                port: server.address().port
-            });
-        });
-    });
-}
-
-function contentType(filePath) {
-    if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
-    if (filePath.endsWith(".js")) return "text/javascript; charset=utf-8";
-    if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
-    if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
-    if (filePath.endsWith(".svg")) return "image/svg+xml";
-    if (filePath.endsWith(".png")) return "image/png";
-    if (filePath.endsWith(".mp3")) return "audio/mpeg";
-    if (filePath.endsWith(".ogg")) return "audio/ogg";
-    return "application/octet-stream";
-}
-
-function run(command, args) {
-    return new Promise((resolve, reject) => {
-        execFile(command, args, (error, stdout, stderr) => {
-            if (error) {
-                error.message = `${error.message}\n${stderr}`;
-                reject(error);
-                return;
-            }
-            resolve({stdout, stderr});
-        });
-    });
-}
-
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function assert(condition, message) {
-    if (!condition) throw new Error(message);
 }
 
 main().catch(error => {
