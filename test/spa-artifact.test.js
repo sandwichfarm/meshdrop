@@ -34,6 +34,15 @@ test("SPA artifact builder packages public assets with target metadata", async (
     }
 });
 
+test("SPA artifact smoke proves backend-free Nostr WebRTC transfer", async () => {
+    const smoke = await fs.readFile(new URL("../scripts/spa-artifact-smoke.mjs", import.meta.url), "utf8");
+
+    assert.match(smoke, /backend-free-spa-nostr-webrtc/);
+    assert.match(smoke, /startFakeRelay/);
+    assert.match(smoke, /meshdropNostrMesh\.connect/);
+    assert.match(smoke, /meshdrop-spa-proof\.txt/);
+});
+
 test("SPA artifact version sanitizer rejects empty versions", () => {
     assert.equal(sanitizeArtifactPart("v0.1.0+build 1"), "v0.1.0-build-1");
     assert.throws(() => sanitizeArtifactPart("///"), /empty/);

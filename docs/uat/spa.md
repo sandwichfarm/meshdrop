@@ -31,4 +31,6 @@ Run:
 PLAYWRIGHT_MODULE_PATH= PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium npm run test:spa-artifact
 ```
 
-The smoke builds the tarball, unpacks it, serves it as a static site, and proves the browser negotiates the no-backend SPA runtime.
+The smoke builds the tarball, unpacks it, serves it as a static site, proves the browser negotiates the no-backend SPA
+runtime, connects two Nostr identities through a test relay, and transfers `meshdrop-spa-proof.txt` over WebRTC without
+backend endpoints.

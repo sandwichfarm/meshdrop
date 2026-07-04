@@ -6,9 +6,11 @@ import path from "node:path";
 import {pathToFileURL} from "node:url";
 
 import {buildSpaArtifact} from "./build-spa-artifact.mjs";
+import {startFakeRelay} from "./fake-nostr-relay.mjs";
 
 const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/node_modules/playwright/index.mjs";
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
+const proofText = "backend-free-spa-nostr-webrtc";
 
 async function main() {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-spa-artifact-"));
@@ -26,6 +28,7 @@ async function main() {
 
     const root = path.join(unpackDir, result.prefix);
     const server = await startStaticServer(root);
+    const relay = await startFakeRelay();
     let browser = null;
 
     try {
@@ -34,21 +37,8 @@ async function main() {
         if (chromiumPath) launchOptions.executablePath = chromiumPath;
         browser = await chromium.launch(launchOptions);
         const page = await browser.newPage();
-        const pageErrors = [];
-        page.on("pageerror", error => pageErrors.push(error.stack || error.message));
-        page.on("console", message => {
-            if (message.type() === "error") pageErrors.push(message.text());
-        });
-        await page.addInitScript(() => {
-            globalThis.__meshdropE2E = {
-                config: null,
-                configLoaded: false
-            };
-            window.addEventListener("config", event => {
-                globalThis.__meshdropE2E.config = event.detail;
-                globalThis.__meshdropE2E.configLoaded = true;
-            });
-        });
+        const pageErrors = watchPage("spa-runtime", page);
+        await addSpaInitScript(page, "runtime", relay.url);
 
         await page.goto(`http://127.0.0.1:${server.port}`, {waitUntil: "domcontentloaded"});
         await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager);
@@ -71,13 +61,239 @@ async function main() {
         assert(state.serverSettings === false, "Server settings must be unsupported");
         assert(pageErrors.length === 0, `SPA smoke page errors:\n${pageErrors.join("\n")}`);
 
+        await runBackendFreeTransferProof(browser, server.port, relay.url);
+
         console.log(`SPA artifact smoke passed for ${result.artifactPath}`);
     }
     finally {
         await browser?.close();
+        await new Promise(resolve => relay.close(resolve));
         await new Promise(resolve => server.close(resolve));
         await fs.rm(tempDir, {recursive: true, force: true});
     }
+}
+
+async function runBackendFreeTransferProof(browser, port, relayUrl) {
+    const contextA = await browser.newContext({serviceWorkers: "block"});
+    const contextB = await browser.newContext({serviceWorkers: "block"});
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const pageErrors = [
+        ...watchPage("backend-free-spa-nostr-webrtc:a", pageA),
+        ...watchPage("backend-free-spa-nostr-webrtc:b", pageB)
+    ];
+
+    try {
+        await Promise.all([
+            addSpaInitScript(pageA, "a", relayUrl),
+            addSpaInitScript(pageB, "b", relayUrl)
+        ]);
+        await Promise.all([
+            pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
+            pageB.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"})
+        ]);
+        await Promise.all([waitForSpaHydration(pageA), waitForSpaHydration(pageB)]);
+        await Promise.all([connectNostr(pageA), connectNostr(pageB)]);
+        await Promise.all([setFollowList(pageA), setFollowList(pageB)]);
+        await Promise.all([
+            pageA.evaluate(() => globalThis.meshdropNostrMesh.connect()),
+            pageB.evaluate(() => globalThis.meshdropNostrMesh.connect())
+        ]);
+        await Promise.all([
+            pageA.waitForFunction(() => globalThis.meshdropNostrMesh._active),
+            pageB.waitForFunction(() => globalThis.meshdropNostrMesh._active)
+        ]);
+
+        const peerId = await waitForConnectedPeer(pageA, "nostr");
+        await waitForConnectedPeer(pageB, "nostr");
+        await sendSpaProofFile(pageA, peerId);
+        const received = await waitForReceivedFiles(pageB);
+
+        assert(received[0]?.name.startsWith("meshdrop-spa-proof"), "SPA transfer delivered unexpected file");
+        assert(received[0]?.text === proofText, "SPA transfer delivered unexpected contents");
+        assert(pageErrors.length === 0, `SPA backend-free transfer page errors:\n${pageErrors.join("\n")}`);
+        console.log("Proof backend-free-spa-nostr-webrtc: nostr delivered meshdrop-spa-proof.txt");
+    }
+    finally {
+        await Promise.allSettled([contextA.close(), contextB.close()]);
+    }
+}
+
+async function addSpaInitScript(page, identityName, relayUrl) {
+    await page.addInitScript(({name, relay, payload}) => {
+        globalThis.__meshdropDisableNostrRelayNetwork = true;
+        const pubkey = name === "a" ? "1".repeat(64) : "2".repeat(64);
+        const displayName = `npub ${pubkey.slice(0, 8)}`;
+        let counter = 0;
+
+        localStorage.setItem("meshdrop_relay_settings", JSON.stringify({
+            bootstrapRelays: [relay],
+            webRtcRelays: [relay],
+            inboxRelays: [relay],
+            outboxRelays: [relay]
+        }));
+        localStorage.setItem("meshdrop_nostr_identity", JSON.stringify({
+            pubkey,
+            displayName,
+            picture: "",
+            relays: {read: [relay], write: [relay]},
+            followPubkeys: ["1".repeat(64), "2".repeat(64)],
+            followListStatus: "found",
+            blossomServers: [],
+            blossomServerListStatus: "missing",
+            event: {
+                kind: 27235,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [["client", "meshdrop"], ["origin", location.origin], ["name", displayName]],
+                content: "MeshDrop Nostr identity",
+                pubkey,
+                id: `${pubkey.slice(0, 32)}${"0".repeat(32)}`,
+                sig: "3".repeat(128)
+            }
+        }));
+        globalThis.nostr = {
+            getPublicKey: async () => pubkey,
+            signEvent: async event => ({
+                ...event,
+                pubkey,
+                id: `${pubkey.slice(0, 32)}${String(++counter).padStart(32, "0")}`.slice(0, 64),
+                sig: "3".repeat(128)
+            }),
+            nip04: {
+                encrypt: async (_pubkey, plaintext) => plaintext,
+                decrypt: async (_pubkey, ciphertext) => ciphertext
+            }
+        };
+
+        globalThis.__meshdropE2E = {
+            config: null,
+            configLoaded: false,
+            connected: [],
+            received: [],
+            proofText: payload
+        };
+        window.addEventListener("config", event => {
+            globalThis.__meshdropE2E.config = event.detail;
+            globalThis.__meshdropE2E.configLoaded = true;
+        });
+        window.addEventListener("files-transfer-request", event => {
+            window.dispatchEvent(new CustomEvent("respond-to-files-transfer-request", {
+                detail: {to: event.detail.peerId, accepted: true}
+            }));
+        });
+        window.addEventListener("files-received", async event => {
+            const files = await Promise.all(event.detail.files.map(async file => ({
+                name: file.name,
+                text: await file.text()
+            })));
+            globalThis.__meshdropE2E.received.push({peerId: event.detail.peerId, files});
+        });
+        window.addEventListener("peer-connected", event => {
+            globalThis.__meshdropE2E.connected.push(event.detail.peerId);
+        });
+    }, {name: identityName, relay: relayUrl, payload: proofText});
+}
+
+function watchPage(name, page) {
+    const pageErrors = [];
+    page.on("pageerror", error => pageErrors.push(`${name}: ${error.stack || error.message}`));
+    page.on("console", message => {
+        if (message.type() !== "error") return;
+        const text = message.text();
+        if (text.includes("RTCErrorEvent")) return;
+        pageErrors.push(`${name} console error: ${text}`);
+    });
+    return pageErrors;
+}
+
+async function waitForSpaHydration(page) {
+    await page.waitForFunction(() => (
+        globalThis.__meshdropE2E?.configLoaded
+        && globalThis.__meshdropE2E?.peersManager
+        && globalThis.meshdropNostrIdentity
+        && globalThis.meshdropNostrMesh
+    ));
+}
+
+async function connectNostr(page) {
+    const hasIdentity = await page.evaluate(() => !!globalThis.meshdropNostrIdentity.getIdentity());
+    if (hasIdentity) return;
+
+    await page.evaluate(() => globalThis.meshdropNostrIdentity.connect());
+    await page.waitForFunction(() => !!globalThis.meshdropNostrIdentity.getIdentity());
+}
+
+async function setFollowList(page) {
+    await page.evaluate(() => {
+        const identity = globalThis.meshdropNostrIdentity.getIdentity();
+        identity.followPubkeys = ["1".repeat(64), "2".repeat(64)];
+        identity.followListStatus = "found";
+        localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(identity));
+    });
+}
+
+async function waitForConnectedPeer(page, roomType) {
+    try {
+        const handle = await page.waitForFunction(type => {
+            const peer = document.querySelector(`x-peer.type-${type}`);
+            if (!peer) return "";
+            if (!globalThis.__meshdropE2E.connected.includes(peer.id)) return "";
+            return peer?.id || "";
+        }, roomType, {timeout: 30000});
+        return handle.jsonValue();
+    } catch (error) {
+        throw new Error(`${error.message}\n${JSON.stringify(await debugPageState(page), null, 2)}`, {cause: error});
+    }
+}
+
+async function sendSpaProofFile(page, peerId) {
+    await page.evaluate(({to, payload}) => {
+        const file = new File([payload], "meshdrop-spa-proof.txt", {type: "text/plain"});
+        window.dispatchEvent(new CustomEvent("files-selected", {detail: {to, files: [file]}}));
+    }, {to: peerId, payload: proofText});
+}
+
+async function waitForReceivedFiles(page) {
+    try {
+        const handle = await page.waitForFunction(() => {
+            const batch = globalThis.__meshdropE2E.received.at(-1);
+            if (!batch || batch.files.length !== 1) return null;
+            return batch.files;
+        }, {timeout: 45000});
+        return handle.jsonValue();
+    } catch (error) {
+        throw new Error(`${error.message}\n${JSON.stringify(await debugPageState(page), null, 2)}`, {cause: error});
+    }
+}
+
+async function debugPageState(page) {
+    return page.evaluate(() => ({
+        identity: globalThis.meshdropNostrIdentity?.getIdentity?.(),
+        connected: globalThis.__meshdropE2E?.connected,
+        received: globalThis.__meshdropE2E?.received,
+        nostrMesh: {
+            active: globalThis.meshdropNostrMesh?._active,
+            connecting: globalThis.meshdropNostrMesh?._connecting,
+            room: globalThis.meshdropNostrMesh?._room,
+            relayUrls: globalThis.meshdropNostrMesh?._relayUrls,
+            relaySockets: globalThis.meshdropNostrMesh?._sockets?.size,
+            peers: [...(globalThis.meshdropNostrMesh?._peers || [])]
+        },
+        peers: [...document.querySelectorAll("x-peer")].map(peer => ({
+            id: peer.id,
+            classes: [...peer.classList]
+        })),
+        managerPeers: Object.values(globalThis.__meshdropE2E?.peersManager?.peers || {}).map(peer => ({
+            id: peer._peerId,
+            isCaller: peer._isCaller,
+            roomIds: peer._roomIds,
+            channelState: peer._channel?.readyState || "",
+            signalingState: peer._conn?.signalingState || "",
+            iceConnectionState: peer._conn?.iceConnectionState || "",
+            connectionState: peer._conn?.connectionState || "",
+            signalSessionId: peer._signalSessionId || ""
+        }))
+    }));
 }
 
 async function loadPlaywright() {
