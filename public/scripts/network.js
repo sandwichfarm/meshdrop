@@ -1540,7 +1540,17 @@ class RTCPeer extends Peer {
         Events.fire('peer-disconnected', this._peerId);
         if (this._intentionalDisconnect) return;
         if (!this._isCaller) return;
+        this._dropConnection();
         this._connect(); // reopen the channel
+    }
+
+    _dropConnection() {
+        if (this._conn && this._conn.signalingState !== 'closed') this._conn.close();
+        this._conn = null;
+        this._channel = null;
+        this._pendingIceCandidates = [];
+        this._remoteOfferSdp = "";
+        this._signalSessionId = "";
     }
 
     _onConnectionStateChange() {

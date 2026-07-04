@@ -92,6 +92,7 @@ function createHarness() {
         sessionStorage: {getItem: () => null, setItem() {}},
         localStorage: {getItem: () => null},
         crypto: {randomUUID: () => `session-${++sessionIndex}`},
+        cyrb53: () => 1,
         Events: {
             on() {},
             fire(type, detail) {
@@ -277,6 +278,31 @@ test("RTC signaling does not remove peers on transient disconnected state", () =
 
     assert.equal(fired.some(event => event.type === "peer-disconnected"), false);
     assert.equal(warnings.length, 1);
+});
+
+test("caller reconnects a closed RTC data channel with a fresh peer connection", async () => {
+    const {RTCPeer, connections} = createHarness();
+    const sent = [];
+
+    new RTCPeer({send: message => sent.push(message)}, true, "peer-a", "nostr", "room", {});
+    await flushPromises();
+
+    const firstConnection = connections[0];
+    const firstChannel = firstConnection.dataChannels[0];
+    firstConnection.signalingState = "stable";
+    firstConnection.localDescription = {sdp: "a=fingerprint:local\r\n"};
+    firstConnection.remoteDescription = {sdp: "a=fingerprint:remote\r\n"};
+    firstChannel.readyState = "open";
+    firstChannel.onopen({target: firstChannel});
+
+    firstChannel.close();
+    await flushPromises();
+
+    assert.equal(connections.length, 2);
+    assert.equal(firstConnection.signalingState, "closed");
+    assert.equal(connections[1].dataChannels.length, 1);
+    assert.equal(sent.at(-1).sdp.type, "offer");
+    assert.equal(sent.at(-1).sessionId, "session-2");
 });
 
 test("file transfer route selection resolves a Nostr pubkey alias to the visible RTC peer", async () => {
