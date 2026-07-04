@@ -206,6 +206,32 @@ test("RTC signaling ignores late local answers after negotiation already settled
     assert.deepEqual(errors, []);
 });
 
+test("RTC signaling ignores async stale-answer InvalidStateError", async () => {
+    const {RTCPeer, connections, errors} = createHarness();
+    const sent = [];
+    const peer = new RTCPeer({send: message => sent.push(message)}, false, "peer-a", "nostr", "room", {});
+    let setLocalAttempts = 0;
+
+    peer.onServerMessage({sessionId: "remote-session", sdp: {type: "offer", sdp: "offer-sdp"}});
+    connections[0].setLocalDescription = description => {
+        setLocalAttempts += 1;
+        if (description.type === "answer") {
+            const error = new Error(
+                "Failed to execute 'setLocalDescription' on 'RTCPeerConnection': Called in wrong state: stable"
+            );
+            error.name = "InvalidStateError";
+            connections[0].signalingState = "stable";
+            return Promise.reject(error);
+        }
+        return Promise.resolve();
+    };
+    await flushPromises();
+
+    assert.equal(setLocalAttempts, 1);
+    assert.deepEqual(sent, []);
+    assert.deepEqual(errors, []);
+});
+
 test("RTC signaling drops buffered ICE from stale pre-offer sessions", async () => {
     const {RTCPeer, connections} = createHarness();
     const peer = new RTCPeer({send() {}}, false, "peer-a", "nostr", "room", {});

@@ -18,6 +18,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-release-ceremony-baseline` | complete | actionlint; release artifact smoke; `npm test`; `npm run test:docker`; diff/slop gates |
 | 2026-07-04 | `20260704-runtime-capability-contract` | complete | focused red/green tests; `npm test`; e2e transfer proof; Docker smoke; diff/slop gates |
 | 2026-07-04 | `20260704-spa-runtime-capabilities` | complete | static SPA browser proof; `npm test`; e2e transfer proof; Docker smoke; diff/slop gates |
+| 2026-07-04 | `260704-kkw-fix-federated-fips-rtc-glare-so-e2e-tran` | complete | focused red/green RTC test; `npm test`; e2e transfer proof; Docker smoke; diff/slop gates |
 
 ## Active Quick Task
 

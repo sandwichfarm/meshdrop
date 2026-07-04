@@ -349,7 +349,9 @@ function watchPages(name, pages) {
             if (text.includes("RTCErrorEvent")) return;
             const location = message.location();
             const source = location.url ? `${location.url}:${location.lineNumber}:${location.columnNumber}` : "";
-            console.warn(`${label} console error: ${text}${source ? ` @ ${source}` : ""}`);
+            const entry = `${label} console error: ${text}${source ? ` @ ${source}` : ""}`;
+            pageErrors.push(entry);
+            console.warn(entry);
         });
     });
 
