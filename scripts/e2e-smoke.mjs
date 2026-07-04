@@ -5,12 +5,13 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import {pathToFileURL} from "node:url";
 
 import {WebSocketServer} from "ws";
-import {chromium} from "/usr/lib/node_modules/playwright/index.mjs";
 
 const repoRoot = new URL("..", import.meta.url);
-const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH || "/usr/bin/chromium";
+const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/node_modules/playwright/index.mjs";
+const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const PROOF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="12" fill="#1b806a"/>
   <path d="M18 34 28 44 47 21" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
@@ -31,10 +32,11 @@ async function main() {
     const blossomServerUrl = `http://127.0.0.1:${blossom.port}`;
     await waitForHttp(`${baseUrl}/config`);
 
-    const browser = await chromium.launch({
-        headless: true,
-        executablePath: chromiumPath
-    });
+    const {chromium} = await loadPlaywright();
+    const launchOptions = {headless: true};
+    const executablePath = await resolveChromiumPath();
+    if (executablePath) launchOptions.executablePath = executablePath;
+    const browser = await chromium.launch(launchOptions);
 
     try {
         await runVisibilityScenario(browser, baseUrl);
@@ -131,6 +133,33 @@ async function main() {
     }
 
     console.log(`Browser E2E smoke passed on ${baseUrl}`);
+}
+
+async function loadPlaywright() {
+    if (playwrightModulePath) {
+        try {
+            await fs.access(playwrightModulePath);
+            return import(pathToFileURL(playwrightModulePath).href);
+        } catch (error) {
+            if (process.env.PLAYWRIGHT_MODULE_PATH) {
+                throw new Error(`PLAYWRIGHT_MODULE_PATH is not readable: ${playwrightModulePath}\n${error.message}`);
+            }
+        }
+    }
+
+    return import("playwright");
+}
+
+async function resolveChromiumPath() {
+    if (chromiumPath !== undefined) return chromiumPath;
+
+    const systemChromiumPath = "/usr/bin/chromium";
+    try {
+        await fs.access(systemChromiumPath);
+        return systemChromiumPath;
+    } catch {
+        return "";
+    }
 }
 
 async function runVisibilityScenario(browser, baseUrl) {
