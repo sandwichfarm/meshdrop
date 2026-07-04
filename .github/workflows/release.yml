@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -84,3 +85,63 @@ jobs:
             --generate-notes \
             --prerelease \
             --verify-tag
+
+  container-images:
+    name: GHCR target image (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    needs: release
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [standalone, start9, umbrel]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Prepare image metadata
+        id: image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          version="${GITHUB_REF_NAME#v}"
+          target="${{ matrix.target }}"
+          {
+            echo "image=${image}"
+            echo "version=${version}"
+            echo "tag=${GITHUB_REF_NAME}"
+            echo "target=${target}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build target image
+        run: |
+          image="${{ steps.image.outputs.image }}"
+          version="${{ steps.image.outputs.version }}"
+          tag="${{ steps.image.outputs.tag }}"
+          target="${{ steps.image.outputs.target }}"
+
+          docker build \
+            --build-arg MESH_DROP_COMMIT="${GITHUB_SHA}" \
+            --build-arg MESHDROP_TARGET="${target}" \
+            --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.version=${tag}" \
+            --label "org.opencontainers.image.title=MeshDrop ${target}" \
+            --tag "${image}:${tag}-${target}" \
+            --tag "${image}:${version}-${target}" \
+            .
+
+      - name: Push target image
+        run: |
+          image="${{ steps.image.outputs.image }}"
+          version="${{ steps.image.outputs.version }}"
+          tag="${{ steps.image.outputs.tag }}"
+          target="${{ steps.image.outputs.target }}"
+
+          docker push "${image}:${tag}-${target}"
+          docker push "${image}:${version}-${target}"
