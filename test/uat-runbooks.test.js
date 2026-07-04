@@ -44,6 +44,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     }
     assert.match(releaseTargets, /multi-architecture manifests for `linux\/amd64` and `linux\/arm64`/);
     assert.match(releaseTargets, /docker buildx imagetools inspect/);
+    assert.match(releaseTargets, /release-verify\.yml/);
+    assert.match(releaseTargets, /readback runs with GitHub Actions package permissions/);
     assert.match(releaseTargets, /Start9 source tarball/);
     assert.match(releaseTargets, /Umbrel package tarball/);
     assert.match(releaseTargets, /Not proven/);
