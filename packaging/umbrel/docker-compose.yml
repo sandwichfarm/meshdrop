@@ -1,0 +1,29 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: meshdrop_server_1
+      APP_PORT: 3000
+
+  server:
+    image: __MESHDROP_IMAGE__
+    restart: on-failure
+    environment:
+      - NODE_ENV=production
+      - MESHDROP_TARGET=umbrel
+      - PORT=3000
+      - RATE_LIMIT=false
+      - WS_FALLBACK=false
+      - NOSTR_RELAYS=wss://bucket.coracle.social
+      - MESHDROP_DISCOVERY_NPUBS=
+      - MESHDROP_ADMIN_NPUB=
+      - BLOSSOM_SERVERS=
+      - FIPS_DISCOVERY=false
+      - POLLEN_TRANSFER=true
+      - PLN_DIR=/data/pln
+      - POLLEN_PORT=60611
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    ports:
+      - "60611:60611/udp"
