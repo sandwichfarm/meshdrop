@@ -3,10 +3,12 @@ import RateLimit from "express-rate-limit";
 import {fileURLToPath} from "url";
 import path, {dirname} from "path";
 import http from "http";
+import {adminPublicConfig, createAdminConfig, verifySignedAdminRequest} from "./admin-auth.js";
 
 export default class PairDropServer {
 
     constructor(conf) {
+        const admin = conf.admin || createAdminConfig();
         const app = express();
         app.use(express.json({limit: "64kb"}));
 
@@ -65,6 +67,7 @@ export default class PairDropServer {
                     enabled: conf.fips.enabled,
                     room: conf.fips.room
                 },
+                admin: adminPublicConfig(admin),
                 buttons: conf.buttons
             });
         });
@@ -127,7 +130,17 @@ export default class PairDropServer {
 
         app.post('/settings/fips/peers', async (req, res) => {
             try {
-                res.send(await conf.fipsClient.savePeers(req.body?.peers || []));
+                const adminRequest = verifySignedAdminRequest(admin, req.body?.event);
+                if (!adminRequest.ok) {
+                    res.status(403).send({error: adminRequest.error});
+                    return;
+                }
+                if (adminRequest.request.action !== "settings.fips.peers") {
+                    res.status(400).send({error: "admin_action_mismatch"});
+                    return;
+                }
+
+                res.send(await conf.fipsClient.savePeers(adminRequest.request.peers || []));
             } catch (error) {
                 res.status(502).send({error: error.message});
             }
