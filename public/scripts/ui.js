@@ -324,6 +324,7 @@ class PeersUI {
     }
 
     _joinPeer(peer, roomType, roomId) {
+        if (roomType === "ip" && globalThis.meshdropLocalDiscovery?.isEnabled?.() === false) return;
         if (globalThis.NostrFollowPolicy?.allowsPeer(peer, roomType) === false) return;
 
         const existingPeerId = this._existingPeerId(peer, roomType);
