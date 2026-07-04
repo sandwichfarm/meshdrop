@@ -6,6 +6,7 @@ const baseUrl = process.env.MESHDROP_DOCKER_TRANSFER_BASE_URL || process.argv[2]
 const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/node_modules/playwright/index.mjs";
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const adminSecretKey = secretKeyFromHex(process.env.MESHDROP_DOCKER_ADMIN_SECRET_KEY || "");
+const adminFipsPeerNpub = process.env.MESHDROP_DOCKER_ADMIN_FIPS_PEER_NPUB || "npub1peer";
 const proofIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="12" fill="#1b806a"/>
   <path d="M18 34 28 44 47 21" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
@@ -83,7 +84,7 @@ async function runAdminSettingsProof(browser, secretKey) {
         await adminPage.click("#protocol-settings");
         await adminPage.click('[data-settings-tab="fips"]');
         await adminPage.click(".fips-add-peer");
-        await adminPage.fill('.fips-peer-row [data-field="npub"]', "npub1peer");
+        await adminPage.fill('.fips-peer-row [data-field="npub"]', adminFipsPeerNpub);
         await adminPage.fill('.fips-peer-row [data-field="address"]', "203.0.113.9:2121");
         await adminPage.selectOption('.fips-peer-row [data-field="transport"]', "tcp");
         await adminPage.click(".fips-save-peers");

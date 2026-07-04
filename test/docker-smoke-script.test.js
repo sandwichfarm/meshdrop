@@ -28,6 +28,8 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerSmoke, /scripts\/docker-two-host-relay-smoke\.mjs/);
     assert.match(dockerTransfer, /docker-admin-settings/);
     assert.match(dockerTransfer, /settings\/fips\/peers/);
+    assert.match(packageJson, /"test:docker:admin": "node scripts\/docker-compose-admin-uat\.mjs"/);
+    assert.equal(fs.existsSync(new URL("../scripts/docker-compose-admin-uat.mjs", import.meta.url)), true);
     assert.match(dockerTwoHostRelay, /docker-two-host-nostr-webrtc/);
     assert.match(dockerTwoHostRelay, /docker-public-relay-two-host-webrtc/);
     assert.match(dockerTwoHostRelay, /MESHDROP_DOCKER_PUBLIC_RELAY_URLS/);

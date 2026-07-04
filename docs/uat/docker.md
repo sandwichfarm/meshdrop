@@ -64,6 +64,19 @@ npm run test:docker:two-host
 
 Passing output must include `Proof docker-two-host-nostr-webrtc: nostr delivered meshdrop-proof-icon.svg between two Docker instances`.
 
+To prove the compose deployment path with a configured shared-instance admin npub, run:
+
+```sh
+npm run test:docker:admin
+```
+
+This UAT inherits `docker-compose.yml`, overrides the container name and fixed ports so it can run beside an existing
+deployment, injects a temporary `MESHDROP_ADMIN_NPUB`, starts the service with compose, checks `/config`, confirms
+FIPS/Pollen use configured `npub-network:` IDs instead of legacy rooms, drives the signed admin GUI request, confirms a
+non-admin signer cannot see or submit server settings, and initiates local plus Pollen browser transfers.
+
+Passing output must include `Proof docker-deployed-admin-settings: compose admin`.
+
 ## Public Relay UAT
 
 The default two-host smoke uses an in-process relay so CI remains deterministic. To prove the same Docker-served
@@ -85,9 +98,12 @@ Current GitHub-hosted proof: manual run `28715209725` on `agent/docker-public-re
 Docker public relay UAT job against `wss://bucket.coracle.social`. The first public relay attempt timed out waiting for
 an open RTC peer; the second attempt emitted the required public proof line.
 
+## Current Proof
+
+- `npm run test:docker:admin` passed locally on 2026-07-04 in branch
+  `agent/docker-deployed-admin-uat-20260704`, proving the isolated compose deployed-admin path without disturbing the
+  already-running `meshdrop` container.
+
 ## Not proven
 
-- The Docker smoke proves local WebRTC, Pollen mesh, and deterministic two-host Nostr WebRTC transfers; run
-  `npm run test:e2e` for the broader source-served transfer matrix.
-- Real shared-instance admin UAT still needs a manual signed GUI request using the deployment admin npub and deployment
-  FIPS control plane.
+- Run `npm run test:e2e` for the broader source-served transfer matrix outside Docker.
