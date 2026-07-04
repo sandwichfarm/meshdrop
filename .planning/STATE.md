@@ -60,6 +60,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `20260705-desktop-native-linux-shell` | complete | Linux GTK/WebKit shell artifact builds and config-smokes; release workflow will include `meshdrop-desktop-linux`; native transfer UAT still open |
 | 2026-07-05 | `260705-0x0-prove-packaged-linux-gtk-webkit-desktop-` | complete | Packaged GTK/WebKit shell WebDriver smoke proves Desktop Native manifest injection and WebRTC gate-off; native transfer UAT still open |
 | 2026-07-05 | `260705-mns-mobile-native-shell-source-artifacts` | complete | iOS/Android native-source wrapper artifacts build and release verifier expects them; app package/device transfer UAT still open |
+| 2026-07-05 | `260705-mnci-mobile-native-source-ci` | complete | PR CI runs iOS/Android native-source package scripts and tar readbacks after unit tests |
 
 ## Active Quick Task
 
