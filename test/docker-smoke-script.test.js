@@ -17,6 +17,7 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerTransfer, /docker-local-webrtc/);
     assert.match(dockerTransfer, /docker-pollen-webrtc/);
     assert.match(dockerTransfer, /meshdropPollenTransfer\.enable/);
+    assert.match(dockerTransfer, /undefined, \{timeout: 45000\}/);
     assert.match(dockerSmoke, /MESHDROP_DOCKER_ADMIN_SECRET_KEY/);
     assert.match(dockerSmoke, /scripts\/fips-control-smoke-mock\.mjs/);
     assert.match(dockerTransfer, /docker-admin-settings/);
