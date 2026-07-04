@@ -43,6 +43,7 @@ test("Desktop package builder creates source artifact with target metadata", asy
         assert.equal(manifest.transports.localDiscovery, false);
         assert.equal(manifest.transports.pollen, false);
         assert.equal(manifest.transports.fips, false);
+        assert.equal(manifest.transports.bluetooth, false);
         assert.deepEqual(manifest.remainingProof, [
             "native shell build",
             "native desktop WebRTC transfer UAT",

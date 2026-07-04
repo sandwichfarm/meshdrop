@@ -72,6 +72,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(desktop, /runtime\.platform` as `desktop`/);
     assert.match(desktop, /nativeShellBuilt` as `false`/);
     assert.match(desktop, /backend-only transports are not claimed/);
+    assert.match(desktop, /bluetooth` is `false`/);
     assert.match(desktop, /Nostr WebRTC/);
     assert.match(desktop, /npm run test:target-artifacts/);
     assert.match(desktop, /native desktop WebRTC transfer UAT/);

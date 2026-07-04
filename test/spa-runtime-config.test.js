@@ -113,6 +113,7 @@ test("server connection falls back to static SPA config when backend config is u
     assert.equal(configEvent.detail.capabilities.transports.localDiscovery.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.fips.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.pollen.supported, false);
+    assert.equal(configEvent.detail.capabilities.transports.bluetooth.supported, false);
     assert.equal(configEvent.detail.capabilities.serverSettings.supported, false);
     assert.deepEqual(Object.keys(configEvent.detail.buttons), [
         "donation_button",
@@ -194,6 +195,7 @@ test("static config applies target manifest runtime metadata when present", asyn
     assert.equal(configEvent.detail.capabilities.transports.localDiscovery.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.nostr.supported, true);
     assert.equal(configEvent.detail.capabilities.transports.pollen.supported, false);
+    assert.equal(configEvent.detail.capabilities.transports.bluetooth.supported, false);
     assert.equal(configEvent.detail.capabilities.serverSettings.supported, false);
     assert.deepEqual(sockets, []);
 });

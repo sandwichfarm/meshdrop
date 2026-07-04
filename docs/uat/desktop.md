@@ -15,7 +15,8 @@ Use this runbook for the dependency-free Desktop Native source artifact built by
 3. Confirm `meshdrop-target.json` reports `runtime.hasBackend` as `false` and `runtime.sharedInstance` as `false`.
 4. Confirm `meshdrop-target.json` reports `nativeShellBuilt` as `false`.
 5. Confirm backend-only transports are not claimed: `localDiscovery`, `pollen`, and `fips` are `false`.
-6. Confirm browser-backed transports are available for a future shell: `webrtc`, `nostr`, `blossom`, and `hashtree` are `true`.
+6. Confirm `bluetooth` is `false` until a real desktop Bluetooth transport is implemented and tested.
+7. Confirm browser-backed transports are available for a future shell: `webrtc`, `nostr`, `blossom`, and `hashtree` are `true`.
 
 ## Native Shell Acceptance
 
