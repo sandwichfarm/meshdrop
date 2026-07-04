@@ -13,6 +13,7 @@ const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const browserTypeName = process.env.PLAYWRIGHT_BROWSER || "chromium";
 const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
+const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
 
 async function main() {
     assert(
@@ -101,7 +102,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrl) {
             pageA.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"}),
             pageB.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"})
         ]);
-        await Promise.all([waitForSpaHydration(pageA), waitForSpaHydration(pageB)]);
+        await Promise.all([waitForSpaHydration(pageA, "sender"), waitForSpaHydration(pageB, "receiver")]);
         await Promise.all([connectNostr(pageA), connectNostr(pageB)]);
         await Promise.all([setFollowList(pageA), setFollowList(pageB)]);
         await Promise.all([
@@ -219,20 +220,26 @@ function watchPage(name, page) {
 
 async function waitForInitialSpaState(page, pageErrors) {
     try {
-        await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager);
-        await page.waitForFunction(() => globalThis.__meshdropE2E?.configLoaded);
+        await page.waitForFunction(() => globalThis.__meshdropE2E?.peersManager, {timeout: spaHydrationTimeoutMs});
+        await page.waitForFunction(() => globalThis.__meshdropE2E?.configLoaded, {timeout: spaHydrationTimeoutMs});
     } catch (error) {
         throw new Error(`${error.message}\n${pageErrors.join("\n")}`, {cause: error});
     }
 }
 
-async function waitForSpaHydration(page) {
-    await page.waitForFunction(() => (
-        globalThis.__meshdropE2E?.configLoaded
-        && globalThis.__meshdropE2E?.peersManager
-        && globalThis.meshdropNostrIdentity
-        && globalThis.meshdropNostrMesh
-    ));
+async function waitForSpaHydration(page, role) {
+    try {
+        await page.waitForFunction(() => (
+            globalThis.__meshdropE2E?.configLoaded
+            && globalThis.__meshdropE2E?.peersManager
+            && globalThis.meshdropNostrIdentity
+            && globalThis.meshdropNostrMesh
+        ), {timeout: spaHydrationTimeoutMs});
+    } catch (error) {
+        throw new Error(`${role} SPA hydration failed: ${error.message}\n${JSON.stringify(await debugPageState(page), null, 2)}`, {
+            cause: error
+        });
+    }
 }
 
 async function connectNostr(page) {

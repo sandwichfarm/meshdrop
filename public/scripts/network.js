@@ -1497,21 +1497,10 @@ class RTCPeer extends Peer {
     }
 
     getConnectionHash() {
-        const localDescriptionLines = this._conn.localDescription.sdp.split("\r\n");
-        const remoteDescriptionLines = this._conn.remoteDescription.sdp.split("\r\n");
-        let localConnectionFingerprint, remoteConnectionFingerprint;
-        for (let i=0; i<localDescriptionLines.length; i++) {
-            if (localDescriptionLines[i].startsWith("a=fingerprint:")) {
-                localConnectionFingerprint = localDescriptionLines[i].substring(14);
-                break;
-            }
-        }
-        for (let i=0; i<remoteDescriptionLines.length; i++) {
-            if (remoteDescriptionLines[i].startsWith("a=fingerprint:")) {
-                remoteConnectionFingerprint = remoteDescriptionLines[i].substring(14);
-                break;
-            }
-        }
+        const localConnectionFingerprint = this._connectionFingerprint(this._conn?.localDescription?.sdp || "");
+        const remoteConnectionFingerprint = this._connectionFingerprint(this._conn?.remoteDescription?.sdp || "");
+        if (!localConnectionFingerprint || !remoteConnectionFingerprint) return "";
+
         const combinedFingerprints = this._isCaller
             ? localConnectionFingerprint + remoteConnectionFingerprint
             : remoteConnectionFingerprint + localConnectionFingerprint;
@@ -1520,6 +1509,13 @@ class RTCPeer extends Peer {
             hash = "0" + hash;
         }
         return hash;
+    }
+
+    _connectionFingerprint(sdp) {
+        const fingerprint = sdp
+            .split("\r\n")
+            .find(line => line.startsWith("a=fingerprint:"));
+        return fingerprint?.substring(14) || "";
     }
 
     _onBeforeUnload(e) {
