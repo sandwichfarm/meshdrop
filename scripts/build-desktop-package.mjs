@@ -8,12 +8,15 @@ import {cacheVersionFromEnv, updateServiceWorkerVersion} from "./set-service-wor
 
 const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const packageJson = JSON.parse(await fs.readFile(path.join(repoRoot, "package.json"), "utf8"));
+const modes = new Set(["source", "native", "chromium"]);
 
 export function parseArgs(argv) {
     const args = {
         version: packageJson.version,
         outDir: path.join(repoRoot, "dist"),
-        native: false
+        mode: "source",
+        native: false,
+        chromium: false
     };
 
     for (let i = 0; i < argv.length; i += 1) {
@@ -26,7 +29,12 @@ export function parseArgs(argv) {
             i += 1;
         }
         else if (argv[i] === "--native") {
+            args.mode = "native";
             args.native = true;
+        }
+        else if (argv[i] === "--chromium-shell") {
+            args.mode = "chromium";
+            args.chromium = true;
         }
         else {
             throw new Error(`Unknown argument: ${argv[i]}`);
@@ -39,23 +47,32 @@ export function parseArgs(argv) {
 export async function buildDesktopPackage(options = {}) {
     return buildDesktopArtifact({
         ...options,
-        native: false
+        mode: "source"
     });
 }
 
 export async function buildDesktopNativePackage(options = {}) {
     return buildDesktopArtifact({
         ...options,
-        native: true
+        mode: "native"
+    });
+}
+
+export async function buildDesktopChromiumPackage(options = {}) {
+    return buildDesktopArtifact({
+        ...options,
+        mode: "chromium"
     });
 }
 
 async function buildDesktopArtifact(options = {}) {
-    const native = options.native === true;
+    const mode = normalizeMode(options.mode || (options.native ? "native" : "source"));
+    const native = mode === "native";
+    const chromium = mode === "chromium";
     const version = sanitizeArtifactPart(options.version || packageJson.version);
     const outDir = path.resolve(options.outDir || path.join(repoRoot, "dist"));
-    const prefix = native ? `meshdrop-desktop-linux-${version}` : `meshdrop-desktop-${version}`;
-    const stageRoot = path.join(outDir, native ? ".desktop-native-stage" : ".desktop-stage");
+    const prefix = artifactPrefix(mode, version);
+    const stageRoot = path.join(outDir, `.${prefix}-stage`);
     const stageDir = path.join(stageRoot, prefix);
     const appDir = path.join(stageDir, "app");
     const artifactPath = path.join(outDir, `${prefix}.tar.gz`);
@@ -63,18 +80,21 @@ async function buildDesktopArtifact(options = {}) {
     await fs.rm(stageRoot, {recursive: true, force: true});
     await fs.mkdir(stageDir, {recursive: true});
     await fs.cp(path.join(repoRoot, "public"), appDir, {recursive: true});
-    await writeTargetManifest(stageDir, version, native);
-    await writeDesktopReadme(stageDir, version, native);
+    await writeTargetManifest(stageDir, version, mode);
+    await writeDesktopReadme(stageDir, version, mode);
     await fs.copyFile(path.join(repoRoot, "docs", "uat", "desktop.md"), path.join(stageDir, "UAT-DESKTOP.md"));
     await stampServiceWorker(appDir, version, options.env || process.env);
     if (native) {
         await compileNativeShell(stageDir);
     }
+    if (chromium) {
+        await writeChromiumShell(stageDir);
+    }
     await fs.rm(artifactPath, {force: true});
     await tarCreate(artifactPath, stageRoot, prefix);
     await fs.rm(stageRoot, {recursive: true, force: true});
 
-    return {artifactPath, prefix, version, nativeShellBuilt: native};
+    return {artifactPath, prefix, version, nativeShellBuilt: native || chromium, mode};
 }
 
 export async function listTarEntries(artifactPath) {
@@ -87,15 +107,29 @@ export async function readTarEntry(artifactPath, entry) {
     return stdout;
 }
 
-async function writeTargetManifest(stageDir, version, native) {
+function normalizeMode(mode) {
+    if (!modes.has(mode)) throw new Error(`Unknown desktop artifact mode: ${mode}`);
+    return mode;
+}
+
+function artifactPrefix(mode, version) {
+    if (mode === "native") return `meshdrop-desktop-linux-${version}`;
+    if (mode === "chromium") return `meshdrop-desktop-chromium-${version}`;
+    return `meshdrop-desktop-${version}`;
+}
+
+async function writeTargetManifest(stageDir, version, mode) {
+    const native = mode === "native";
+    const chromium = mode === "chromium";
     const manifest = {
         schemaVersion: 1,
-        name: native ? "meshdrop-desktop-linux" : "meshdrop-desktop",
+        name: manifestName(mode),
         version,
         target: "desktop",
         appRoot: "app",
         entrypoint: "app/index.html",
-        nativeShellBuilt: native,
+        nativeShellBuilt: native || chromium,
+        chromiumShellBuilt: chromium,
         uatRunbook: "UAT-DESKTOP.md",
         runtime: {
             target: "desktop",
@@ -119,6 +153,11 @@ async function writeTargetManifest(stageDir, version, native) {
                 "native desktop WebRTC transfer UAT",
                 "desktop installer or signed binary"
             ]
+            : chromium
+                ? [
+                    "bundled Chromium engine or installer",
+                    "desktop installer or signed binary"
+                ]
             : [
                 "native shell build",
                 "native desktop WebRTC transfer UAT",
@@ -133,18 +172,28 @@ async function writeTargetManifest(stageDir, version, native) {
             source: "src/meshdrop-desktop.c"
         };
     }
+    if (chromium) {
+        manifest.nativeShell = {
+            platform: "linux",
+            toolkit: "chromium",
+            executable: "bin/meshdrop-desktop-chromium.mjs",
+            source: "src/meshdrop-desktop-chromium.mjs"
+        };
+    }
 
     await fs.writeFile(path.join(stageDir, "meshdrop-target.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-async function writeDesktopReadme(stageDir, version, native) {
-    const title = native ? "MeshDrop Desktop Linux Native Artifact" : "MeshDrop Desktop Source Artifact";
-    const description = native
-        ? "This artifact packages MeshDrop app assets with a compiled Linux GTK/WebKit native shell."
-        : "This artifact packages the MeshDrop app assets and target metadata for a future native desktop shell.";
-    const nativeNote = native
-        ? "Launch command: `bin/meshdrop-desktop --app-dir app`. This GTK/WebKit shell does not claim WebRTC until native engine UAT proves `RTCPeerConnection` support."
-        : "It is not a native installer or executable.";
+function manifestName(mode) {
+    if (mode === "native") return "meshdrop-desktop-linux";
+    if (mode === "chromium") return "meshdrop-desktop-chromium";
+    return "meshdrop-desktop";
+}
+
+async function writeDesktopReadme(stageDir, version, mode) {
+    const title = desktopTitle(mode);
+    const description = desktopDescription(mode);
+    const nativeNote = desktopNote(mode);
     const text = [
         `# ${title}`,
         "",
@@ -160,6 +209,31 @@ async function writeDesktopReadme(stageDir, version, native) {
     ].join("\n");
 
     await fs.writeFile(path.join(stageDir, "README-DESKTOP.md"), text);
+}
+
+function desktopTitle(mode) {
+    if (mode === "native") return "MeshDrop Desktop Linux Native Artifact";
+    if (mode === "chromium") return "MeshDrop Desktop Chromium Shell Artifact";
+    return "MeshDrop Desktop Source Artifact";
+}
+
+function desktopDescription(mode) {
+    if (mode === "native") return "This artifact packages MeshDrop app assets with a compiled Linux GTK/WebKit native shell.";
+    if (mode === "chromium") return "This artifact packages MeshDrop app assets with a Chromium-backed desktop shell.";
+    return "This artifact packages the MeshDrop app assets and target metadata for a future native desktop shell.";
+}
+
+function desktopNote(mode) {
+    if (mode === "native") {
+        return [
+            "Launch command: `bin/meshdrop-desktop --app-dir app`.",
+            "This GTK/WebKit shell does not claim WebRTC until native engine UAT proves `RTCPeerConnection` support."
+        ].join(" ");
+    }
+    if (mode === "chromium") {
+        return "Launch command: `node bin/meshdrop-desktop-chromium.mjs --app-dir app`. Requires an installed Chromium-compatible browser.";
+    }
+    return "It is not a native installer or executable.";
 }
 
 async function compileNativeShell(stageDir) {
@@ -183,6 +257,20 @@ async function compileNativeShell(stageDir) {
         ...flags
     ]);
     await fs.chmod(binaryPath, 0o755);
+}
+
+async function writeChromiumShell(stageDir) {
+    const sourcePath = path.join(repoRoot, "packaging", "desktop", "meshdrop-desktop-chromium.mjs");
+    const sourceDir = path.join(stageDir, "src");
+    const binDir = path.join(stageDir, "bin");
+    const stagedSourcePath = path.join(sourceDir, "meshdrop-desktop-chromium.mjs");
+    const launcherPath = path.join(binDir, "meshdrop-desktop-chromium.mjs");
+
+    await fs.mkdir(sourceDir, {recursive: true});
+    await fs.mkdir(binDir, {recursive: true});
+    await fs.copyFile(sourcePath, stagedSourcePath);
+    await fs.copyFile(sourcePath, launcherPath);
+    await fs.chmod(launcherPath, 0o755);
 }
 
 async function pkgConfigFlags(packages) {
@@ -231,7 +319,15 @@ function run(command, args) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
     const args = parseArgs(process.argv.slice(2));
-    const result = args.native ? await buildDesktopNativePackage(args) : await buildDesktopPackage(args);
-    const kind = args.native ? "Desktop native package" : "Desktop source package";
+    const result = args.mode === "native"
+        ? await buildDesktopNativePackage(args)
+        : args.mode === "chromium"
+            ? await buildDesktopChromiumPackage(args)
+            : await buildDesktopPackage(args);
+    const kind = args.mode === "native"
+        ? "Desktop native package"
+        : args.mode === "chromium"
+            ? "Desktop Chromium shell package"
+            : "Desktop source package";
     console.log(`${kind}: ${result.artifactPath}`);
 }

@@ -77,6 +77,7 @@ jobs:
           npm run build:spa -- --version "${version}" --out-dir dist
           npm run build:desktop -- --version "${version}" --out-dir dist
           npm run build:desktop:native -- --version "${version}" --out-dir dist
+          npm run build:desktop:chromium -- --version "${version}" --out-dir dist
           npm run build:ios -- --version "${version}" --out-dir dist
           npm run build:ios:native-source -- --version "${version}" --out-dir dist
           npm run build:android -- --version "${version}" --out-dir dist

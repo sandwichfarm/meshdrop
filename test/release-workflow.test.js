@@ -36,6 +36,7 @@ test("release workflow publishes GHCR images for alpha target packages", () => {
     assert.match(releaseWorkflow, /--image "\$\{image\}:\$\{GITHUB_REF_NAME\}-umbrel"/);
     assert.match(releaseWorkflow, /npm run build:desktop -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npm run build:desktop:native -- --version "\$\{version\}" --out-dir dist/);
+    assert.match(releaseWorkflow, /npm run build:desktop:chromium -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npm run build:ios -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npm run build:ios:native-source -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npm run build:android -- --version "\$\{version\}" --out-dir dist/);
@@ -70,6 +71,7 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /ref: \$\{\{ inputs\.tag \}\}/);
     assert.match(releaseVerifyWorkflow, /gh release view "\$\{tag\}"/);
     assert.match(releaseVerifyWorkflow, /meshdrop-desktop-\$\{version\}\.tar\.gz/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-desktop-chromium-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-desktop-linux-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-ios-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-ios-native-source-\$\{version\}\.tar\.gz/);

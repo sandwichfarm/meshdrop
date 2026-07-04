@@ -61,6 +61,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-0x0-prove-packaged-linux-gtk-webkit-desktop-` | complete | Packaged GTK/WebKit shell WebDriver smoke proves Desktop Native manifest injection and WebRTC gate-off; native transfer UAT still open |
 | 2026-07-05 | `260705-mns-mobile-native-shell-source-artifacts` | complete | iOS/Android native-source wrapper artifacts build and release verifier expects them; app package/device transfer UAT still open |
 | 2026-07-05 | `260705-mnci-mobile-native-source-ci` | complete | PR CI runs iOS/Android native-source package scripts and tar readbacks after unit tests |
+| 2026-07-05 | `260705-dcs-desktop-chromium-shell-uat` | complete | Chromium desktop shell artifact transfers `meshdrop-desktop-chromium-proof.txt` over Nostr WebRTC; GTK/WebKit remains gated; installer/bundled engine open |
 
 ## Active Quick Task
 
