@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {execFile} from "node:child_process";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {promisify} from "node:util";
@@ -109,4 +110,10 @@ test("Start9 generated package source typechecks against declared SDK dependency
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});
     }
+});
+
+test("Start9 package smoke command runs the generated package environment", () => {
+    const packageJson = JSON.parse(fsSync.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    assert.equal(packageJson.scripts["test:start9-package"], "node scripts/start9-package-smoke.mjs");
+    assert.equal(fsSync.existsSync(new URL("../scripts/start9-package-smoke.mjs", import.meta.url)), true);
 });

@@ -53,6 +53,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(start9, /MESHDROP_DISCOVERY_NPUBS/);
     assert.match(start9, /MESHDROP_ADMIN_NPUB/);
     assert.match(start9, /\.s9pk/);
+    assert.match(start9, /npm run test:start9-package/);
+    assert.match(start9, /local WebRTC and Pollen WebRTC/);
     assert.match(start9, /Not Proven/);
 
     const umbrel = readDoc("docs/uat/umbrel.md");
@@ -127,6 +129,12 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /deterministic two-host relay, public relay two-host UAT, and deployed-admin UAT exists/);
     assert.match(targetStatus, /manual run `28715209725` Docker public relay UAT/);
     assert.match(targetStatus, /\| Docker \|[^|]+deployed-admin UAT exists[^|]+\|[^|]+\| None recorded for Docker \|/);
+    assert.match(
+        targetStatus,
+        /\| Start9 \| Generated package environment transfer smoke exists; real StartOS device UAT open \|/
+    );
+    assert.match(targetStatus, /`npm run test:start9-package` proves package build/);
+    assert.match(targetStatus, /Real StartOS device install from UI and device transfer UAT/);
     assert.match(targetStatus, /\| Desktop Native \| Source artifact transfer smoke exists; native shell not built \|/);
     assert.match(targetStatus, /`npm run build:desktop`; `node --test test\/desktop-package\.test\.js`; `npm run test:target-artifacts`/);
     assert.match(targetStatus, /Native shell build, installer\/binary, and native desktop transfer UAT/);
