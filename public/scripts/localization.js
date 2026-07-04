@@ -59,6 +59,10 @@ class Localization {
         if (!locale) locale = Localization.systemLocale;
 
         await Localization.fetchTranslations(locale)
+        if (!Localization.locale) {
+            Localization.locale = Localization.defaultLocale;
+            Localization.translations = {};
+        }
         await Localization.translatePage();
 
         if (Localization.localeIsRtl(locale)) {
