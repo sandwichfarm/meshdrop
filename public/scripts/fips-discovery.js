@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+
 const FipsDiscoveryProtocol = {
     statusPath: "fips/status",
     storageKey: "meshdrop_fips_discovery_enabled",
@@ -11,7 +13,7 @@ const FipsDiscoveryProtocol = {
     },
 
     roomFromConfig(config) {
-        return config?.fips?.room || "meshdrop-fips";
+        return config?.fips?.room || "npub-network:unconfigured";
     },
 
     enabledFromConfig(config) {
@@ -28,7 +30,7 @@ const FipsDiscoveryProtocol = {
             ipv6Addr: status.ipv6Addr || "",
             peerCount: Number(status.peerCount || status.peers?.length || 0),
             meshSize: Number(status.meshSize || 0),
-            room: status.room || "meshdrop-fips"
+            room: status.room || "npub-network:unconfigured"
         };
     }
 };

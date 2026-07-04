@@ -1,6 +1,11 @@
 import net from "net";
+import {
+    DEFAULT_NPUB_DISCOVERY_NETWORK_ID,
+    createNpubDiscoveryNetwork,
+    parseNostrPubkeys,
+    pubkeyFromSecret
+} from "./npub-network.js";
 
-export const DEFAULT_FIPS_ROOM = "meshdrop-fips";
 export const DEFAULT_FIPS_CONTROL_HOST = "127.0.0.1";
 export const DEFAULT_FIPS_CONTROL_PORT = "21210";
 
@@ -10,12 +15,16 @@ export function defaultFipsSocketPath() {
 
 export function createFipsConfig(env = process.env) {
     const enabled = env.FIPS_DISCOVERY !== "false" || !!env.FIPS_CONTROL_SOCKET;
+    const network = createNpubDiscoveryNetwork({
+        localPubkey: pubkeyFromSecret(env.MESHDROP_NOSTR_SECRET_KEY),
+        peerPubkeys: parseNostrPubkeys(env.MESHDROP_DISCOVERY_NPUBS || env.MESHDROP_NPUBS || "")
+    });
 
     return {
         enabled,
         controlSocket: env.FIPS_CONTROL_SOCKET || defaultFipsSocketPath(),
         controlHost: env.FIPS_CONTROL_HOST || DEFAULT_FIPS_CONTROL_HOST,
-        room: env.FIPS_ROOM || DEFAULT_FIPS_ROOM,
+        room: network.id || DEFAULT_NPUB_DISCOVERY_NETWORK_ID,
         timeoutMs: parseInt(env.FIPS_CONTROL_TIMEOUT_MS, 10) || 1000,
         eventCommand: env.FIPS_EVENT_COMMAND || "events"
     };

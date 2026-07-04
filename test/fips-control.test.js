@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import net from "node:net";
+import {generateSecretKey, getPublicKey, nip19, utils} from "nostr-tools";
 
-import FipsControlClient, {createFipsConfig, DEFAULT_FIPS_CONTROL_PORT, DEFAULT_FIPS_ROOM} from "../server/fips-control.js";
+import {DEFAULT_NPUB_DISCOVERY_NETWORK_ID} from "../server/npub-network.js";
+import FipsControlClient, {createFipsConfig, DEFAULT_FIPS_CONTROL_PORT} from "../server/fips-control.js";
 
 async function withFipsControlServer(handler, testBody) {
     const server = net.createServer(socket => {
@@ -31,7 +33,7 @@ test("FIPS config uses the default control socket unless explicitly disabled", (
     const config = createFipsConfig({});
 
     assert.equal(config.enabled, true);
-    assert.equal(config.room, DEFAULT_FIPS_ROOM);
+    assert.equal(config.room, DEFAULT_NPUB_DISCOVERY_NETWORK_ID);
     assert.equal(config.timeoutMs, 1000);
     assert.equal(config.controlSocket, DEFAULT_FIPS_CONTROL_PORT);
 });
@@ -40,25 +42,28 @@ test("FIPS config can be disabled explicitly", () => {
     const config = createFipsConfig({FIPS_DISCOVERY: "false"});
 
     assert.equal(config.enabled, false);
-    assert.equal(config.room, DEFAULT_FIPS_ROOM);
+    assert.equal(config.room, DEFAULT_NPUB_DISCOVERY_NETWORK_ID);
 });
 
-test("FIPS config enables discovery when control socket is set", () => {
-    assert.deepEqual(
-        createFipsConfig({
-            FIPS_CONTROL_SOCKET: "21210",
-            FIPS_ROOM: "meshdrop-test",
-            FIPS_CONTROL_TIMEOUT_MS: "2500"
-        }),
-        {
-            enabled: true,
-            controlSocket: "21210",
-            controlHost: "127.0.0.1",
-            room: "meshdrop-test",
-            timeoutMs: 2500,
-            eventCommand: "events"
-        }
-    );
+test("FIPS config derives its federation room from the configured npub network", () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const peerPubkey = getPublicKey(peerSecret);
+    const config = createFipsConfig({
+        FIPS_CONTROL_SOCKET: "21210",
+        FIPS_ROOM: "meshdrop-test",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(peerPubkey),
+        FIPS_CONTROL_TIMEOUT_MS: "2500"
+    });
+
+    assert.equal(config.enabled, true);
+    assert.equal(config.controlSocket, "21210");
+    assert.equal(config.controlHost, "127.0.0.1");
+    assert.match(config.room, /^npub-network:[a-f0-9]{32}$/);
+    assert.notEqual(config.room, "meshdrop-test");
+    assert.equal(config.timeoutMs, 2500);
+    assert.equal(config.eventCommand, "events");
 });
 
 test("FIPS config supports a TCP control host override", () => {
