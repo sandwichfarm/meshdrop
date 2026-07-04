@@ -236,7 +236,7 @@ async function waitForSpaHydration(page, role) {
             && globalThis.meshdropNostrMesh
         ), {timeout: spaHydrationTimeoutMs});
     } catch (error) {
-        throw new Error(`${role} SPA hydration failed: ${error.message}\n${JSON.stringify(await debugPageState(page), null, 2)}`, {
+        throw new Error(`${role} SPA hydration failed: ${error.message}\n${JSON.stringify(await safeDebugPageState(page), null, 2)}`, {
             cause: error
         });
     }
@@ -269,7 +269,7 @@ async function waitForConnectedPeer(page, roomType) {
         }, roomType, {timeout: 30000});
         return handle.jsonValue();
     } catch (error) {
-        throw new Error(`${error.message}\n${JSON.stringify(await debugPageState(page), null, 2)}`, {cause: error});
+        throw new Error(`${error.message}\n${JSON.stringify(await safeDebugPageState(page), null, 2)}`, {cause: error});
     }
 }
 
@@ -289,7 +289,7 @@ async function waitForReceivedFiles(page) {
         }, {timeout: 45000});
         return handle.jsonValue();
     } catch (error) {
-        throw new Error(`${error.message}\n${JSON.stringify(await debugPageState(page), null, 2)}`, {cause: error});
+        throw new Error(`${error.message}\n${JSON.stringify(await safeDebugPageState(page), null, 2)}`, {cause: error});
     }
 }
 
@@ -321,6 +321,17 @@ async function debugPageState(page) {
             signalSessionId: peer._signalSessionId || ""
         }))
     }));
+}
+
+async function safeDebugPageState(page) {
+    try {
+        return await debugPageState(page);
+    } catch (error) {
+        return {
+            closed: page.isClosed(),
+            error: error.message
+        };
+    }
 }
 
 async function loadPlaywright() {

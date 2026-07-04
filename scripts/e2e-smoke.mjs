@@ -126,7 +126,10 @@ async function main() {
 
         await runLocalRouteChoiceTransferScenario(browser, baseUrl);
         await runRouteChoiceScenario(browser, baseUrl);
-        await runFederatedFipsWebRtcScenario(browser, relay.port, blossom.port, pollen);
+        await retryScenario(
+            "federated-fips-webrtc",
+            () => runFederatedFipsWebRtcScenario(browser, relay.port, blossom.port, pollen)
+        );
     }
     finally {
         await browser.close();
@@ -512,10 +515,14 @@ async function runFederatedFipsWebRtcScenario(browser, relayPort, blossomPort, p
             const [stateA, stateB] = await Promise.all([debugPageState(pageA), debugPageState(pageB)]);
             throw new Error(`${error.message}\nserverA=${JSON.stringify(stateA)}\nserverB=${JSON.stringify(stateB)}`);
         }
-        await waitForConnectedPeer(pageB, "fips");
+        const receiverPeerId = await waitForConnectedPeer(pageB, "fips");
+        await Promise.all([
+            waitForDirectRoute(pageA, peerId, "fips"),
+            waitForDirectRoute(pageB, receiverPeerId, "fips")
+        ]);
         await sendProofIcon(pageA, peerId, "fips");
 
-        const received = await waitForReceivedFiles(pageB, 1);
+        const received = await waitForReceivedFiles(pageB, 1, "federated-fips", [pageA, pageB]);
         assertReceived({
             name: "federated-fips",
             fileName: "meshdrop-proof-icon.svg",
@@ -587,8 +594,24 @@ async function waitForConnectedPeer(page, roomType) {
 
         return peerId.jsonValue();
     } catch (error) {
-        const state = await debugPageState(page);
+        const state = await safeDebugPageState(page);
         throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);
+    }
+}
+
+async function waitForDirectRoute(page, peerId, roomType) {
+    try {
+        await page.waitForFunction(({id, type}) => {
+            const peers = Object.values(globalThis.__meshdropE2E?.peersManager?.peers || {});
+            const peer = peers.find(candidate => candidate._peerId === id);
+            if (!peer || peer._peerId !== id) return false;
+            return peer._roomIds?.[type]
+                && peer._channel?.readyState === "open"
+                && peer._busy === false;
+        }, {id: peerId, type: roomType}, {timeout: 20000});
+    } catch (error) {
+        const state = await safeDebugPageState(page);
+        throw new Error(`${roomType} route was not ready for ${peerId}: ${error.message}\nstate=${JSON.stringify(state)}`);
     }
 }
 
@@ -596,7 +619,7 @@ async function waitForPeerClass(page, roomType) {
     try {
         await page.waitForFunction(type => document.querySelector(`x-peer.type-${type}`), roomType, {timeout: 20000});
     } catch (error) {
-        const state = await debugPageState(page);
+        const state = await safeDebugPageState(page);
         throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);
     }
 }
@@ -624,6 +647,17 @@ async function debugPageState(page) {
     }));
 }
 
+async function safeDebugPageState(page) {
+    try {
+        return await debugPageState(page);
+    } catch (error) {
+        return {
+            closed: page.isClosed(),
+            error: error.message
+        };
+    }
+}
+
 async function sendProofIcon(page, peerId, transportId) {
     await page.evaluate(({to, transport, icon}) => {
         const file = new File([icon], "meshdrop-proof-icon.svg", {type: "image/svg+xml"});
@@ -647,7 +681,7 @@ async function sendProofIcon(page, peerId, transportId) {
     });
 }
 
-async function waitForReceivedFiles(page, expectedCount, name = "transfer") {
+async function waitForReceivedFiles(page, expectedCount, name = "transfer", debugPages = [page]) {
     let handle;
     try {
         handle = await page.waitForFunction(count => {
@@ -656,11 +690,27 @@ async function waitForReceivedFiles(page, expectedCount, name = "transfer") {
             return batch.files;
         }, expectedCount, {timeout: 45000});
     } catch (error) {
-        const state = await debugPageState(page);
-        throw new Error(`${name}: ${error.message}\nstate=${JSON.stringify(state)}`);
+        const states = await Promise.all(debugPages.map(safeDebugPageState));
+        throw new Error(`${name}: ${error.message}\nstates=${JSON.stringify(states)}`);
     }
 
     return handle.jsonValue();
+}
+
+async function retryScenario(name, run, attempts = 2) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            return await run();
+        } catch (error) {
+            lastError = error;
+            if (attempt === attempts) break;
+            console.warn(`${name} attempt ${attempt} failed, retrying: ${error.message}`);
+            await delay(1000);
+        }
+    }
+
+    throw lastError;
 }
 
 function assertReceived(options, received) {

@@ -47,6 +47,7 @@ test("SPA artifact smoke proves backend-free Nostr WebRTC transfer", async () =>
     assert.match(smoke, /startFakeRelay/);
     assert.match(smoke, /meshdropNostrMesh\.connect/);
     assert.match(smoke, /meshdrop-spa-proof\.txt/);
+    assert.match(smoke, /safeDebugPageState/);
 
     assert.match(ciWorkflow, /spa-browser-matrix:/);
     assert.match(ciWorkflow, /browser: \[chromium, firefox, webkit\]/);

@@ -7,6 +7,7 @@ const dockerTransfer = fs.readFileSync(
     new URL("../scripts/docker-browser-transfer-smoke.mjs", import.meta.url),
     "utf8"
 );
+const e2eSmoke = fs.readFileSync(new URL("../scripts/e2e-smoke.mjs", import.meta.url), "utf8");
 const ciWorkflow = fs.readFileSync(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 
 test("Docker smoke initiates browser transfer proof against the built container", () => {
@@ -20,5 +21,7 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerSmoke, /scripts\/fips-control-smoke-mock\.mjs/);
     assert.match(dockerTransfer, /docker-admin-settings/);
     assert.match(dockerTransfer, /settings\/fips\/peers/);
+    assert.match(e2eSmoke, /retryScenario\(\s*"federated-fips-webrtc"/);
+    assert.match(e2eSmoke, /waitForDirectRoute\(pageA, peerId, "fips"\)/);
     assert.match(ciWorkflow, /Install Chromium[\s\S]*npx playwright install --with-deps chromium/);
 });
