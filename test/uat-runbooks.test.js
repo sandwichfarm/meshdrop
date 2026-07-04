@@ -69,6 +69,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(desktop, /nativeShellBuilt` as `false`/);
     assert.match(desktop, /backend-only transports are not claimed/);
     assert.match(desktop, /Nostr WebRTC/);
+    assert.match(desktop, /npm run test:target-artifacts/);
+    assert.match(desktop, /native desktop WebRTC transfer UAT/);
     assert.match(desktop, /Not Proven/);
 
     const mobile = readDoc("docs/uat/mobile.md");
@@ -78,7 +80,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /runtime\.platform` as `mobile`/);
     assert.match(mobile, /nativeShellBuilt` as `false`/);
     assert.match(mobile, /bluetooth` is `false`/);
-    assert.match(mobile, /mobile WebRTC transfer UAT/);
+    assert.match(mobile, /npm run test:target-artifacts/);
+    assert.match(mobile, /native mobile WebRTC transfer UAT/);
     assert.match(mobile, /Not Proven/);
 
     const releaseTargets = readDoc("docs/uat/release-target-images.md");
@@ -122,13 +125,13 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /deterministic two-host relay, public relay two-host UAT, and deployed-admin UAT exists/);
     assert.match(targetStatus, /manual run `28715209725` Docker public relay UAT/);
     assert.match(targetStatus, /\| Docker \|[^|]+deployed-admin UAT exists[^|]+\|[^|]+\| None recorded for Docker \|/);
-    assert.match(targetStatus, /\| Desktop Native \| Source artifact exists; native shell not built \|/);
-    assert.match(targetStatus, /`npm run build:desktop`; `node --test test\/desktop-package\.test\.js`/);
-    assert.match(targetStatus, /Native shell build, desktop runtime capability readback, installer\/binary, and desktop transfer UAT/);
-    assert.match(targetStatus, /\| iOS \| Source artifact exists; native shell not built \|/);
-    assert.match(targetStatus, /\| Android \| Source artifact exists; native shell not built \|/);
+    assert.match(targetStatus, /\| Desktop Native \| Source artifact transfer smoke exists; native shell not built \|/);
+    assert.match(targetStatus, /`npm run build:desktop`; `node --test test\/desktop-package\.test\.js`; `npm run test:target-artifacts`/);
+    assert.match(targetStatus, /Native shell build, installer\/binary, and native desktop transfer UAT/);
+    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke exists; native shell not built \|/);
+    assert.match(targetStatus, /\| Android \| Source artifact transfer smoke exists; native shell not built \|/);
     assert.match(targetStatus, /`npm run build:ios`; `node --test test\/mobile-package\.test\.js`/);
     assert.match(targetStatus, /`npm run build:android`; `node --test test\/mobile-package\.test\.js`/);
-    assert.match(targetStatus, /Native iOS shell build, mobile runtime capability readback, app package/);
-    assert.match(targetStatus, /Native Android shell build, mobile runtime capability readback, app package/);
+    assert.match(targetStatus, /Native iOS shell build, app package/);
+    assert.match(targetStatus, /Native Android shell build, app package/);
 });

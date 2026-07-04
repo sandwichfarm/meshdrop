@@ -67,7 +67,7 @@ export function startStaticServer(root) {
             response.writeHead(200, {"content-type": contentType(filePath)});
             response.end(body);
         } catch {
-            const body = await fs.readFile(path.join(root, "index.html"));
+            const body = await fs.readFile(await fallbackIndexPath(root));
             response.writeHead(200, {"content-type": "text/html; charset=utf-8"});
             response.end(body);
         }
@@ -81,6 +81,16 @@ export function startStaticServer(root) {
             });
         });
     });
+}
+
+async function fallbackIndexPath(root) {
+    const rootIndex = path.join(root, "index.html");
+    try {
+        await fs.access(rootIndex);
+        return rootIndex;
+    } catch {
+        return path.join(root, "app", "index.html");
+    }
 }
 
 export function parseRelayUrls(value) {

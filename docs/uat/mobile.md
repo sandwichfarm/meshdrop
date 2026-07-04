@@ -38,13 +38,15 @@ Run:
 npm run build:ios -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 node --test test/mobile-package.test.js
+npm run test:target-artifacts
 ```
 
-This smoke proves source artifact shape, target metadata, runtime capability metadata, and the current proof boundary.
+This smoke proves source artifact shape, target metadata, runtime capability metadata, and real Nostr WebRTC transfers
+between two browser peers served from the generated iOS and Android source artifacts.
 
 ## Not Proven
 
 - These source artifacts do not prove native iOS or Android shells exist.
 - These source artifacts do not prove signed app-store packages or installable mobile binaries.
-- These source artifacts do not prove mobile WebRTC transfer UAT.
+- These source artifacts do not prove native mobile WebRTC transfer UAT.
 - These source artifacts do not prove Bluetooth transport support.

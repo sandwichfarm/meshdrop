@@ -91,7 +91,10 @@ function createContext({responses}) {
 
 test("server connection falls back to static SPA config when backend config is unavailable", async () => {
     const {context, fired, opened, sockets} = createContext({
-        responses: [{status: 404, body: ""}]
+        responses: [
+            {status: 404, body: ""},
+            {status: 404, body: ""}
+        ]
     });
 
     new context.__meshdropTest.ServerConnection();
@@ -101,7 +104,10 @@ test("server connection falls back to static SPA config when backend config is u
     const configEvent = fired.find(event => event.type === "config");
     const wsConfigEvent = fired.find(event => event.type === "ws-config");
 
-    assert.deepEqual(opened, [{method: "GET", url: "config"}]);
+    assert.deepEqual(opened, [
+        {method: "GET", url: "config"},
+        {method: "GET", url: "/meshdrop-target.json"}
+    ]);
     assert.equal(configEvent.detail.capabilities.runtime.target, "spa");
     assert.equal(configEvent.detail.capabilities.runtime.hasBackend, false);
     assert.equal(configEvent.detail.capabilities.transports.localDiscovery.supported, false);
@@ -122,7 +128,10 @@ test("server connection falls back to static SPA config when backend config is u
 
 test("server connection falls back to static SPA config when a static host serves HTML for config", async () => {
     const {context, fired, opened, sockets} = createContext({
-        responses: [{status: 200, body: "<!doctype html><title>MeshDrop</title>"}]
+        responses: [
+            {status: 200, body: "<!doctype html><title>MeshDrop</title>"},
+            {status: 404, body: ""}
+        ]
     });
 
     new context.__meshdropTest.ServerConnection();
@@ -131,8 +140,60 @@ test("server connection falls back to static SPA config when a static host serve
 
     const configEvent = fired.find(event => event.type === "config");
 
-    assert.deepEqual(opened, [{method: "GET", url: "config"}]);
+    assert.deepEqual(opened, [
+        {method: "GET", url: "config"},
+        {method: "GET", url: "/meshdrop-target.json"}
+    ]);
     assert.equal(configEvent.detail.capabilities.runtime.target, "spa");
     assert.equal(configEvent.detail.capabilities.runtime.hasBackend, false);
+    assert.deepEqual(sockets, []);
+});
+
+test("static config applies target manifest runtime metadata when present", async () => {
+    const {context, fired, opened, sockets} = createContext({
+        responses: [
+            {status: 200, body: "<!doctype html><title>MeshDrop</title>"},
+            {
+                status: 200,
+                body: JSON.stringify({
+                    target: "desktop",
+                    runtime: {
+                        target: "desktop",
+                        platform: "desktop",
+                        hasBackend: false,
+                        sharedInstance: false
+                    },
+                    transports: {
+                        localDiscovery: false,
+                        webrtc: true,
+                        nostr: true,
+                        blossom: true,
+                        hashtree: true,
+                        pollen: false,
+                        fips: false
+                    }
+                })
+            }
+        ]
+    });
+
+    new context.__meshdropTest.ServerConnection();
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+
+    const configEvent = fired.find(event => event.type === "config");
+
+    assert.deepEqual(opened, [
+        {method: "GET", url: "config"},
+        {method: "GET", url: "/meshdrop-target.json"}
+    ]);
+    assert.equal(configEvent.detail.capabilities.runtime.target, "desktop");
+    assert.equal(configEvent.detail.capabilities.runtime.platform, "desktop");
+    assert.equal(configEvent.detail.capabilities.runtime.hasBackend, false);
+    assert.equal(configEvent.detail.capabilities.transports.localDiscovery.supported, false);
+    assert.equal(configEvent.detail.capabilities.transports.nostr.supported, true);
+    assert.equal(configEvent.detail.capabilities.transports.pollen.supported, false);
+    assert.equal(configEvent.detail.capabilities.serverSettings.supported, false);
     assert.deepEqual(sockets, []);
 });

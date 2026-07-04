@@ -107,7 +107,7 @@ async function writeTargetManifest(stageDir, target, version) {
         },
         remainingProof: [
             "native mobile shell build",
-            "mobile WebRTC transfer UAT",
+            "native mobile WebRTC transfer UAT",
             "mobile file picker and share sheet",
             "Bluetooth transport negotiation"
         ]

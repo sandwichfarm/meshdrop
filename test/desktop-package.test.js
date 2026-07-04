@@ -45,7 +45,7 @@ test("Desktop package builder creates source artifact with target metadata", asy
         assert.equal(manifest.transports.fips, false);
         assert.deepEqual(manifest.remainingProof, [
             "native shell build",
-            "desktop WebRTC transfer UAT",
+            "native desktop WebRTC transfer UAT",
             "desktop installer or signed binary"
         ]);
 

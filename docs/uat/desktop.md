@@ -33,12 +33,14 @@ Run:
 ```sh
 npm run build:desktop -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-desktop-smoke
 node --test test/desktop-package.test.js
+npm run test:target-artifacts
 ```
 
-This smoke proves source artifact shape, target metadata, runtime capability metadata, and the current proof boundary.
+This smoke proves source artifact shape, target metadata, runtime capability metadata, and a real Nostr WebRTC transfer
+between two browser peers served from the generated desktop source artifact.
 
 ## Not Proven
 
 - This source artifact does not prove a native desktop shell exists.
-- This source artifact does not prove desktop WebRTC transfer UAT.
+- This source artifact does not prove native desktop WebRTC transfer UAT.
 - This source artifact does not prove a signed installer or native binary.

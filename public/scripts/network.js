@@ -121,7 +121,7 @@ class ServerConnection {
 
     _getConfig() {
         console.log("Loading config...")
-        return new Promise((resolve, reject) => {
+        return new Promise(resolve => {
             let xhr = new XMLHttpRequest();
             xhr.addEventListener("load", () => {
                 if (xhr.status === 200) {
@@ -163,11 +163,30 @@ class ServerConnection {
                     return;
                 }
 
-                const config = globalThis.RuntimeCapabilities.staticConfig();
-                console.log("Static SPA config loaded:", config);
-                this._config = config;
-                Events.fire('config', config);
-                resolve();
+                const finish = targetManifest => {
+                    const config = globalThis.RuntimeCapabilities.staticConfig(targetManifest);
+                    console.log("Static config loaded:", config);
+                    this._config = config;
+                    Events.fire('config', config);
+                    resolve();
+                };
+
+                const manifestXhr = new XMLHttpRequest();
+                manifestXhr.addEventListener("load", () => {
+                    if (manifestXhr.status !== 200) {
+                        finish(null);
+                        return;
+                    }
+
+                    try {
+                        finish(JSON.parse(manifestXhr.responseText));
+                    } catch {
+                        finish(null);
+                    }
+                });
+                manifestXhr.addEventListener("error", () => finish(null));
+                manifestXhr.open('GET', '/meshdrop-target.json');
+                manifestXhr.send();
             };
 
             openAndSend(xhr);

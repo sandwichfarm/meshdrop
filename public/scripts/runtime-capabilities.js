@@ -8,7 +8,10 @@ const RuntimeCapabilities = {
         ]
     },
 
-    staticConfig() {
+    staticConfig(targetManifest = null) {
+        const staticRuntime = this.staticRuntime(targetManifest);
+        const staticTransports = this.staticTransports(targetManifest);
+
         return {
             signalingServer: false,
             nostrMesh: {
@@ -33,45 +36,40 @@ const RuntimeCapabilities = {
             },
             capabilities: {
                 schemaVersion: 1,
-                runtime: {
-                    target: "spa",
-                    platform: "browser",
-                    hasBackend: false,
-                    sharedInstance: false
-                },
+                runtime: staticRuntime,
                 transports: {
                     localDiscovery: {
-                        supported: false,
+                        supported: staticTransports.localDiscovery,
                         requiresBackend: true
                     },
                     webrtc: {
-                        supported: true,
+                        supported: staticTransports.webrtc,
                         requiresBackend: false
                     },
                     nostr: {
-                        supported: true,
+                        supported: staticTransports.nostr,
                         requiresBackend: false,
                         requiresNostrIdentity: true
                     },
                     blossom: {
-                        supported: true,
+                        supported: staticTransports.blossom,
                         requiresBackend: false,
                         requiresNostrIdentity: true,
                         configuredServers: 0
                     },
                     hashtree: {
-                        supported: true,
+                        supported: staticTransports.hashtree,
                         requiresBackend: false,
                         requiresNostrIdentity: true
                     },
                     pollen: {
-                        supported: false,
+                        supported: staticTransports.pollen,
                         requiresBackend: true,
                         room: "",
                         maxUploadBytes: 0
                     },
                     fips: {
-                        supported: false,
+                        supported: staticTransports.fips,
                         requiresBackend: true,
                         room: ""
                     }
@@ -96,6 +94,31 @@ const RuntimeCapabilities = {
                 custom_button: {},
                 privacypolicy_button: {}
             }
+        };
+    },
+
+    staticRuntime(targetManifest = null) {
+        const runtime = targetManifest?.runtime || {};
+
+        return {
+            target: runtime.target || targetManifest?.target || "spa",
+            platform: runtime.platform || "browser",
+            hasBackend: false,
+            sharedInstance: false
+        };
+    },
+
+    staticTransports(targetManifest = null) {
+        const transports = targetManifest?.transports || {};
+
+        return {
+            localDiscovery: transports.localDiscovery === true,
+            webrtc: transports.webrtc !== false,
+            nostr: transports.nostr !== false,
+            blossom: transports.blossom !== false,
+            hashtree: transports.hashtree !== false,
+            pollen: transports.pollen === true,
+            fips: transports.fips === true
         };
     },
 

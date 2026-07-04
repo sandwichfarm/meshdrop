@@ -19,7 +19,8 @@
     "test:docker:admin": "node scripts/docker-compose-admin-uat.mjs",
     "test:docker:two-host": "node scripts/docker-two-host-relay-smoke.mjs",
     "test:e2e": "node scripts/e2e-smoke.mjs",
-    "test:spa-artifact": "node scripts/spa-artifact-smoke.mjs"
+    "test:spa-artifact": "node scripts/spa-artifact-smoke.mjs",
+    "test:target-artifacts": "node scripts/target-artifact-smoke.mjs"
   },
   "author": "",
   "license": "ISC",
