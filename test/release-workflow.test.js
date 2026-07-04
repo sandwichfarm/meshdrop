@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const releaseWorkflow = fs.readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+const duplicateGhcrWorkflow = new URL("../.github/workflows/github-image.yml", import.meta.url);
 const dockerfile = fs.readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
 
 test("release workflow publishes GHCR images for alpha target packages", () => {
@@ -21,4 +22,8 @@ test("Dockerfile records the image target inside released containers", () => {
     assert.match(dockerfile, /ARG MESHDROP_TARGET=standalone/);
     assert.match(dockerfile, /ENV MESHDROP_TARGET="\$\{MESHDROP_TARGET\}"/);
     assert.match(dockerfile, /farm\.sandwich\.meshdrop\.target="\$\{MESHDROP_TARGET\}"/);
+});
+
+test("release tags use one workflow for GitHub release artifacts and GHCR images", () => {
+    assert.equal(fs.existsSync(duplicateGhcrWorkflow), false);
 });
