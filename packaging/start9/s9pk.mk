@@ -63,12 +63,12 @@ x86 x86_64: arch/x86_64
 arm arm64 aarch64: arch/aarch64
 riscv riscv64: arch/riscv64
 
-$(BASE_NAME).s9pk: $(INGREDIENTS) $(GIT_DEPS)
+$(BASE_NAME).s9pk: javascript/index.js $(INGREDIENTS) $(GIT_DEPS)
 	@$(MAKE) --no-print-directory ingredients
 	@echo "   Packing '$@'..."
 	start-cli s9pk pack -o $@
 
-$(BASE_NAME)_%.s9pk: $(INGREDIENTS) $(GIT_DEPS)
+$(BASE_NAME)_%.s9pk: javascript/index.js $(INGREDIENTS) $(GIT_DEPS)
 	@$(MAKE) --no-print-directory ingredients
 	@echo "   Packing '$@'..."
 	start-cli s9pk pack --arch=$* -o $@
@@ -135,4 +135,4 @@ node_modules: package-lock.json package.json
 
 clean:
 	@echo "Cleaning up build artifacts..."
-	@rm -rf $(PACKAGE_ID).s9pk $(PACKAGE_ID)_x86_64.s9pk $(PACKAGE_ID)_aarch64.s9pk $(PACKAGE_ID)_riscv64.s9pk javascript node_modules
+	@rm -rf $(PACKAGE_ID).s9pk $(PACKAGE_ID)_x86_64.s9pk $(PACKAGE_ID)_aarch64.s9pk $(PACKAGE_ID)_riscv64.s9pk dist javascript node_modules

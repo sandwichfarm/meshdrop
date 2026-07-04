@@ -40,6 +40,7 @@ export async function buildStart9Package(options = {}) {
     const version = sanitizeArtifactPart(options.version || packageJson.version);
     const outDir = path.resolve(options.outDir || path.join(repoRoot, "dist"));
     const image = options.image || `ghcr.io/sandwichfarm/meshdrop:${version}-start9`;
+    const exver = `${version}:0`;
     const prefix = `meshdrop-start9-${version}`;
     const stageRoot = path.join(outDir, ".start9-stage");
     const stageDir = path.join(stageRoot, prefix);
@@ -47,8 +48,10 @@ export async function buildStart9Package(options = {}) {
 
     await fs.rm(stageRoot, {recursive: true, force: true});
     await fs.mkdir(stageDir, {recursive: true});
-    await copyRenderedDirectory(path.join(repoRoot, "packaging", "start9"), stageDir, {version, image});
+    await copyRenderedDirectory(path.join(repoRoot, "packaging", "start9"), stageDir, {version, exver, image});
     await writeTargetManifest(stageDir, version, image);
+    await fs.copyFile(path.join(repoRoot, "public", "images", "android-chrome-192x192.png"), path.join(stageDir, "icon.png"));
+    await fs.copyFile(path.join(repoRoot, "LICENSE"), path.join(stageDir, "LICENSE"));
     await fs.copyFile(path.join(repoRoot, "docs", "uat", "start9.md"), path.join(stageDir, "UAT-START9.md"));
     await fs.rm(artifactPath, {force: true});
     await tarCreate(artifactPath, stageRoot, prefix);
@@ -82,6 +85,7 @@ async function copyRenderedDirectory(sourceDir, destinationDir, values) {
             const source = await fs.readFile(sourcePath, "utf8");
             const rendered = source
                 .replaceAll("__MESHDROP_VERSION__", values.version)
+                .replaceAll("__MESHDROP_EXVER__", values.exver)
                 .replaceAll("__MESHDROP_IMAGE__", values.image);
             await fs.writeFile(destinationPath, rendered);
         }

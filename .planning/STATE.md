@@ -42,6 +42,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-docker-public-relay-uat` | complete | PR CI run `28715161999`; manual run `28715209725` Docker public relay UAT passed against `wss://bucket.coracle.social`; changed-code slop clean |
 | 2026-07-04 | `20260704-docker-deployed-admin-uat` | complete | Isolated compose deployed-admin proof; signed admin GUI saved FIPS peers against real FIPS control; local and Pollen browser transfers passed |
 | 2026-07-04 | `20260704-start9-package-typecheck` | complete | Generated Start9 source `npm run check` passed; `make` reached `start-cli s9pk pack` and is blocked by missing local `start-cli`; `.s9pk` and device UAT remain open |
+| 2026-07-04 | `20260704-start9-s9pk-pack` | complete | Generated Start9 source `npm run build` emits `javascript/index.js`; isolated `start-cli 0.4.0-beta.10` pack reaches squashfs packaging and is blocked by missing local `tar2sqfs`; `.s9pk` and device UAT remain open |
 
 ## Active Quick Task
 
