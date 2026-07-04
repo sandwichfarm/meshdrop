@@ -70,12 +70,25 @@ Repeat with `target=start9` and `target=umbrel`.
    gh run watch <run-id> --repo sandwichfarm/meshdrop --exit-status
    ```
 
+9. Run a local anonymous GHCR readback without mutating the active Docker login state:
+
+   ```sh
+   npm run verify:ghcr-anonymous -- v0.x.y
+   ```
+
+   This command uses a temporary `DOCKER_CONFIG` and checks every `standalone`, `start9`, and `umbrel` tag pair for
+   `linux/amd64` plus `linux/arm64`.
+
 ## Not proven
 
 - `v0.1.0` authenticated release artifacts are proven by release run `28711136765` and release verification run
   `28711452622`.
 - Anonymous local readback is not proven for `v0.1.0`: `docker manifest inspect
   ghcr.io/sandwichfarm/meshdrop:v0.1.0-start9` returned `denied` on 2026-07-04.
+- Anonymous local readback is still not proven after adding the local verifier: with an empty temporary Docker config,
+  `npm run verify:ghcr-anonymous -- v0.1.0` returns `unauthorized` for
+  `ghcr.io/sandwichfarm/meshdrop:v0.1.0-standalone`. The local GitHub token also lacks `read:packages`, so this
+  session cannot inspect or change package visibility through the Packages REST API.
 - A future release is not proven until its real `v0.*.*` tag runs and the GitHub release plus GHCR tags are read back.
 - The release workflow is configured for multi-architecture GHCR manifests, but no multi-arch release is proven until
   `docker buildx imagetools inspect` confirms the published tags. If the local token lacks `read:packages`, use
@@ -102,3 +115,5 @@ Repeat with `target=start9` and `target=umbrel`.
 - `release-verify.yml` confirmed `linux/amd64` and `linux/arm64` manifests with GitHub Actions package permissions,
   pulled target metadata, and `npm run test:docker` against `ghcr.io/sandwichfarm/meshdrop:v0.1.0-standalone`.
 - Anonymous GHCR manifest readback was added after the `v0.1.0` release and is required for the next release proof.
+- Local anonymous readback command: `npm run verify:ghcr-anonymous -- v0.1.0` currently fails with GHCR `unauthorized`
+  until the `ghcr.io/sandwichfarm/meshdrop` package is public or a newer release proves public visibility.

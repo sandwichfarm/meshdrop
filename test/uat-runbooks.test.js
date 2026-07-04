@@ -99,6 +99,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /authenticated readback runs with GitHub Actions package/);
     assert.match(releaseTargets, /permissions and anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /anonymous GHCR manifest readback/);
+    assert.match(releaseTargets, /npm run verify:ghcr-anonymous -- v0\.x\.y/);
+    assert.match(releaseTargets, /temporary `DOCKER_CONFIG`/);
     assert.match(releaseTargets, /v0\.1\.0` authenticated release artifacts are proven by release run `28711136765`/);
     assert.match(releaseTargets, /release verification workflow: https:\/\/github\.com\/sandwichfarm\/meshdrop\/actions\/runs\/28711452622/i);
     assert.match(releaseTargets, /meshdrop-spa-0\.1\.0\.tar\.gz/);
@@ -111,14 +113,19 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /v0\.1\.0-standalone/);
     assert.match(releaseTargets, /Start9 source tarball/);
     assert.match(releaseTargets, /Umbrel package tarball/);
+    assert.match(releaseTargets, /`npm run verify:ghcr-anonymous -- v0\.1\.0` currently fails with GHCR `unauthorized`/);
     assert.match(releaseTargets, /Not proven/);
 
     const targetStatus = readDoc("docs/uat/target-status.md");
     for (const target of ["SPA", "Docker", "Start9", "Umbrel", "Desktop Native", "iOS", "Android", "Release Images"]) {
         assert.match(targetStatus, new RegExp(`\\| ${target} \\|`));
     }
-    assert.match(targetStatus, /\| Release Images \| `v0\.1\.0` authenticated readback verified \|/);
-    assert.match(targetStatus, /local anonymous `docker manifest inspect ghcr\.io\/sandwichfarm\/meshdrop:v0\.1\.0-start9` returned `denied`/);
+    assert.match(
+        targetStatus,
+        /\| Release Images \| `v0\.1\.0` authenticated readback verified; anonymous verifier exists but current GHCR visibility blocks it \|/
+    );
+    assert.match(targetStatus, /`npm run verify:ghcr-anonymous -- v0\.1\.0` with a temporary empty Docker config/);
+    assert.match(targetStatus, /Make `ghcr\.io\/sandwichfarm\/meshdrop` public/);
     assert.match(
         targetStatus,
         /\| SPA \| Chromium\/Firefox\/WebKit backend-free transfer smoke exists; Chromium\/Firefox public relay UAT exists \|/
