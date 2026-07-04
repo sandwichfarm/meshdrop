@@ -13,3 +13,18 @@ test("CI runs desktop and mobile target artifact transfer smoke", () => {
     assert.match(ciWorkflow, /npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /npm run test:target-artifacts/);
 });
+
+test("CI builds mobile native-source artifacts through package scripts", () => {
+    assert.match(ciWorkflow, /mobile-native-source-artifacts:/);
+    assert.match(ciWorkflow, /name: Mobile native source artifact smoke/);
+    assert.match(ciWorkflow, /needs: unit/);
+    assert.match(ciWorkflow, /npm run build:ios:native-source -- --version 0\.0\.0-ci --out-dir "\$\{out_dir\}"/);
+    assert.match(ciWorkflow, /npm run build:android:native-source -- --version 0\.0\.0-ci --out-dir "\$\{out_dir\}"/);
+    assert.match(ciWorkflow, /meshdrop-ios-native-source-0\.0\.0-ci\.tar\.gz/);
+    assert.match(ciWorkflow, /MeshDropViewController\.swift/);
+    assert.match(ciWorkflow, /Resources\/meshdrop\/index\.html/);
+    assert.match(ciWorkflow, /meshdrop-android-native-source-0\.0\.0-ci\.tar\.gz/);
+    assert.match(ciWorkflow, /AndroidManifest\.xml/);
+    assert.match(ciWorkflow, /MainActivity\.java/);
+    assert.match(ciWorkflow, /assets\/meshdrop\/index\.html/);
+});
