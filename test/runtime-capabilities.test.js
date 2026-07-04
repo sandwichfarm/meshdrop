@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {createRuntimeCapabilities} from "../server/runtime-capabilities.js";
+import {createRuntimeCapabilities, createServerRuntimeConfig} from "../server/runtime-capabilities.js";
 
 test("runtime capabilities describe backend transport support", () => {
     const capabilities = createRuntimeCapabilities({
@@ -23,6 +23,19 @@ test("runtime capabilities describe backend transport support", () => {
     assert.equal(capabilities.transports.fips.room, "npub-network:fips");
     assert.equal(capabilities.transports.pollen.supported, true);
     assert.equal(capabilities.transports.pollen.maxUploadBytes, 1024);
+});
+
+test("server runtime config reports the configured deployment target", () => {
+    assert.deepEqual(createServerRuntimeConfig({}), {
+        target: "standalone",
+        platform: "server",
+        hasBackend: true
+    });
+    assert.deepEqual(createServerRuntimeConfig({MESHDROP_TARGET: "umbrel"}), {
+        target: "umbrel",
+        platform: "server",
+        hasBackend: true
+    });
 });
 
 test("runtime capabilities gate signed server settings", () => {
