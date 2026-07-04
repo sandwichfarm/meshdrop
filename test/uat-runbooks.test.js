@@ -102,19 +102,16 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /npm run verify:ghcr-anonymous -- v0\.x\.y/);
     assert.match(releaseTargets, /temporary `DOCKER_CONFIG`/);
-    assert.match(releaseTargets, /v0\.1\.0` authenticated release artifacts are proven by release run `28711136765`/);
-    assert.match(releaseTargets, /release verification workflow: https:\/\/github\.com\/sandwichfarm\/meshdrop\/actions\/runs\/28711452622/i);
-    assert.match(releaseTargets, /meshdrop-spa-0\.1\.0\.tar\.gz/);
-    assert.match(releaseTargets, /Desktop Native source tarball/);
-    assert.match(releaseTargets, /iOS source/);
-    assert.match(releaseTargets, /Android source/);
-    assert.match(releaseTargets, /meshdrop-desktop-<version>\.tar\.gz/);
-    assert.match(releaseTargets, /meshdrop-ios-<version>\.tar\.gz/);
-    assert.match(releaseTargets, /meshdrop-android-<version>\.tar\.gz/);
-    assert.match(releaseTargets, /v0\.1\.0-standalone/);
+    assert.match(releaseTargets, /v0\.1\.2` release assets and authenticated GHCR readback are proven by release run `28721154277`/);
+    assert.match(releaseTargets, /meshdrop-spa-0\.1\.2\.tar\.gz/);
+    assert.match(releaseTargets, /meshdrop-desktop-0\.1\.2\.tar\.gz/);
+    assert.match(releaseTargets, /meshdrop-ios-0\.1\.2\.tar\.gz/);
+    assert.match(releaseTargets, /meshdrop-android-0\.1\.2\.tar\.gz/);
+    assert.match(releaseTargets, /v0\.1\.2-standalone/);
+    assert.match(releaseTargets, /Docker smoke passed for `ghcr\.io\/sandwichfarm\/meshdrop:v0\.1\.2-standalone`/);
     assert.match(releaseTargets, /Start9 source tarball/);
     assert.match(releaseTargets, /Umbrel package tarball/);
-    assert.match(releaseTargets, /`npm run verify:ghcr-anonymous -- v0\.1\.0` currently fails with GHCR `unauthorized`/);
+    assert.match(releaseTargets, /`npm run verify:ghcr-anonymous -- v0\.1\.2` currently fails with GHCR `unauthorized`/);
     assert.match(releaseTargets, /Not proven/);
 
     const targetStatus = readDoc("docs/uat/target-status.md");
@@ -123,9 +120,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     }
     assert.match(
         targetStatus,
-        /\| Release Images \| `v0\.1\.0` authenticated readback verified; anonymous verifier exists but current GHCR visibility blocks it \|/
+        /\| Release Images \| `v0\.1\.2` release assets, target images, authenticated readback, and Docker smoke verified; anonymous GHCR visibility blocks final release proof \|/
     );
-    assert.match(targetStatus, /`npm run verify:ghcr-anonymous -- v0\.1\.0` with a temporary empty Docker config/);
+    assert.match(targetStatus, /`npm run verify:ghcr-anonymous -- v0\.1\.2` with a temporary empty Docker config/);
     assert.match(targetStatus, /Make `ghcr\.io\/sandwichfarm\/meshdrop` public/);
     assert.match(
         targetStatus,
