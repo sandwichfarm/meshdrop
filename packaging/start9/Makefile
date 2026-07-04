@@ -1,3 +1,4 @@
 ARCHES := x86 arm
+PACKAGE_ID := meshdrop
 
-include node_modules/@start9labs/start-sdk/s9pk.mk
+include s9pk.mk

@@ -1,5 +1,5 @@
-import { setupSdk } from "@start9labs/start-sdk";
+import { StartSdk } from "@start9labs/start-sdk";
 
-import { manifest } from "./manifest/index";
+import { manifest } from "./manifest/index.js";
 
-export const sdk = setupSdk(manifest);
+export const sdk = StartSdk.of().withManifest(manifest).build(true);

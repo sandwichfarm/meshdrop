@@ -11,7 +11,7 @@ Use this runbook for the StartOS package source artifact built from `packaging/s
 4. In a StartOS packaging workspace with `start-cli`, npm, and a developer key configured, unpack the artifact and run:
 
    ```sh
-   npm install
+   npm install --ignore-scripts --no-audit --fund=false
    npm run check
    make
    ```
@@ -50,12 +50,28 @@ npm run build:start9 -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-start9-smo
 node --test test/start9-package.test.js
 ```
 
-This smoke proves package source artifact shape, manifest rendering, image/target metadata, npub-discovery environment,
-admin-npub environment, Pollen enablement, and the absence of legacy static room environment variables.
+This smoke proves package source artifact shape, manifest rendering, image/target metadata, vendored StartOS make
+plumbing, npub-discovery environment, admin-npub environment, Pollen enablement, absence of legacy static room
+environment variables, and generated source `npm run check` against `@start9labs/start-sdk@1.5.3`.
+
+Current local package proof on 2026-07-04:
+
+```sh
+npm run build:start9 -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-start9-uat
+tar -xzf /tmp/meshdrop-start9-uat/meshdrop-start9-0.0.0-smoke.tar.gz -C /tmp/meshdrop-start9-uat
+cd /tmp/meshdrop-start9-uat/meshdrop-start9-0.0.0-smoke
+npm install --ignore-scripts --no-audit --fund=false
+npm run check
+make
+```
+
+`npm run check` passes. `make` reaches `start-cli s9pk pack --arch=x86_64 -o meshdrop_x86_64.s9pk` and then stops on
+this host because `start-cli` is not installed.
 
 ## Not Proven
 
 - This package-source smoke does not prove an `.s9pk` build.
+- This package-source smoke does not prove `start-cli s9pk pack` because this host does not have `start-cli`.
 - This package-source smoke does not prove installation on a real StartOS device.
 - This package-source smoke does not prove browser transfer UAT on StartOS.
 - FIPS is disabled by default until the target has a tested FIPS binary and device-network path.

@@ -1,6 +1,3 @@
-import { sdk } from "./sdk";
+import { sdk } from "./sdk.js";
 
-export const backups = sdk.setupBackups(async () => ({
-  volumes: ["main"],
-  exclusions: []
-}));
+export const { createBackup, restoreInit } = sdk.setupBackups(async () => sdk.Backups.ofVolumes("main"));
