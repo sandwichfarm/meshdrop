@@ -6,6 +6,7 @@
   "main": "server/index.js",
   "scripts": {
     "build:spa": "node scripts/build-spa-artifact.mjs",
+    "build:desktop": "node scripts/build-desktop-package.mjs",
     "build:start9": "node scripts/build-start9-package.mjs",
     "build:umbrel": "node scripts/build-umbrel-package.mjs",
     "build:service-worker": "node scripts/set-service-worker-version.mjs",

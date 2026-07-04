@@ -72,3 +72,30 @@ test("runtime capabilities describe static SPA support without backend-only tran
     assert.equal(capabilities.serverSettings.supported, false);
     assert.equal(capabilities.serverSettings.actions.fipsPeers, false);
 });
+
+test("runtime capabilities describe desktop source support without shared backend controls", () => {
+    const capabilities = createRuntimeCapabilities({
+        runtime: {
+            target: "desktop",
+            platform: "desktop",
+            hasBackend: false
+        },
+        signalingServer: false,
+        fips: {enabled: false},
+        pollen: {enabled: false},
+        admin: {enabled: false}
+    });
+
+    assert.equal(capabilities.runtime.target, "desktop");
+    assert.equal(capabilities.runtime.platform, "desktop");
+    assert.equal(capabilities.runtime.hasBackend, false);
+    assert.equal(capabilities.runtime.sharedInstance, false);
+    assert.equal(capabilities.transports.webrtc.supported, true);
+    assert.equal(capabilities.transports.nostr.supported, true);
+    assert.equal(capabilities.transports.blossom.supported, true);
+    assert.equal(capabilities.transports.hashtree.supported, true);
+    assert.equal(capabilities.transports.localDiscovery.supported, false);
+    assert.equal(capabilities.transports.fips.supported, false);
+    assert.equal(capabilities.transports.pollen.supported, false);
+    assert.equal(capabilities.serverSettings.supported, false);
+});
