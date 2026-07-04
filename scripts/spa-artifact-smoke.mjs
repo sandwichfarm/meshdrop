@@ -27,13 +27,14 @@ const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
 const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
 const webkitTransferRequested = process.env.MESHDROP_SPA_WEBKIT_TRANSFER === "1";
+const defaultSmokeAttempts = browserTypeName === "webkit" ? 3 : 1;
 const webkitTransferStrategies = webkitTransferRequested && browserTypeName === "webkit"
     ? [
         {name: "one-context-two-origins", singleBrowserContext: true},
         {name: "two-contexts-two-origins", singleBrowserContext: false},
         {name: "two-contexts-two-origins", singleBrowserContext: false}
     ]
-    : [{name: "default", singleBrowserContext: false}];
+    : Array.from({length: defaultSmokeAttempts}, () => ({name: "default", singleBrowserContext: false}));
 const smokeAttempts = webkitTransferStrategies.length;
 const runsBackendFreeTransferProof = browserTypeName !== "webkit" || webkitTransferRequested;
 const publicRelayUrls = parseRelayUrls(process.env.MESHDROP_SPA_PUBLIC_RELAY_URLS || "");
