@@ -119,7 +119,7 @@ async function runProofTransfer(browser, options) {
         await waitForConnectedPeer(pageB, options.roomType);
         await sendProofIcon(pageA, peerId, options.transportId);
 
-        const received = await waitForReceivedFiles(pageB);
+        const received = await waitForReceivedFiles(pageB, options.name);
         assertReceived(received);
         assert(!logs.pageErrors.length, `${options.name}: page errors: ${logs.pageErrors.join("\n")}`);
         console.log(`Proof ${options.name}: ${options.transportId} delivered meshdrop-proof-icon.svg`);
@@ -230,14 +230,36 @@ async function sendProofIcon(page, peerId, transportId) {
     }, {to: peerId, icon: proofIcon, transport: transportId});
 }
 
-async function waitForReceivedFiles(page) {
-    const handle = await page.waitForFunction(() => {
-        const batch = globalThis.__meshdropDockerTransfer.received.at(-1);
-        if (!batch || batch.files.length !== 1) return null;
-        return batch.files;
-    }, {timeout: 45000});
+async function waitForReceivedFiles(page, name) {
+    let handle;
+    try {
+        handle = await page.waitForFunction(() => {
+            const batch = globalThis.__meshdropDockerTransfer.received.at(-1);
+            if (!batch || batch.files.length !== 1) return null;
+            return batch.files;
+        }, undefined, {timeout: 45000});
+    } catch (error) {
+        throw new Error(`${name}: ${error.message}\nstate=${JSON.stringify(await debugPageState(page))}`);
+    }
 
     return handle.jsonValue();
+}
+
+async function debugPageState(page) {
+    return page.evaluate(() => ({
+        connected: globalThis.__meshdropDockerTransfer?.connected,
+        received: globalThis.__meshdropDockerTransfer?.received,
+        peers: [...document.querySelectorAll("x-peer")].map(peer => ({
+            id: peer.id,
+            classes: [...peer.classList]
+        })),
+        managerPeers: Object.values(globalThis.__meshdropE2E?.peersManager?.peers || {}).map(peer => ({
+            id: peer._peerId,
+            roomIds: peer._roomIds,
+            channelState: peer._channel?.readyState || "",
+            connectionState: peer._conn?.connectionState || ""
+        }))
+    }));
 }
 
 function assertReceived(received) {
