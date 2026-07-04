@@ -9,6 +9,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
+ARG MESHDROP_TARGET=standalone
 ARG PLN_VERSION=v0.0.1-dev.21
 RUN set -eux; \
     arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
@@ -40,10 +41,15 @@ RUN MESH_DROP_COMMIT="${MESH_DROP_COMMIT}" node scripts/set-service-worker-versi
 
 # environment settings
 ENV NODE_ENV="production"
+ENV MESHDROP_TARGET="${MESHDROP_TARGET}"
 ENV FIPS_CONFIG="/etc/fips/fips.yaml"
 ENV PLN_DIR="/var/lib/meshdrop/pln"
 ENV POLLEN_TRANSFER="true"
 ENV POLLEN_PORT="60611"
+
+LABEL org.opencontainers.image.title="MeshDrop"
+LABEL org.opencontainers.image.description="MeshDrop ${MESHDROP_TARGET} alpha target image"
+LABEL farm.sandwich.meshdrop.target="${MESHDROP_TARGET}"
 
 EXPOSE 3000
 EXPOSE 2121/udp
