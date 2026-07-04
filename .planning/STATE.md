@@ -5,7 +5,7 @@
 See: `.planning/PROJECT.md` (updated 2026-07-04)
 
 **Core value:** Files must transfer between peers reliably over every negotiated transport that claims to support the path.
-**Current focus:** Fix post-merge browser CI transfer readiness flake.
+**Current focus:** Continue the MeshDrop finish-line milestone from the next highest-risk gap.
 
 ## Quick Tasks Completed
 
@@ -15,6 +15,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-ci-test-baseline` | complete | `npm ci`; repo/e2e/docker/actionlint/diff gates; changed-code slop exit 0 |
 | 2026-07-04 | `20260704-fix-browser-ci-local-disable` | complete | e2e transfer proof; `npm test`; `git diff --check` |
 | 2026-07-04 | `20260704-fix-browser-ci-bidirectional-ready` | complete | e2e transfer proof; `npm test`; changed-code slop exit 0 |
+| 2026-07-04 | `20260704-release-ceremony-baseline` | complete | actionlint; release artifact smoke; `npm test`; `npm run test:docker`; diff/slop gates |
 
 ## Active Quick Task
 
