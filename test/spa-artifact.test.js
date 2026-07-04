@@ -55,7 +55,9 @@ test("SPA artifact smoke proves runtime support plus browser-backed WebRTC trans
     assert.match(smoke, /safeDebugPageState/);
     assert.match(smoke, /undefined, \{timeout: spaHydrationTimeoutMs\}/);
     assert.match(smoke, /smokeAttempts = browserTypeName === "webkit" \? 3 : 1/);
-    assert.match(smoke, /runsBackendFreeTransferProof = browserTypeName !== "webkit"/);
+    assert.match(smoke, /MESHDROP_SPA_WEBKIT_TRANSFER/);
+    assert.match(smoke, /runsBackendFreeTransferProof = browserTypeName !== "webkit" \|\| webkitTransferRequested/);
+    assert.match(smoke, /set MESHDROP_SPA_WEBKIT_TRANSFER=1 to attempt WebKit transfer UAT/);
     assert.match(smoke, /retrySmoke/);
 
     assert.match(support, /finalizeEvent/);
@@ -68,9 +70,12 @@ test("SPA artifact smoke proves runtime support plus browser-backed WebRTC trans
     assert.match(ciWorkflow, /PLAYWRIGHT_BROWSER: \$\{\{ matrix\.browser \}\}/);
     assert.match(ciWorkflow, /npm run test:spa-artifact/);
     assert.match(ciWorkflow, /spa_public_relay_urls:/);
+    assert.match(ciWorkflow, /spa_webkit_transfer:/);
     assert.match(ciWorkflow, /spa-public-relay-uat:/);
+    assert.match(ciWorkflow, /spa-webkit-transfer-uat:/);
     assert.match(ciWorkflow, /github\.event_name == 'workflow_dispatch'/);
     assert.match(ciWorkflow, /MESHDROP_SPA_PUBLIC_RELAY_URLS: \$\{\{ inputs\.spa_public_relay_urls \}\}/);
+    assert.match(ciWorkflow, /MESHDROP_SPA_WEBKIT_TRANSFER: "1"/);
 });
 
 test("SPA artifact version sanitizer rejects empty versions", () => {
