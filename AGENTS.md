@@ -49,6 +49,10 @@ Use GSD plus this loop for every non-trivial change. GSD is the durable project 
 1. Inspect
    - Run `git status --short --branch`.
    - Identify current branch, remote, and user-owned dirty files.
+   - State a git brief before edits:
+     - primary worktree path, branch, and dirty paths
+     - task worktree path, branch, and base commit
+     - dirty-state decision: ignored unrelated, blocked overlap, or incorporated by explicit user request
    - Check GSD state before planning:
      - If `.planning/` exists, run `$gsd-progress` or `gsd-sdk query init.progress`.
      - If `.planning/` is missing and work is more than a tiny docs/config edit, run `$gsd-new-project` before implementation.
@@ -182,12 +186,37 @@ Slop patterns to hunt manually while iterating:
 ## Git And Shipping
 
 Default:
-- For each new user task, start from `master`/`origin/master` and create a fresh task branch before editing, unless the user explicitly says to continue the current branch or work directly on `master`.
+- Use git worktrees for agent work. Treat the user's normal checkout as the operator worktree; do not edit it when it has unrelated dirty state.
+- For each new user task, start from `master`/`origin/master` in a fresh task worktree and create a fresh task branch before editing, unless the user explicitly says to continue the current branch or work directly on `master`.
+- Use predictable branch names: `agent/<kind>-<slug>-<yyyymmdd>` or an issue-specific `fix/<issue>-<slug>` when the user names an issue.
 - Preserve user changes. Never reset, checkout, or overwrite dirty files you did not create.
 - Commit every completed task.
 - Push every completed task.
 - Open/update PR when branch is not `master` or when task references issue/PR flow.
 - When a branch should be pushed, push it before announcing completion.
+
+Worktree roles:
+- Operator worktree: the user's normal checkout. Use it for inspection only unless it is clean and the user explicitly wants work there.
+- Task worktree: the agent-owned worktree for one task branch. Implement, test, commit, and push from here.
+- Review/UAT worktree: optional clean checkout of the PR branch for the operator to run or inspect locally. Create or update it when useful, and report its path.
+
+Dirty-state protocol:
+- If the operator worktree has unrelated dirty files, leave them untouched and create a task worktree from `origin/master`.
+- If dirty files overlap intended edit paths, stop before editing and report exact paths plus the decision needed.
+- If the user explicitly wants to continue dirty work, say that in the git brief and keep all commits on that existing branch.
+- Never stash, reset, checkout, clean, or rebase user-owned dirty state unless the user explicitly requests that exact operation.
+
+Successive PR policy:
+- Independent task: branch from current `origin/master`.
+- Dependent or overlapping task: branch from the prior PR branch.
+- If overlap with an open PR is accidental, stop and ask whether to stack, split, or wait.
+- Stacked PR bodies must include `Depends on: #N`, merge order, retarget/rebase plan after the base PR merges, and overlapping files or behavior.
+
+PR ceremony:
+- Push the branch before any completion claim.
+- Open or update the PR.
+- Read the PR back with `gh pr view --json number,url,state,headRefName,baseRefName,title,body,commits,statusCheckRollup`.
+- PR bodies must include summary, verification, known baseline failures, runtime/UAT notes, dependencies, and merge order when stacked.
 
 Before commit:
 
@@ -214,7 +243,13 @@ Scope-risk: <narrow|moderate|broad>
 After push:
 - Read back `git status --short --branch`.
 - For PRs, read back PR URL/state/checks with `gh pr view`.
-- Final response must include branch and commit hash.
+- Final response must include branch, commit hash, push status, PR URL when relevant, task worktree path, and review/UAT path if one exists.
+
+Task end states:
+- Ready for UAT: code is committed, branch is pushed, PR is open/read back, verification is recorded, and the review path or task worktree path is named.
+- Complete: PR is merged, or the user explicitly accepts PR-ready handoff as the endpoint.
+- Do not delete task or review worktrees automatically after opening a PR. Keep them until merge or explicit cleanup request.
+- Before cleanup, show the worktree path and branch to be removed. Never remove a dirty worktree.
 
 ## Runtime Truth Surfaces
 
