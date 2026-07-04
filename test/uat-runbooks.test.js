@@ -11,6 +11,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         "docs/uat/start9.md",
         "docs/uat/umbrel.md",
         "docs/uat/desktop.md",
+        "docs/uat/mobile.md",
         "docs/uat/release-target-images.md",
         "docs/uat/target-status.md",
     ];
@@ -70,6 +71,16 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(desktop, /Nostr WebRTC/);
     assert.match(desktop, /Not Proven/);
 
+    const mobile = readDoc("docs/uat/mobile.md");
+    assert.match(mobile, /npm run build:ios/);
+    assert.match(mobile, /npm run build:android/);
+    assert.match(mobile, /target` as `ios` or `android`/);
+    assert.match(mobile, /runtime\.platform` as `mobile`/);
+    assert.match(mobile, /nativeShellBuilt` as `false`/);
+    assert.match(mobile, /bluetooth` is `false`/);
+    assert.match(mobile, /mobile WebRTC transfer UAT/);
+    assert.match(mobile, /Not Proven/);
+
     const releaseTargets = readDoc("docs/uat/release-target-images.md");
     for (const target of ["standalone", "start9", "umbrel"]) {
         assert.match(releaseTargets, new RegExp(`MESHDROP_TARGET=${target}`));
@@ -108,6 +119,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Desktop Native \| Source artifact exists; native shell not built \|/);
     assert.match(targetStatus, /`npm run build:desktop`; `node --test test\/desktop-package\.test\.js`/);
     assert.match(targetStatus, /Native shell build, desktop runtime capability readback, installer\/binary, and desktop transfer UAT/);
-    assert.match(targetStatus, /\| iOS \| Not implemented \|/);
-    assert.match(targetStatus, /\| Android \| Not implemented \|/);
+    assert.match(targetStatus, /\| iOS \| Source artifact exists; native shell not built \|/);
+    assert.match(targetStatus, /\| Android \| Source artifact exists; native shell not built \|/);
+    assert.match(targetStatus, /`npm run build:ios`; `node --test test\/mobile-package\.test\.js`/);
+    assert.match(targetStatus, /`npm run build:android`; `node --test test\/mobile-package\.test\.js`/);
+    assert.match(targetStatus, /Native iOS shell build, mobile runtime capability readback, app package/);
+    assert.match(targetStatus, /Native Android shell build, mobile runtime capability readback, app package/);
 });
