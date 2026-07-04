@@ -182,7 +182,7 @@ Slop patterns to hunt manually while iterating:
 ## Git And Shipping
 
 Default:
-- Work on a branch unless user explicitly asks direct `master` work.
+- For each new user task, start from `master`/`origin/master` and create a fresh task branch before editing, unless the user explicitly says to continue the current branch or work directly on `master`.
 - Preserve user changes. Never reset, checkout, or overwrite dirty files you did not create.
 - Commit every completed task.
 - Push every completed task.
