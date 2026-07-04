@@ -4,7 +4,7 @@ This ledger prevents release or UAT notes from overstating platform support.
 
 | Target | Status | Current proof | Remaining proof before complete |
 |--------|--------|---------------|---------------------------------|
-| SPA | Automated artifact smoke exists | `npm run test:spa-artifact` | Backend-free file transfer UAT |
+| SPA | Backend-free transfer smoke exists | `npm run test:spa-artifact` | Public relay and browser-matrix UAT |
 | Docker | Container admin, local, and Pollen smoke exists | `npm run test:docker` | Real deployed-admin UAT and two-host relay UAT |
 | Start9 | Target image metadata only | `MESHDROP_TARGET=start9` image tags | Start9 package and device UAT |
 | Umbrel | Target image metadata only | `MESHDROP_TARGET=umbrel` image tags | Umbrel package and device UAT |
