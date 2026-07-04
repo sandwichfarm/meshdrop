@@ -2,6 +2,7 @@ import {spawn} from "node:child_process";
 
 const image = process.env.MESHDROP_DOCKER_IMAGE || "meshdrop:smoke";
 const container = `meshdrop-smoke-${process.pid}`;
+const smokeAdminPubkey = "1".repeat(64);
 
 async function main() {
     await run("docker", ["build", "-t", image, "."]);
@@ -17,6 +18,8 @@ async function main() {
             "127.0.0.1::3000",
             "-e",
             "FIPS_DISCOVERY=true",
+            "-e",
+            `MESHDROP_ADMIN_NPUB=${smokeAdminPubkey}`,
             image
         ]);
         started = true;
@@ -31,6 +34,8 @@ async function main() {
         assert(Array.isArray(config.nostrMesh?.relays), "Nostr mesh relays were not exposed");
         assert(config.fips?.enabled === true, "FIPS config was not enabled in container");
         assert((config.fips?.room || "").startsWith("npub-network:"), "FIPS config did not use npub network discovery");
+        assert(config.admin?.enabled === true, "Admin config was not enabled in container");
+        assert(config.admin?.pubkey === smokeAdminPubkey, "Admin pubkey was not exposed in container config");
         assert(config.pollen?.enabled === true, "Pollen config was not enabled in container");
         assert((config.pollen?.room || "").startsWith("npub-network:"), "Pollen config did not use npub network discovery");
         assert(Array.isArray(config.blossom?.servers), "Blossom config was not exposed");
