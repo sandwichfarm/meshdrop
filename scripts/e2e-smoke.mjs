@@ -136,10 +136,15 @@ async function main() {
 async function runVisibilityScenario(browser, baseUrl) {
     const context = await newContext(browser, "unsigned", {signer: false});
     const page = await context.newPage();
+    const logs = watchPages("visibility", [page]);
 
     try {
         await page.goto(baseUrl, {waitUntil: "domcontentloaded"});
-        await waitForHydration(page);
+        try {
+            await waitForHydration(page);
+        } catch (error) {
+            throw new Error(`${error.message}\npageErrors=${logs.pageErrors.join("\n")}`);
+        }
         await page.waitForFunction(() => !document.getElementById("fips-discovery").hasAttribute("hidden"));
 
         const visibility = await page.evaluate(() => ({
@@ -158,43 +163,6 @@ async function runVisibilityScenario(browser, baseUrl) {
     }
     finally {
         await context.close();
-    }
-}
-
-async function runTransferScenario(browser, baseUrl, options) {
-    const contextA = await newContext(browser, "a", {blossomServer: options.blossomServer || ""});
-    const contextB = await newContext(browser, "b", {blossomServer: options.blossomServer || ""});
-    const pageA = await contextA.newPage();
-    const pageB = await contextB.newPage();
-    const logs = watchPages(options.name, [pageA, pageB]);
-
-    try {
-        await Promise.all([
-            pageA.goto(baseUrl, {waitUntil: "domcontentloaded"}),
-            pageB.goto(baseUrl, {waitUntil: "domcontentloaded"})
-        ]);
-
-        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
-        await assertMeshDropBranding(pageA);
-
-        if (options.nostrOnly) {
-            await leaveIpRoom(pageA);
-            await leaveIpRoom(pageB);
-        }
-
-        if (options.setupBoth) await options.setupBoth([pageA, pageB]);
-        if (options.setupSender) await options.setupSender(pageA);
-        if (options.setupReceiver) await options.setupReceiver(pageB);
-
-        const peerId = await waitForConnectedPeer(pageA, options.nostrOnly ? "nostr" : null);
-        await sendFiles(pageA, peerId, options.fileName, options.contents);
-
-        const received = await waitForReceivedFiles(pageB, options.contents.length);
-        assertReceived(options, received);
-        assert(!logs.pageErrors.length, `${options.name}: page errors: ${logs.pageErrors.join("\n")}`);
-    }
-    finally {
-        await Promise.allSettled([contextA.close(), contextB.close()]);
     }
 }
 
@@ -529,29 +497,6 @@ async function runFederatedFipsWebRtcScenario(browser, relayPort, blossomPort, p
     }
 }
 
-async function assertMeshDropBranding(page) {
-    const branding = await page.evaluate(() => ({
-        title: document.title,
-        appName: document.querySelector("meta[name='application-name']")?.content,
-        aboutLinks: [...document.querySelectorAll("#about a")]
-            .map(link => link.href)
-    }));
-
-    assert(branding.title.startsWith("MeshDrop"), `Unexpected document title: ${branding.title}`);
-    assert(branding.appName === "MeshDrop", `Unexpected application name: ${branding.appName}`);
-    [
-        "https://github.com/sandwichfarm/PairDrop",
-        "https://nostr.com/",
-        "https://github.com/hzrd149/blossom",
-        "https://hashtree.cc/",
-        "https://github.com/nostr-protocol/nips/pull/363",
-        "https://fips.network/",
-        "https://github.com/schlagmichdoch/PairDrop"
-    ].forEach(href => {
-        assert(branding.aboutLinks.includes(href), `Missing info overlay link: ${href}`);
-    });
-}
-
 async function connectNostrIdentity(page) {
     const hasIdentity = await page.evaluate(() => !!globalThis.meshdropNostrIdentity.getIdentity());
     if (hasIdentity) return;
@@ -636,23 +581,6 @@ async function debugPageState(page) {
         nostrActive: globalThis.meshdropNostrMesh?._active,
         relaySockets: globalThis.meshdropNostrMesh?._sockets?.size
     }));
-}
-
-async function sendFiles(page, peerId, firstFileName, contents) {
-    await page.evaluate(({to, fileName, payloads}) => {
-        const files = payloads.map((payload, index) => {
-            const name = index === 0 ? fileName : fileName.replace(/(\.[^.]+)?$/, `-${index + 1}$1`);
-            return new File([payload], name, {type: "text/plain"});
-        });
-
-        window.dispatchEvent(new CustomEvent("files-selected", {
-            detail: {to, files}
-        }));
-    }, {
-        to: peerId,
-        fileName: firstFileName,
-        payloads: contents
-    });
 }
 
 async function sendProofIcon(page, peerId, transportId) {
@@ -768,7 +696,7 @@ async function startFakeRelay() {
     const history = [];
 
     wss.on("connection", socket => {
-        subscriptions.set(socket, new Set());
+        subscriptions.set(socket, new Map());
         socket.on("message", raw => {
             let message;
             try {
@@ -778,15 +706,20 @@ async function startFakeRelay() {
             }
 
             if (message[0] === "REQ" && message[1]) {
-                subscriptions.get(socket).add(message[1]);
-                for (const event of history) sendRelayEvent(socket, message[1], event);
+                const filters = message.slice(2).filter(filter => filter && typeof filter === "object");
+                subscriptions.get(socket).set(message[1], filters);
+                for (const event of history) {
+                    if (matchesAnyRelayFilter(event, filters)) sendRelayEvent(socket, message[1], event);
+                }
                 return;
             }
 
             if (message[0] === "EVENT" && message[1]) {
                 history.push(message[1]);
-                for (const [client, subIds] of subscriptions.entries()) {
-                    for (const subId of subIds) sendRelayEvent(client, subId, message[1]);
+                for (const [client, clientSubscriptions] of subscriptions.entries()) {
+                    for (const [subId, filters] of clientSubscriptions.entries()) {
+                        if (matchesAnyRelayFilter(message[1], filters)) sendRelayEvent(client, subId, message[1]);
+                    }
                 }
             }
         });
@@ -800,6 +733,28 @@ async function startFakeRelay() {
     });
 
     return {port};
+}
+
+function matchesAnyRelayFilter(event, filters) {
+    return filters.some(filter => matchesRelayFilter(event, filter));
+}
+
+function matchesRelayFilter(event, filter) {
+    if (Array.isArray(filter.kinds) && !filter.kinds.includes(event.kind)) return false;
+    if (Number.isFinite(filter.since) && Number(event.created_at || 0) < filter.since) return false;
+    if (!matchesTagFilter(event, filter, "p")) return false;
+    if (!matchesTagFilter(event, filter, "r")) return false;
+    return true;
+}
+
+function matchesTagFilter(event, filter, tagName) {
+    const allowed = filter[`#${tagName}`];
+    if (!Array.isArray(allowed)) return true;
+
+    const values = (event.tags || [])
+        .filter(tag => tag[0] === tagName)
+        .map(tag => tag[1]);
+    return values.some(value => allowed.includes(value));
 }
 
 function sendRelayEvent(socket, subscriptionId, event) {
