@@ -27,6 +27,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-docker-admin-gui-smoke` | complete | Docker-served signed admin GUI proof; `npm test`; diff/slop gates |
 | 2026-07-04 | `20260704-spa-backend-free-transfer-smoke` | complete | SPA Nostr WebRTC proof; focused test; diff/slop gates |
 | 2026-07-04 | `20260704-umbrel-package-artifact` | complete | Umbrel package build/test; `npm test`; diff/slop gates |
+| 2026-07-04 | `20260704-start9-package-source-artifact` | complete | Start9 source build/test; `npm test`; diff/slop gates |
 
 ## Active Quick Task
 

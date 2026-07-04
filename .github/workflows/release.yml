@@ -73,6 +73,7 @@ jobs:
 
           npm run build:spa -- --version "${version}" --out-dir dist
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          npm run build:start9 -- --version "${version}" --out-dir dist --image "${image}:${GITHUB_REF_NAME}-start9"
           npm run build:umbrel -- --version "${version}" --out-dir dist --image "${image}:${GITHUB_REF_NAME}-umbrel"
 
           sha256sum dist/meshdrop-*.tar.gz > dist/SHA256SUMS
