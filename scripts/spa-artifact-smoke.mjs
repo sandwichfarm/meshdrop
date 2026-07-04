@@ -32,7 +32,7 @@ const webkitTransferStrategies = webkitTransferRequested && browserTypeName === 
     ? [
         {name: "one-context-two-origins", singleBrowserContext: true},
         {name: "two-contexts-two-origins", singleBrowserContext: false},
-        {name: "two-contexts-two-origins", singleBrowserContext: false}
+        {name: "two-browsers-two-origins", separateBrowsers: true, singleBrowserContext: false}
     ]
     : Array.from({length: defaultSmokeAttempts}, () => ({name: "default", singleBrowserContext: false}));
 const smokeAttempts = webkitTransferStrategies.length;
@@ -77,7 +77,9 @@ async function main() {
                 if (runsBackendFreeTransferProof) {
                     await runBackendFreeTransferProof(browser, server.port, relayUrls, {
                         peerBPort: peerBServer?.port,
+                        browserType,
                         singleBrowserContext: strategy.singleBrowserContext,
+                        separateBrowsers: strategy.separateBrowsers,
                         sequentialSetup: browserTypeName === "webkit",
                         strategyName: strategy.name
                     });
@@ -164,8 +166,9 @@ async function runBackendFreeTransferProof(browser, port, relayUrls, options = {
         console.log(`WebKit transfer UAT strategy: ${options.strategyName}`);
     }
 
+    const browserB = options.separateBrowsers ? await launchBrowser(options.browserType) : browser;
     const contextA = await browser.newContext({serviceWorkers: "block"});
-    const contextB = options.singleBrowserContext ? contextA : await browser.newContext({serviceWorkers: "block"});
+    const contextB = options.singleBrowserContext ? contextA : await browserB.newContext({serviceWorkers: "block"});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const identities = createProofIdentityPair();
@@ -227,6 +230,7 @@ async function runBackendFreeTransferProof(browser, port, relayUrls, options = {
     }
     finally {
         await Promise.allSettled(contextA === contextB ? [contextA.close()] : [contextA.close(), contextB.close()]);
+        if (browserB !== browser) await browserB.close();
     }
 }
 
