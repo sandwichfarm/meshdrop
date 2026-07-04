@@ -187,6 +187,7 @@ Default:
 - Commit every completed task.
 - Push every completed task.
 - Open/update PR when branch is not `master` or when task references issue/PR flow.
+- When a branch should be pushed, push it before announcing completion.
 
 Before commit:
 
