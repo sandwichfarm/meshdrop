@@ -63,8 +63,10 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /meshdrop-android-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /docker buildx imagetools inspect "\$\{image\}"/);
     assert.match(releaseVerifyWorkflow, /Verify anonymous GHCR manifests/);
-    assert.match(releaseVerifyWorkflow, /docker logout ghcr\.io/);
-    assert.match(releaseVerifyWorkflow, /without GHCR login/);
+    assert.match(releaseVerifyWorkflow, /image_base="ghcr\.io\/\$\{GITHUB_REPOSITORY,,\}"/);
+    assert.match(releaseVerifyWorkflow, /MESHDROP_GHCR_IMAGE_BASE="\$\{image_base\}"/);
+    assert.match(releaseVerifyWorkflow, /npm run verify:ghcr-anonymous -- "\$\{tag\}"/);
+    assert.doesNotMatch(releaseVerifyWorkflow, /Inspecting \$\{image\} without GHCR login/);
     assert.match(releaseVerifyWorkflow, /linux\/amd64/);
     assert.match(releaseVerifyWorkflow, /linux\/arm64/);
     assert.match(releaseVerifyWorkflow, /MESHDROP_DOCKER_IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}:\$\{\{ inputs\.tag \}\}-standalone/);
