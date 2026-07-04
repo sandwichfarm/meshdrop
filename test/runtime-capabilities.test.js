@@ -44,3 +44,31 @@ test("runtime capabilities gate signed server settings", () => {
     assert.equal(withoutFips.serverSettings.supported, true);
     assert.equal(withoutFips.serverSettings.actions.fipsPeers, false);
 });
+
+test("runtime capabilities describe static SPA support without backend-only transports", () => {
+    const capabilities = createRuntimeCapabilities({
+        runtime: {
+            target: "spa",
+            platform: "browser",
+            hasBackend: false
+        },
+        signalingServer: false,
+        fips: {enabled: true, room: "npub-network:fips"},
+        pollen: {enabled: true, maxUploadBytes: 1024},
+        admin: {enabled: true}
+    });
+
+    assert.equal(capabilities.runtime.target, "spa");
+    assert.equal(capabilities.runtime.platform, "browser");
+    assert.equal(capabilities.runtime.hasBackend, false);
+    assert.equal(capabilities.runtime.sharedInstance, false);
+    assert.equal(capabilities.transports.webrtc.supported, true);
+    assert.equal(capabilities.transports.nostr.supported, true);
+    assert.equal(capabilities.transports.blossom.supported, true);
+    assert.equal(capabilities.transports.hashtree.supported, true);
+    assert.equal(capabilities.transports.localDiscovery.supported, false);
+    assert.equal(capabilities.transports.fips.supported, false);
+    assert.equal(capabilities.transports.pollen.supported, false);
+    assert.equal(capabilities.serverSettings.supported, false);
+    assert.equal(capabilities.serverSettings.actions.fipsPeers, false);
+});

@@ -5,7 +5,7 @@ export function createRuntimeCapabilities(conf = {}) {
     const hasBackend = runtime.hasBackend !== false;
     const fipsSupported = hasBackend && !!conf.fips?.enabled;
     const pollenSupported = hasBackend && !!conf.pollen?.enabled;
-    const adminEnabled = !!conf.admin?.enabled;
+    const adminEnabled = hasBackend && !!conf.admin?.enabled;
 
     return {
         schemaVersion: 1,
@@ -13,7 +13,7 @@ export function createRuntimeCapabilities(conf = {}) {
             target: runtime.target || DEFAULT_RUNTIME_TARGET,
             platform: runtime.platform || "server",
             hasBackend,
-            sharedInstance: adminEnabled
+            sharedInstance: hasBackend && adminEnabled
         },
         transports: {
             localDiscovery: {
