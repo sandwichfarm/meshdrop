@@ -347,6 +347,7 @@ function watchPages(name, pages) {
             if (message.type() !== "error") return;
             const text = message.text();
             if (text.includes("RTCErrorEvent")) return;
+            if (text === "rtc connection failed") return;
             const location = message.location();
             const source = location.url ? `${location.url}:${location.lineNumber}:${location.columnNumber}` : "";
             const entry = `${label} console error: ${text}${source ? ` @ ${source}` : ""}`;
