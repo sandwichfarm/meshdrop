@@ -4,6 +4,7 @@ import {fileURLToPath} from "url";
 import path, {dirname} from "path";
 import http from "http";
 import {adminPublicConfig, createAdminConfig, verifySignedAdminRequest} from "./admin-auth.js";
+import {createRuntimeCapabilities} from "./runtime-capabilities.js";
 
 export default class PairDropServer {
 
@@ -68,6 +69,7 @@ export default class PairDropServer {
                     room: conf.fips.room
                 },
                 admin: adminPublicConfig(admin),
+                capabilities: createRuntimeCapabilities({...conf, admin}),
                 buttons: conf.buttons
             });
         });

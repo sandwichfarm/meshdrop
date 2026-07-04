@@ -82,6 +82,7 @@ globalThis.Events = {
 };
 
 await import("../public/scripts/nostr-relays.js");
+await import("../public/scripts/runtime-capabilities.js");
 await import("../public/scripts/nostr-identity.js");
 await import("../public/scripts/local-discovery.js");
 await import("../public/scripts/nostr-mesh.js");

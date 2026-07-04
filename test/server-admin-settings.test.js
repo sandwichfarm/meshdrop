@@ -56,6 +56,8 @@ test("/config exposes configured admin metadata", async () => {
         assert.equal(config.admin.enabled, true);
         assert.equal(config.admin.pubkey, pubkey);
         assert.match(config.admin.npub, /^npub1/);
+        assert.equal(config.capabilities.runtime.hasBackend, true);
+        assert.equal(config.capabilities.serverSettings.actions.fipsPeers, true);
     });
 });
 

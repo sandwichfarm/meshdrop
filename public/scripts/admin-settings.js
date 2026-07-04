@@ -9,8 +9,11 @@ const AdminSettingsProtocol = {
     canManageServerSettings(config, identity) {
         const adminPubkey = this.normalizePubkey(config?.admin?.pubkey || "");
         const identityPubkey = this.normalizePubkey(identity?.pubkey || "");
+        const settingsSupported = globalThis.RuntimeCapabilities
+            ? globalThis.RuntimeCapabilities.serverActionSupported(config, "fipsPeers")
+            : true;
 
-        return !!config?.admin?.enabled && !!adminPubkey && adminPubkey === identityPubkey;
+        return settingsSupported && !!config?.admin?.enabled && !!adminPubkey && adminPubkey === identityPubkey;
     },
 
     setConfig(config) {

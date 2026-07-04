@@ -36,6 +36,14 @@ async function main() {
         assert((config.fips?.room || "").startsWith("npub-network:"), "FIPS config did not use npub network discovery");
         assert(config.admin?.enabled === true, "Admin config was not enabled in container");
         assert(config.admin?.pubkey === smokeAdminPubkey, "Admin pubkey was not exposed in container config");
+        assert(config.capabilities?.runtime?.target === "standalone", "Runtime target capability was not exposed");
+        assert(config.capabilities?.runtime?.hasBackend === true, "Backend runtime capability was not exposed");
+        assert(config.capabilities?.transports?.fips?.supported === true, "FIPS capability was not exposed");
+        assert(config.capabilities?.transports?.pollen?.supported === true, "Pollen capability was not exposed");
+        assert(
+            config.capabilities?.serverSettings?.actions?.fipsPeers === true,
+            "Signed FIPS settings capability was not exposed"
+        );
         assert(config.pollen?.enabled === true, "Pollen config was not enabled in container");
         assert((config.pollen?.room || "").startsWith("npub-network:"), "Pollen config did not use npub network discovery");
         assert(Array.isArray(config.blossom?.servers), "Blossom config was not exposed");
@@ -67,6 +75,12 @@ async function main() {
         assert(page.includes("id=\"fips-discovery\""), "FIPS discovery control missing from served page");
         assert(page.includes("id=\"blossom-transfer\""), "Blossom transfer control missing from served page");
         assert(page.includes("id=\"hashtree-transfer\""), "Hashtree transfer control missing from served page");
+
+        const runtimeCapabilitiesScript = await getText(`${baseUrl}/scripts/runtime-capabilities.js`);
+        assert(
+            runtimeCapabilitiesScript.includes("RuntimeCapabilities"),
+            "Runtime capabilities script was not served"
+        );
 
         console.log(`Docker smoke passed for ${image} on ${baseUrl}`);
     }

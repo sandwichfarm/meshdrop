@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {finalizeEvent, generateSecretKey, getPublicKey, verifyEvent} from "nostr-tools";
 
+await import("../public/scripts/runtime-capabilities.js");
 await import("../public/scripts/admin-settings.js");
 
 test("admin settings protocol gates shared-instance controls to the configured admin pubkey", () => {
@@ -25,6 +26,16 @@ test("admin settings protocol gates shared-instance controls to the configured a
     assert.equal(
         globalThis.AdminSettingsProtocol.canManageServerSettings(
             {admin: {enabled: false, pubkey}},
+            {pubkey}
+        ),
+        false
+    );
+    assert.equal(
+        globalThis.AdminSettingsProtocol.canManageServerSettings(
+            {
+                admin: {enabled: true, pubkey},
+                capabilities: {serverSettings: {supported: true, actions: {fipsPeers: false}}}
+            },
             {pubkey}
         ),
         false
