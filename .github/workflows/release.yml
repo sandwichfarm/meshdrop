@@ -70,6 +70,8 @@ jobs:
             README.md \
             LICENSE
 
+          npm run build:spa -- --version "${version}" --out-dir dist
+
           sha256sum dist/meshdrop-*.tar.gz > dist/SHA256SUMS
 
       - name: Create GitHub release
