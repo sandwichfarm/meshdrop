@@ -9,8 +9,8 @@ This ledger prevents release or UAT notes from overstating platform support.
 | Start9 | x86_64 `.s9pk` package build exists | `npm run build:start9`; `node --test test/start9-package.test.js`; generated source `npm run check` and `npm run build`; isolated `start-cli 0.4.0-beta.10` plus generated `bin/tar2sqfs` fallback produced `meshdrop_x86_64.s9pk` with SHA-256 `4a166eb17d1b51e09f38b63980dcf3a05acb1b889069d00bcc34ff4c043e91a1` | StartOS device install and transfer UAT |
 | Umbrel | Package artifact smoke exists | `npm run build:umbrel`; package test | Umbrel device install and transfer UAT |
 | Desktop Native | Source artifact exists; native shell not built | `npm run build:desktop`; `node --test test/desktop-package.test.js` | Native shell build, desktop runtime capability readback, installer/binary, and desktop transfer UAT |
-| iOS | Not implemented | None | Mobile runtime design, build target, platform transport negotiation, and transfer UAT |
-| Android | Not implemented | None | Mobile runtime design, build target, platform transport negotiation, and transfer UAT |
+| iOS | Source artifact exists; native shell not built | `npm run build:ios`; `node --test test/mobile-package.test.js` | Native iOS shell build, mobile runtime capability readback, app package, file-picker/share-sheet integration, Bluetooth negotiation, and mobile transfer UAT |
+| Android | Source artifact exists; native shell not built | `npm run build:android`; `node --test test/mobile-package.test.js` | Native Android shell build, mobile runtime capability readback, app package, file-picker/share-sheet integration, Bluetooth negotiation, and mobile transfer UAT |
 | Release Images | `v0.1.0` authenticated readback verified | Release run `28711136765`; release verification run `28711452622`; local anonymous `docker manifest inspect ghcr.io/sandwichfarm/meshdrop:v0.1.0-start9` returned `denied` | Anonymous GHCR manifest readback and full release verification for each new `v0.*.*` tag |
 
 ## Rules

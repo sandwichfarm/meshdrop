@@ -99,3 +99,30 @@ test("runtime capabilities describe desktop source support without shared backen
     assert.equal(capabilities.transports.pollen.supported, false);
     assert.equal(capabilities.serverSettings.supported, false);
 });
+
+test("runtime capabilities describe mobile source support without backend-only transports", () => {
+    const capabilities = createRuntimeCapabilities({
+        runtime: {
+            target: "ios",
+            platform: "mobile",
+            hasBackend: false
+        },
+        signalingServer: false,
+        fips: {enabled: false},
+        pollen: {enabled: false},
+        admin: {enabled: false}
+    });
+
+    assert.equal(capabilities.runtime.target, "ios");
+    assert.equal(capabilities.runtime.platform, "mobile");
+    assert.equal(capabilities.runtime.hasBackend, false);
+    assert.equal(capabilities.runtime.sharedInstance, false);
+    assert.equal(capabilities.transports.webrtc.supported, true);
+    assert.equal(capabilities.transports.nostr.supported, true);
+    assert.equal(capabilities.transports.blossom.supported, true);
+    assert.equal(capabilities.transports.hashtree.supported, true);
+    assert.equal(capabilities.transports.localDiscovery.supported, false);
+    assert.equal(capabilities.transports.fips.supported, false);
+    assert.equal(capabilities.transports.pollen.supported, false);
+    assert.equal(capabilities.serverSettings.supported, false);
+});
