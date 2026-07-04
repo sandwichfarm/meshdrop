@@ -44,15 +44,22 @@ Risk: <known gaps or "none known">.
 
 ## SDLC Loop
 
-Use this loop for every non-trivial change:
+Use GSD plus this loop for every non-trivial change. GSD is the durable project memory; git is the shipping record.
 
 1. Inspect
    - Run `git status --short --branch`.
    - Identify current branch, remote, and user-owned dirty files.
+   - Check GSD state before planning:
+     - If `.planning/` exists, run `$gsd-progress` or `gsd-sdk query init.progress`.
+     - If `.planning/` is missing and work is more than a tiny docs/config edit, run `$gsd-new-project` before implementation.
    - Read relevant code/tests/docs before editing.
    - For bug work, reproduce or find a failing test/log before patching.
 
 2. Plan
+   - Track the work in GSD:
+     - Use `$gsd-quick` for one narrow fix or cleanup.
+     - Use `$gsd-new-milestone` plus phase flow for multi-step, cross-surface, risky, or user-facing work.
+     - Use `$gsd-discuss-phase` / `$gsd-plan-phase` when requirements or verification shape are not obvious.
    - State concise plan before edits.
    - Keep scope narrow.
    - Prefer deleting bad code over adding layers.
@@ -73,12 +80,21 @@ Use this loop for every non-trivial change:
    - Run broad repo gate.
    - Run runtime/manual check when user-facing behavior depends on browser, network, Docker, filesystem, or service state.
    - Run AI-slop gate.
+   - Record verification in the active GSD quick task, phase summary, or milestone artifact.
 
 6. Ship
+   - Close or update the active GSD quick task/phase with summary, evidence, and known gaps.
+   - Run `$gsd-progress` before commit when `.planning/` exists; do not leave stale active phase state.
    - Review diff.
    - Commit with lore-style message.
    - Push branch.
    - If normal repo flow needs PR, open/update PR and read it back from GitHub.
+
+GSD escalation rule:
+- Tiny docs/config edits may stay as direct SDLC plus git.
+- Bug fixes, feature work, cleanup/refactor/deslop, release work, and runtime behavior changes must have GSD tracking.
+- If user invokes a specific GSD command, follow that command over the generic direct loop.
+- If GSD state conflicts with live repo/user request, say `GSD drift: <conflict>` and trust the latest user request plus live repo evidence.
 
 ## Honesty Rules
 
