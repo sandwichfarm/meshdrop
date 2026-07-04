@@ -81,9 +81,12 @@ For GitHub-hosted proof, dispatch the `CI` workflow manually with `docker_public
 URLs. The manual-only `Docker public relay UAT` job installs Chromium, builds the Docker image, starts two containers,
 and does not run on normal PR or push events.
 
+Current GitHub-hosted proof: manual run `28715209725` on `agent/docker-public-relay-receive-20260704` passed the
+Docker public relay UAT job against `wss://bucket.coracle.social`. The first public relay attempt timed out waiting for
+an open RTC peer; the second attempt emitted the required public proof line.
+
 ## Not proven
 
-- The Docker smoke proves two Docker-served hosts through a deterministic relay, not a public relay deployment.
 - The Docker smoke proves local WebRTC, Pollen mesh, and deterministic two-host Nostr WebRTC transfers; run
   `npm run test:e2e` for the broader source-served transfer matrix.
 - Real shared-instance admin UAT still needs a manual signed GUI request using the deployment admin npub and deployment

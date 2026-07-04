@@ -5,7 +5,7 @@ This ledger prevents release or UAT notes from overstating platform support.
 | Target | Status | Current proof | Remaining proof before complete |
 |--------|--------|---------------|---------------------------------|
 | SPA | Chromium/Firefox backend-free transfer smoke exists; WebKit runtime smoke exists; Chromium/Firefox public relay UAT exists | `SPA browser matrix` CI job; `npm run test:spa-artifact`; manual run `28713488687` public relay jobs against `wss://bucket.coracle.social` | WebKit transfer UAT via `MESHDROP_SPA_WEBKIT_TRANSFER=1` or manual CI dispatch |
-| Docker | Container admin, local, Pollen, and deterministic two-host relay smoke exists | `npm run test:docker`; `npm run test:docker:two-host` | Real deployed-admin UAT and public relay two-host UAT |
+| Docker | Container admin, local, Pollen, deterministic two-host relay, and public relay two-host UAT exists | `npm run test:docker`; `npm run test:docker:two-host`; manual run `28715209725` Docker public relay UAT against `wss://bucket.coracle.social` | Real deployed-admin UAT |
 | Start9 | Package source smoke exists | `npm run build:start9`; package test | `.s9pk` build, device install, and transfer UAT |
 | Umbrel | Package artifact smoke exists | `npm run build:umbrel`; package test | Umbrel device install and transfer UAT |
 | Desktop Native | Not implemented | None | Native shell selection, build target, runtime capability manifest, and transfer UAT |

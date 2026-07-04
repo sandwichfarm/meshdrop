@@ -38,6 +38,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `20260704-spa-webkit-transfer-uat-attempt` | complete | Harness opt-in added; Chromium SPA transfer still passes; local forced WebKit attempt blocked by missing Playwright WebKit `webkit-2311`; WebKit transfer gap remains open |
 | 2026-07-04 | `20260704-spa-webkit-transfer-crash-evidence` | complete | PRs #35-#37 merged; manual runs `28713995244`, `28714194498`, and `28714388605` all failed forced WebKit transfer with page crashes while normal WebKit runtime matrix passed; WebKit transfer gap remains open |
 | 2026-07-04 | `20260704-docker-two-host-relay-uat` | complete | Deterministic two-container Nostr WebRTC proof; `npm test`; Docker smoke; actionlint; diff/slop gates |
+| 2026-07-04 | `20260704-docker-public-relay-uat` | complete | PR CI run `28715161999`; manual run `28715209725` Docker public relay UAT passed against `wss://bucket.coracle.social`; changed-code slop clean |
 
 ## Active Quick Task
 
