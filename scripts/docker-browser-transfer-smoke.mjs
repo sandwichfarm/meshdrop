@@ -17,7 +17,22 @@ async function main() {
     const browser = await chromium.launch(await launchOptions());
 
     try {
-        await runLocalWebRtcTransfer(browser);
+        await runProofTransfer(browser, {
+            name: "docker-local-webrtc",
+            roomType: "ip",
+            transportId: "local"
+        });
+        await runProofTransfer(browser, {
+            name: "docker-pollen-webrtc",
+            roomType: "pollen",
+            transportId: "pollen-mesh",
+            setupBoth: async pages => {
+                await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropPollenTransfer.enable())));
+                await Promise.all(pages.map(page => (
+                    page.waitForFunction(() => globalThis.meshdropPollenTransfer.isActive())
+                )));
+            }
+        });
     }
     finally {
         await browser.close();
@@ -26,12 +41,12 @@ async function main() {
     console.log(`Docker browser transfer smoke passed against ${baseUrl}`);
 }
 
-async function runLocalWebRtcTransfer(browser) {
+async function runProofTransfer(browser, options) {
     const contextA = await newContext(browser);
     const contextB = await newContext(browser);
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
-    const logs = watchPages([pageA, pageB]);
+    const logs = watchPages(options.name, [pageA, pageB]);
 
     try {
         await Promise.all([
@@ -40,14 +55,16 @@ async function runLocalWebRtcTransfer(browser) {
         ]);
         await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
 
-        const peerId = await waitForConnectedPeer(pageA);
-        await waitForConnectedPeer(pageB);
-        await sendLocalProofIcon(pageA, peerId);
+        if (options.setupBoth) await options.setupBoth([pageA, pageB]);
+
+        const peerId = await waitForConnectedPeer(pageA, options.roomType);
+        await waitForConnectedPeer(pageB, options.roomType);
+        await sendProofIcon(pageA, peerId, options.transportId);
 
         const received = await waitForReceivedFiles(pageB);
         assertReceived(received);
-        assert(!logs.pageErrors.length, `docker-local-webrtc: page errors: ${logs.pageErrors.join("\n")}`);
-        console.log("Proof docker-local-webrtc: local delivered meshdrop-proof-icon.svg");
+        assert(!logs.pageErrors.length, `${options.name}: page errors: ${logs.pageErrors.join("\n")}`);
+        console.log(`Proof ${options.name}: ${options.transportId} delivered meshdrop-proof-icon.svg`);
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close()]);
@@ -82,10 +99,10 @@ async function newContext(browser) {
     return context;
 }
 
-function watchPages(pages) {
+function watchPages(name, pages) {
     const pageErrors = [];
     pages.forEach((page, index) => {
-        const label = index === 0 ? "sender" : "receiver";
+        const label = `${name}:${index === 0 ? "sender" : "receiver"}`;
         page.on("pageerror", error => pageErrors.push(`${label}: ${error.stack || error.message}`));
         page.on("console", message => {
             if (message.type() !== "error") return;
@@ -101,29 +118,32 @@ function watchPages(pages) {
 async function waitForHydration(page) {
     await page.waitForFunction(() => (
         globalThis.meshdropLocalDiscovery
+        && globalThis.meshdropPollenTransfer
         && globalThis.__meshdropDockerTransfer.configLoaded
         && globalThis.__meshdropDockerTransfer.wsConnected
         && document.querySelector("x-peers")
     ));
 }
 
-async function waitForConnectedPeer(page) {
-    const peerId = await page.waitForFunction(() => {
-        const peer = document.querySelector("x-peer.type-ip");
+async function waitForConnectedPeer(page, roomType) {
+    const peerId = await page.waitForFunction(type => {
+        const peer = document.querySelector(`x-peer.type-${type}`);
         if (!peer) return "";
         if (!globalThis.__meshdropDockerTransfer.connected.includes(peer.id)) return "";
         return peer.id;
-    }, {timeout: 20000});
+    }, roomType, {timeout: 20000});
 
     return peerId.jsonValue();
 }
 
-async function sendLocalProofIcon(page, peerId) {
-    await page.evaluate(({to, icon}) => {
+async function sendProofIcon(page, peerId, transportId) {
+    await page.evaluate(({to, icon, transport}) => {
         const file = new File([icon], "meshdrop-proof-icon.svg", {type: "image/svg+xml"});
         window.dispatchEvent(new CustomEvent("select-files-transport", {detail: {to, files: [file]}}));
-        document.querySelector('[data-transport-id="local"]')?.click();
-    }, {to: peerId, icon: proofIcon});
+        const button = document.querySelector(`[data-transport-id="${transport}"]`);
+        if (!button) throw new Error(`Missing transport option ${transport}`);
+        button.click();
+    }, {to: peerId, icon: proofIcon, transport: transportId});
 }
 
 async function waitForReceivedFiles(page) {

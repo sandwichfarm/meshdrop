@@ -23,6 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-04 | `260704-l0o-run-the-static-spa-artifact-browser-smok` | complete | actionlint; SPA artifact browser smoke; diff/slop gates |
 | 2026-07-04 | `20260704-platform-uat-runbooks` | complete | red/green UAT doc guard; `npm test`; diff/slop gates |
 | 2026-07-04 | `20260704-docker-browser-transfer-smoke` | complete | Docker-served local WebRTC proof; `npm test`; actionlint; diff/slop gates |
+| 2026-07-04 | `20260704-docker-pollen-transfer-smoke` | complete | Docker-served local and Pollen WebRTC proof; `npm test`; diff/slop gates |
 
 ## Active Quick Task
 

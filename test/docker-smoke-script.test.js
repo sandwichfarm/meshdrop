@@ -14,5 +14,7 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerSmoke, /scripts\/docker-browser-transfer-smoke\.mjs/);
     assert.match(dockerTransfer, /select-files-transport/);
     assert.match(dockerTransfer, /docker-local-webrtc/);
+    assert.match(dockerTransfer, /docker-pollen-webrtc/);
+    assert.match(dockerTransfer, /meshdropPollenTransfer\.enable/);
     assert.match(ciWorkflow, /Install Chromium[\s\S]*npx playwright install --with-deps chromium/);
 });
