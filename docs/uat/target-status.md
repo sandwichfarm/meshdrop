@@ -1,0 +1,20 @@
+# Target UAT Status
+
+This ledger prevents release or UAT notes from overstating platform support.
+
+| Target | Status | Current proof | Remaining proof before complete |
+|--------|--------|---------------|---------------------------------|
+| SPA | Automated artifact smoke exists | `npm run test:spa-artifact` | Backend-free file transfer UAT |
+| Docker | Automated container smoke exists | `npm run test:docker` | Admin GUI UAT and two-host relay UAT |
+| Start9 | Target image metadata only | `MESHDROP_TARGET=start9` image tags | Start9 package and device UAT |
+| Umbrel | Target image metadata only | `MESHDROP_TARGET=umbrel` image tags | Umbrel package and device UAT |
+| Desktop Native | Not implemented | None | Native shell selection, build target, runtime capability manifest, and transfer UAT |
+| iOS | Not implemented | None | Mobile runtime design, build target, platform transport negotiation, and transfer UAT |
+| Android | Not implemented | None | Mobile runtime design, build target, platform transport negotiation, and transfer UAT |
+
+## Rules
+
+- Do not call a target complete unless its build artifact exists, it has a UAT runbook, and the runbook has current passing evidence.
+- Do not use unit tests alone as proof for file-transfer paths.
+- For WebRTC support, initiate a real transfer between two peers before claiming the path works.
+- For release targets, read back the GitHub release and GHCR tags after the workflow runs.
