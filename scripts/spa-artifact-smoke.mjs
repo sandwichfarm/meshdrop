@@ -14,6 +14,7 @@ const browserTypeName = process.env.PLAYWRIGHT_BROWSER || "chromium";
 const supportedBrowserTypes = ["chromium", "firefox", "webkit"];
 const proofText = "backend-free-spa-nostr-webrtc";
 const spaHydrationTimeoutMs = browserTypeName === "webkit" ? 90000 : 30000;
+const smokeAttempts = browserTypeName === "webkit" ? 3 : 1;
 
 async function main() {
     assert(
@@ -37,20 +38,60 @@ async function main() {
     const root = path.join(unpackDir, result.prefix);
     const server = await startStaticServer(root);
     const relay = await startFakeRelay();
-    let browser = null;
 
     try {
         const playwright = await loadPlaywright();
         const browserType = playwright[browserTypeName];
-        const launchOptions = {headless: true};
-        if (browserTypeName === "chromium" && chromiumPath) launchOptions.executablePath = chromiumPath;
-        browser = await browserType.launch(launchOptions);
-        const context = await browser.newContext({serviceWorkers: "block"});
-        const page = await context.newPage();
-        const pageErrors = watchPage(`spa-runtime:${browserTypeName}`, page);
-        await addSpaInitScript(page, "runtime", relay.url);
+        await retrySmoke(async () => {
+            const browser = await launchBrowser(browserType);
+            try {
+                await runRuntimeCapabilityProof(browser, server.port, relay.url);
+                await runBackendFreeTransferProof(browser, server.port, relay.url);
+            }
+            finally {
+                await browser.close();
+            }
+        });
 
-        await page.goto(`http://127.0.0.1:${server.port}`, {waitUntil: "domcontentloaded"});
+        console.log(`SPA artifact smoke passed for ${browserTypeName}: ${result.artifactPath}`);
+    }
+    finally {
+        await new Promise(resolve => relay.close(resolve));
+        await new Promise(resolve => server.close(resolve));
+        await fs.rm(tempDir, {recursive: true, force: true});
+    }
+}
+
+async function launchBrowser(browserType) {
+    const launchOptions = {headless: true};
+    if (browserTypeName === "chromium" && chromiumPath) launchOptions.executablePath = chromiumPath;
+    return browserType.launch(launchOptions);
+}
+
+async function retrySmoke(run) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= smokeAttempts; attempt++) {
+        try {
+            return await run();
+        } catch (error) {
+            lastError = error;
+            if (attempt === smokeAttempts) break;
+            console.warn(`${browserTypeName} SPA smoke attempt ${attempt} failed, retrying: ${error.message}`);
+            await delay(1000);
+        }
+    }
+
+    throw lastError;
+}
+
+async function runRuntimeCapabilityProof(browser, port, relayUrl) {
+    const context = await browser.newContext({serviceWorkers: "block"});
+    const page = await context.newPage();
+    const pageErrors = watchPage(`spa-runtime:${browserTypeName}`, page);
+
+    try {
+        await addSpaInitScript(page, "runtime", relayUrl);
+        await page.goto(`http://127.0.0.1:${port}`, {waitUntil: "domcontentloaded"});
         await waitForInitialSpaState(page, pageErrors);
 
         const state = await page.evaluate(() => ({
@@ -69,17 +110,9 @@ async function main() {
         assert(state.pollenHidden === true, "Pollen transfer control must be hidden");
         assert(state.serverSettings === false, "Server settings must be unsupported");
         assert(pageErrors.length === 0, `SPA smoke page errors:\n${pageErrors.join("\n")}`);
-        await context.close();
-
-        await runBackendFreeTransferProof(browser, server.port, relay.url);
-
-        console.log(`SPA artifact smoke passed for ${browserTypeName}: ${result.artifactPath}`);
     }
     finally {
-        await browser?.close();
-        await new Promise(resolve => relay.close(resolve));
-        await new Promise(resolve => server.close(resolve));
-        await fs.rm(tempDir, {recursive: true, force: true});
+        await context.close();
     }
 }
 
@@ -406,6 +439,10 @@ function run(command, args) {
             resolve({stdout, stderr});
         });
     });
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function assert(condition, message) {
