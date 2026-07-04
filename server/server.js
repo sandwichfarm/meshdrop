@@ -56,6 +56,11 @@ export default class PairDropServer {
                 signalingServer: conf.signalingServer,
                 nostrMesh: conf.nostrMesh,
                 blossom: conf.blossom,
+                pollen: {
+                    enabled: conf.pollen.enabled,
+                    maxUploadBytes: conf.pollen.maxUploadBytes,
+                    room: conf.federation?.pollen?.room
+                },
                 fips: {
                     enabled: conf.fips.enabled,
                     room: conf.fips.room
@@ -66,6 +71,58 @@ export default class PairDropServer {
 
         app.get('/fips/status', async (req, res) => {
             res.send(await conf.fipsClient.status());
+        });
+
+        app.get('/pollen/status', async (req, res) => {
+            res.send(await conf.pollenClient.status());
+        });
+
+        app.get('/.well-known/meshdrop-federation', (req, res) => {
+            if (!conf.federation?.enabled || !conf.federationClient) {
+                res.status(404).send({error: "MeshDrop federation is disabled"});
+                return;
+            }
+
+            res.send(conf.federationClient.snapshot());
+        });
+
+        app.post('/federation/events', async (req, res) => {
+            if (!conf.federation?.enabled || !conf.federationClient) {
+                res.status(404).send({error: "MeshDrop federation is disabled"});
+                return;
+            }
+
+            res.send(await conf.federationClient.receiveEvents(req.body));
+        });
+
+        app.post('/pollen/upload', async (req, res) => {
+            try {
+                const descriptor = await conf.pollenClient.uploadStream(req, {
+                    size: Number(req.headers["content-length"] || 0),
+                    type: req.headers["content-type"] || "application/octet-stream"
+                });
+                res.send(descriptor);
+            } catch (error) {
+                res.status(502).send({error: error.message});
+            }
+        });
+
+        app.get('/pollen/download/:hash', async (req, res) => {
+            let tempFile = null;
+            try {
+                tempFile = await conf.pollenClient.fetchToTemp(req.params.hash);
+                res.sendFile(tempFile.path, {
+                    headers: {
+                        "Content-Type": "application/octet-stream"
+                    }
+                }, async error => {
+                    await tempFile.cleanup();
+                    if (error && !res.headersSent) res.status(502).send({error: error.message});
+                });
+            } catch (error) {
+                if (tempFile) await tempFile.cleanup();
+                res.status(502).send({error: error.message});
+            }
         });
 
         app.post('/settings/fips/peers', async (req, res) => {

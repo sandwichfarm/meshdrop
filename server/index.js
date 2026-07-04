@@ -4,6 +4,8 @@ import fs from "fs";
 import PairDropServer from "./server.js";
 import PairDropWsServer from "./ws-server.js";
 import FipsControlClient, {createFipsConfig} from "./fips-control.js";
+import PollenTransferClient, {createPollenConfig} from "./pollen-transfer.js";
+import MeshFederation, {createFederationConfig} from "./federation.js";
 
 // Handle SIGINT
 process.on('SIGINT', () => {
@@ -73,6 +75,15 @@ conf.blossom = {
 
 conf.fips = createFipsConfig();
 conf.fipsClient = new FipsControlClient(conf.fips);
+
+conf.pollen = createPollenConfig();
+conf.pollenClient = new PollenTransferClient(conf.pollen);
+
+conf.federation = createFederationConfig();
+conf.federationClient = new MeshFederation(conf.federation, {
+    fipsClient: conf.fipsClient,
+    pollenClient: conf.pollenClient
+});
 
 conf.ipv6Localize = parseInt(process.env.IPV6_LOCALIZE) || false;
 
@@ -197,7 +208,9 @@ const meshDropServer = new PairDropServer(conf);
 
 if (!conf.signalingServer) {
     // Start websocket server if SIGNALING_SERVER is not set
-    new PairDropWsServer(meshDropServer.server, conf);
+    const wsServer = new PairDropWsServer(meshDropServer.server, conf);
+    conf.federationClient.attachWsServer(wsServer);
+    conf.federationClient.start();
 } else {
     console.log(
         "This instance does not include a signaling server. Clients on this instance connect to the following signaling server:",

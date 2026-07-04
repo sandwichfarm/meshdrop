@@ -1,11 +1,90 @@
 const PeerAvailabilityProtocol = {
-    roomTypeOrder: ["ip", "secret", "nostr", "fips", "public-id"],
+    roomTypeOrder: ["ip", "secret", "pollen", "fips", "nostr", "public-id"],
     roomTypeMeta: {
-        "ip": {id: "local", label: "Local", shortLabel: "LAN", className: "badge-room-ip"},
-        "secret": {id: "paired", label: "Paired", shortLabel: "Pair", className: "badge-room-secret"},
-        "nostr": {id: "webrtc", label: "WEB-RTC", shortLabel: "WEB", className: "badge-room-nostr"},
-        "fips": {id: "fips", label: "FIPS", shortLabel: "FIPS", className: "badge-room-fips"},
-        "public-id": {id: "room", label: "Room", shortLabel: "Room", className: "badge-room-public-id"}
+        "ip": {
+            id: "local",
+            label: "Local",
+            shortLabel: "LAN",
+            className: "badge-room-ip",
+            description: "Same-network peer-to-peer data channel",
+            privacy: "Best privacy",
+            privacyTone: "strong",
+            details: [
+                ["Path", "direct to device"],
+                ["Encryption", "WebRTC transport"],
+                ["Server access", "no file bytes"]
+            ]
+        },
+        "secret": {
+            id: "paired",
+            label: "Paired",
+            shortLabel: "Pair",
+            className: "badge-room-secret",
+            description: "Paired-device peer-to-peer data channel",
+            privacy: "Best privacy",
+            privacyTone: "strong",
+            details: [
+                ["Path", "direct to paired device"],
+                ["Encryption", "WebRTC transport"],
+                ["Server access", "no file bytes"]
+            ]
+        },
+        "nostr": {
+            id: "webrtc",
+            label: "WEB-RTC",
+            shortLabel: "RTC",
+            className: "badge-room-nostr",
+            description: "Peer-to-peer transfer after Nostr relay discovery",
+            privacy: "Direct after relay discovery",
+            privacyTone: "direct",
+            details: [
+                ["Path", "direct data channel"],
+                ["Encryption", "WebRTC transport"],
+                ["Relays see", "signaling, not file bytes"]
+            ]
+        },
+        "fips": {
+            id: "fips",
+            label: "FIPS",
+            shortLabel: "FIPS",
+            className: "badge-room-fips",
+            description: "Peer-to-peer transfer after FIPS discovery",
+            privacy: "Direct after FIPS discovery",
+            privacyTone: "direct",
+            details: [
+                ["Path", "direct data channel"],
+                ["Encryption", "WebRTC transport"],
+                ["Server access", "no file bytes"]
+            ]
+        },
+        "pollen": {
+            id: "pollen-mesh",
+            label: "Pollen Mesh",
+            shortLabel: "Pollen",
+            className: "badge-room-pollen",
+            description: "Peer-to-peer transfer after Pollen mesh discovery",
+            privacy: "Direct after Pollen discovery",
+            privacyTone: "direct",
+            details: [
+                ["Path", "direct WebRTC data channel"],
+                ["Discovery", "Nostr bootstrap plus Pollen mesh service"],
+                ["Pollen carries", "server signaling, not file bytes"]
+            ]
+        },
+        "public-id": {
+            id: "room",
+            label: "Room",
+            shortLabel: "Room",
+            className: "badge-room-public-id",
+            description: "Peer-to-peer transfer found through room signaling",
+            privacy: "Direct after room signaling",
+            privacyTone: "direct",
+            details: [
+                ["Path", "direct data channel"],
+                ["Encryption", "WebRTC transport"],
+                ["Room server", "signaling only"]
+            ]
+        }
     },
 
     roomTypes(peer) {
@@ -26,9 +105,22 @@ const PeerAvailabilityProtocol = {
                 id: option.id,
                 type: "direct",
                 roomType: option.roomType,
+                peerId: this.peerIdForRoomType(peer, option.roomType),
                 label: option.label,
-                description: `${option.label} direct transfer`
+                description: option.description,
+                privacy: option.privacy,
+                privacyTone: option.privacyTone,
+                details: option.details
             }));
+    },
+
+    peerIdForRoomType(peer, roomType) {
+        return peer?._peerIdsByRoomType?.[roomType] || peer?.id;
+    },
+
+    identityKeys(peer, roomType = null) {
+        const pubkey = peer?.nostrIdentity?.pubkey || (roomType === "nostr" ? peer?.id : "");
+        return pubkey ? [`nostr:${pubkey}`] : [];
     },
 
     storageOptions() {
@@ -38,7 +130,14 @@ const PeerAvailabilityProtocol = {
                 id: "hashtree",
                 type: "storage",
                 label: "Hashtree",
-                description: "Upload a verified hashtree manifest"
+                description: "Upload a verified content-addressed manifest",
+                privacy: "Integrity, not secrecy",
+                privacyTone: "caution",
+                details: [
+                    ["Path", "Blossom storage"],
+                    ["Encryption", "none by this route"],
+                    ["Servers store", "readable file chunks"]
+                ]
             });
         }
         if (globalThis.meshdropBlossomTransfer?.isActive?.()) {
@@ -46,7 +145,29 @@ const PeerAvailabilityProtocol = {
                 id: "blossom",
                 type: "storage",
                 label: "Blossom",
-                description: "Upload files to selected Blossom servers"
+                description: "Upload encrypted raw Blossom objects",
+                privacy: "Stored ciphertext",
+                privacyTone: "encrypted",
+                details: [
+                    ["Path", "selected Blossom servers"],
+                    ["Encryption", "AES-256-GCM"],
+                    ["Servers store", "ciphertext only"]
+                ]
+            });
+        }
+        if (globalThis.meshdropPollenTransfer?.isActive?.()) {
+            options.push({
+                id: "pollen",
+                type: "storage",
+                label: "Pollen Storage",
+                description: "Seed files into Pollen storage for handoff",
+                privacy: "Storage handoff",
+                privacyTone: "caution",
+                details: [
+                    ["Path", "browser to MeshDrop server to Pollen blob"],
+                    ["Encryption", "Pollen mesh transport only"],
+                    ["Server sees", "plaintext upload and fetch"]
+                ]
             });
         }
         return options;
@@ -100,6 +221,7 @@ class PeersUI {
         this.$shareModeEditBtn = $$('.shr-panel .edit-btn');
 
         this.peers = {};
+        this._peerAliases = {};
 
         this.shareMode = {
             active: false,
@@ -151,6 +273,9 @@ class PeersUI {
     }
 
     _changePeerDisplayName(peerId, displayName) {
+        peerId = this._visiblePeerId(peerId);
+        if (!this.peers[peerId]) return;
+
         this.peers[peerId].name.displayName = displayName;
         const peerIdNode = $(peerId);
         if (peerIdNode && displayName) peerIdNode.querySelector('.name').textContent = displayName;
@@ -163,7 +288,8 @@ class PeersUI {
     }
 
     _onPeerProfileChanged(e) {
-        const peer = this.peers[e.detail.peerId];
+        const peerId = this._visiblePeerId(e.detail.peerId);
+        const peer = this.peers[peerId];
         if (!peer) return;
 
         if (e.detail.displayName) peer.name.displayName = e.detail.displayName;
@@ -172,12 +298,12 @@ class PeersUI {
             picture: e.detail.picture || peer.nostrIdentity?.picture || ""
         };
 
-        const peerNode = $(e.detail.peerId);
+        const peerNode = $(peerId);
         if (!peerNode) return;
 
         if (e.detail.displayName) peerNode.querySelector('.name').textContent = e.detail.displayName;
         peerNode.ui._setAvatar(peer.nostrIdentity.picture);
-        this._redrawPeerRoomTypes(e.detail.peerId);
+        this._redrawPeerRoomTypes(peerId);
     }
 
     async _onKeyDown(e) {
@@ -200,20 +326,89 @@ class PeersUI {
     _joinPeer(peer, roomType, roomId) {
         if (globalThis.NostrFollowPolicy?.allowsPeer(peer, roomType) === false) return;
 
-        const existingPeer = this.peers[peer.id];
+        const existingPeerId = this._existingPeerId(peer, roomType);
+        const existingPeer = this.peers[existingPeerId];
         if (existingPeer) {
-            // peer already exists. Abort but add roomType to GUI
-            existingPeer._roomIds[roomType] = roomId;
-            this._redrawPeerRoomTypes(peer.id);
+            this._mergePeer(existingPeerId, peer, roomType, roomId);
             return;
         }
 
         peer._isSameBrowser = () => BrowserTabsConnector.peerIsSameBrowser(peer.id);
         peer._roomIds = {};
+        peer._peerIdsByRoomType = {};
 
         peer._roomIds[roomType] = roomId;
+        peer._peerIdsByRoomType[roomType] = peer.id;
         this.peers[peer.id] = peer;
+        this._rememberPeerAliases(peer.id, peer);
+        new PeerUI(peer, null, {
+            active: this.shareMode.active,
+            descriptor: this.shareMode.descriptor,
+        });
         this._renderProtocolPeerCounts();
+    }
+
+    _existingPeerId(peer, roomType) {
+        const peerId = this._visiblePeerId(peer.id);
+        if (peerId && this.peers[peerId]) return peerId;
+
+        const identityKeys = this._peerIdentityKeys(peer, roomType);
+        if (!identityKeys.length) return peer.id;
+
+        return Object.keys(this.peers).find(existingPeerId => {
+            const existingPeer = this.peers[existingPeerId];
+            const existingKeys = this._peerIdentityKeys(existingPeer, null);
+            return identityKeys.some(identityKey => existingKeys.includes(identityKey));
+        }) || peer.id;
+    }
+
+    _peerIdentityKeys(peer, roomType) {
+        return PeerAvailabilityProtocol.identityKeys(peer, roomType);
+    }
+
+    _mergePeer(existingPeerId, peer, roomType, roomId) {
+        const existingPeer = this.peers[existingPeerId];
+        existingPeer._roomIds[roomType] = roomId;
+        existingPeer._peerIdsByRoomType = {
+            ...(existingPeer._peerIdsByRoomType || {}),
+            [roomType]: peer.id
+        };
+        existingPeer.nostrIdentity = {
+            ...(existingPeer.nostrIdentity || {}),
+            ...(peer.nostrIdentity || {})
+        };
+
+        if (this._isMoreSpecificPeerName(peer.name, existingPeer.name)) {
+            existingPeer.name = peer.name;
+            const peerNode = $(existingPeerId);
+            if (peerNode) {
+                peerNode.querySelector('.name').textContent = existingPeer.name.displayName;
+                peerNode.querySelector('.device-name').textContent = existingPeer.name.deviceName;
+            }
+        }
+
+        this._rememberPeerAliases(existingPeerId, existingPeer);
+        this._rememberPeerAliases(existingPeerId, peer);
+        const peerNode = $(existingPeerId);
+        if (peerNode) peerNode.ui._setAvatar(existingPeer.nostrIdentity?.picture);
+        this._redrawPeerRoomTypes(existingPeerId);
+    }
+
+    _isMoreSpecificPeerName(nextName = {}, currentName = {}) {
+        if (currentName.deviceName === "Nostr relay peer" && nextName.deviceName !== "Nostr relay peer") return true;
+        if (!currentName.deviceName && nextName.deviceName) return true;
+        return false;
+    }
+
+    _rememberPeerAliases(visiblePeerId, peer) {
+        this._peerAliases[peer.id] = visiblePeerId;
+        const pubkey = peer.nostrIdentity?.pubkey;
+        if (pubkey) this._peerAliases[pubkey] = visiblePeerId;
+        Object.values(peer._peerIdsByRoomType || {}).forEach(peerId => this._peerAliases[peerId] = visiblePeerId);
+    }
+
+    _visiblePeerId(peerId) {
+        return this._peerAliases[peerId] || peerId;
     }
 
     _onNostrIdentityChanged(identity) {
@@ -225,7 +420,14 @@ class PeersUI {
     }
 
     _onPeerConnected(peerId, connectionHash) {
-        if (!this.peers[peerId] || $(peerId)) return;
+        peerId = this._visiblePeerId(peerId);
+        if (!this.peers[peerId]) return;
+
+        const peerNode = $(peerId);
+        if (peerNode) {
+            peerNode.ui?.markConnected(connectionHash);
+            return;
+        }
 
         const peer = this.peers[peerId];
 
@@ -236,12 +438,13 @@ class PeersUI {
     }
 
     _redrawPeerRoomTypes(peerId) {
+        peerId = this._visiblePeerId(peerId);
         const peer = this.peers[peerId];
         const peerNode = $(peerId);
 
         if (!peer || !peerNode) return;
 
-        peerNode.classList.remove('type-ip', 'type-secret', 'type-public-id', 'type-nostr', 'type-same-browser');
+        peerNode.classList.remove('type-ip', 'type-secret', 'type-public-id', 'type-nostr', 'type-pollen', 'type-same-browser');
         peerNode.classList.remove('type-fips');
 
         if (peer._isSameBrowser()) {
@@ -268,8 +471,12 @@ class PeersUI {
     }
 
     _onPeerDisconnected(peerId) {
+        peerId = this._visiblePeerId(peerId);
         // Remove peer from UI
         delete this.peers[peerId];
+        Object.keys(this._peerAliases).forEach(alias => {
+            if (this._peerAliases[alias] === peerId) delete this._peerAliases[alias];
+        });
         this._renderProtocolPeerCounts();
 
         const $peer = $(peerId);
@@ -286,6 +493,7 @@ class PeersUI {
     }
 
     _onRoomTypeRemoved(peerId, roomType) {
+        peerId = this._visiblePeerId(peerId);
         const peer = this.peers[peerId];
 
         if (!peer) return;
@@ -296,7 +504,7 @@ class PeersUI {
     }
 
     _onSetProgress(progress) {
-        const $peer = $(progress.peerId);
+        const $peer = $(this._visiblePeerId(progress.peerId));
         if (!$peer) return;
         $peer.ui.setProgress(progress.progress, progress.status, progress.transport)
     }
@@ -542,8 +750,8 @@ class PeerUI {
         this.$xPeers = $$('x-peers');
 
         this._peer = peer;
-        this._connectionHash =
-            `${connectionHash.substring(0, 4)} ${connectionHash.substring(4, 8)} ${connectionHash.substring(8, 12)} ${connectionHash.substring(12, 16)}`;
+        this._connected = connectionHash !== null && connectionHash !== undefined;
+        this._connectionHash = this._formatConnectionHash(connectionHash);
 
         // This is needed if the ShareMode is started BEFORE the PeerUI is drawn.
         this._shareMode = shareMode;
@@ -555,13 +763,12 @@ class PeerUI {
 
         // ShareMode
         Events.on('share-mode-changed', e => this._onShareModeChanged(e.detail.active, e.detail.descriptor));
-
-        // Stop background animation
-        Events.fire('background-animation', {animate: false});
     }
 
     html() {
-        let title= this._shareMode.active
+        let title = !this._connected
+            ? Localization.getTranslation("notifications.connecting")
+            : this._shareMode.active
             ? Localization.getTranslation("peer-ui.click-to-send-share-mode", null, {descriptor: this._shareMode.descriptor})
             : Localization.getTranslation("peer-ui.click-to-send");
 
@@ -578,6 +785,7 @@ class PeerUI {
                         <div class="highlight highlight-room-secret" shadow="1"></div>
                         <div class="highlight highlight-room-nostr" shadow="1"></div>
                         <div class="highlight highlight-room-fips" shadow="1"></div>
+                        <div class="highlight highlight-room-pollen" shadow="1"></div>
                         <div class="highlight highlight-room-public-id" shadow="1"></div>
                     </div>
                 </x-icon>
@@ -601,6 +809,12 @@ class PeerUI {
 
         this.$label = this.$el.querySelector('label');
         this.$input = this.$el.querySelector('input');
+    }
+
+    _formatConnectionHash(connectionHash) {
+        if (!connectionHash) return "";
+
+        return `${connectionHash.substring(0, 4)} ${connectionHash.substring(4, 8)} ${connectionHash.substring(8, 12)} ${connectionHash.substring(12, 16)}`;
     }
 
     _setAvatar(picture) {
@@ -646,6 +860,18 @@ class PeerUI {
         this._bindListeners();
     }
 
+    markConnected(connectionHash) {
+        this._connected = true;
+        this._connectionHash = this._formatConnectionHash(connectionHash);
+        if (this.currentStatus === 'connecting') {
+            this.$el.removeAttribute('status');
+            this.$el.querySelector('.status').innerHTML = '';
+            this.currentStatus = null;
+        }
+        this._evaluateShareMode();
+        this._bindListeners();
+    }
+
     _onShareModeChanged(active = false, descriptor = "") {
         // This is needed if the ShareMode is started AFTER the PeerUI is drawn.
         this._shareMode.active = active;
@@ -657,7 +883,14 @@ class PeerUI {
 
     _evaluateShareMode() {
         let title;
-        if (!this._shareMode.active) {
+        if (!this._connected) {
+            title = Localization.getTranslation("notifications.connecting");
+            this.$input.setAttribute('disabled', true);
+            this.$el.setAttribute('status', 'connecting');
+            this.$el.querySelector('.status').innerText = title;
+            this.currentStatus = 'connecting';
+        }
+        else if (!this._shareMode.active) {
             title = Localization.getTranslation("peer-ui.click-to-send");
             this.$input.removeAttribute('disabled');
         }
@@ -717,6 +950,8 @@ class PeerUI {
     }
 
     _onPointerDown(e) {
+        if (!this._connected) return;
+
         // Prevents triggering of event twice on touch devices
         e.stopPropagation();
         e.preventDefault();
@@ -766,6 +1001,8 @@ class PeerUI {
     }
 
     _onFilesSelected(e) {
+        if (!this._connected) return;
+
         const $input = e.target;
         const files = $input.files;
 
@@ -812,6 +1049,7 @@ class PeerUI {
     }
 
     _onDrop(e) {
+        if (!this._connected) return;
         if (this._shareMode.active || Dialog.anyDialogShown()) return;
 
         e.preventDefault();
@@ -847,6 +1085,8 @@ class PeerUI {
     }
 
     _onRightClick(e) {
+        if (!this._connected) return;
+
         e.preventDefault();
         Events.fire('text-recipient', {
             peerId: this._peer.id,
@@ -860,6 +1100,8 @@ class PeerUI {
     }
 
     _onTouchEnd(e) {
+        if (!this._connected) return;
+
         if (Date.now() - this._touchStart < 500) {
             clearTimeout(this._touchTimer);
         }
@@ -1381,17 +1623,44 @@ class TransferChoiceDialog extends Dialog {
             button.type = 'button';
             button.className = 'transport-choice-option';
             button.dataset.transportId = option.id;
+            button.dataset.privacyTone = option.privacyTone || "neutral";
             if (index === 0) button.dataset.default = 'true';
+
+            const head = document.createElement('span');
+            head.className = 'transport-choice-head';
 
             const label = document.createElement('span');
             label.className = 'transport-choice-label';
             label.textContent = option.label;
 
+            const privacy = document.createElement('span');
+            privacy.className = 'transport-choice-privacy';
+            privacy.textContent = option.privacy || "Route";
+
             const description = document.createElement('span');
             description.className = 'transport-choice-description';
             description.textContent = option.description;
 
-            button.append(label, description);
+            const details = document.createElement('span');
+            details.className = 'transport-choice-details';
+            (option.details || []).forEach(([term, value]) => {
+                const item = document.createElement('span');
+                item.className = 'transport-choice-detail';
+
+                const termNode = document.createElement('span');
+                termNode.className = 'transport-choice-detail-term';
+                termNode.textContent = term;
+
+                const valueNode = document.createElement('span');
+                valueNode.className = 'transport-choice-detail-value';
+                valueNode.textContent = value;
+
+                item.append(termNode, valueNode);
+                details.append(item);
+            });
+
+            head.append(label, privacy);
+            button.append(head, description, details);
             return button;
         }));
     }
@@ -1405,7 +1674,7 @@ class TransferChoiceDialog extends Dialog {
 
         Events.fire('files-selected', {
             files: this._detail.files,
-            to: this._detail.to,
+            to: transport.peerId || this._detail.to,
             transport
         });
         this.hide();
@@ -2371,6 +2640,7 @@ class PublicRoomDialog extends Dialog {
     setFooterBadge() {
         if (!this.roomId) return;
 
+        this.$footerBadgePublicRoomDevices.dataset.roomId = this.roomId.toUpperCase();
         this.$footerBadgePublicRoomDevices.innerText = Localization.getTranslation("footer.public-room-devices", null, {
             roomId: this.roomId.toUpperCase()
         });
@@ -2489,6 +2759,7 @@ class PublicRoomDialog extends Dialog {
         this.roomId = null;
         this.inputKeyContainer._cleanUp();
         sessionStorage.removeItem('public_room_id');
+        delete this.$footerBadgePublicRoomDevices.dataset.roomId;
         this.$footerBadgePublicRoomDevices.setAttribute('hidden', true);
         Events.fire('evaluate-footer-badges');
     }

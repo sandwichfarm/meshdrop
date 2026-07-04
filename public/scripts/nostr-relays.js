@@ -401,9 +401,12 @@ const NostrFollowPolicy = {
     },
 
     allowsPeer(peer, roomType = null, identity = globalThis.meshdropNostrIdentity?.getIdentity?.()) {
-        const peerPubkey = peer?.nostrIdentity?.pubkey || (roomType === "nostr" ? peer?.id : "");
-        if (!peerPubkey) return roomType !== "nostr";
-        if (!identity) return roomType !== "nostr";
+        const roomTypes = Object.keys(peer?._roomIds || {});
+        const nostrOnly = !roomType && roomTypes.length === 1 && roomTypes[0] === "nostr";
+        if (roomType !== "nostr" && !nostrOnly) return true;
+
+        const peerPubkey = peer?.nostrIdentity?.pubkey || peer?.id || "";
+        if (!peerPubkey || !identity) return false;
 
         return this.allowsPubkey(peerPubkey, identity);
     }

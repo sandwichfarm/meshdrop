@@ -138,6 +138,10 @@ class NostrIdentityController {
         return !!(window.nostr?.nip04?.encrypt && window.nostr?.nip04?.decrypt);
     }
 
+    canNip44() {
+        return !!(window.nostr?.nip44?.encrypt && window.nostr?.nip44?.decrypt);
+    }
+
     async encryptTo(pubkey, plaintext) {
         if (!this.canEncrypt()) throw new Error("NIP-04 encryption is unavailable");
         return window.nostr.nip04.encrypt(pubkey, plaintext);
@@ -146,6 +150,16 @@ class NostrIdentityController {
     async decryptFrom(pubkey, ciphertext) {
         if (!this.canEncrypt()) throw new Error("NIP-04 decryption is unavailable");
         return window.nostr.nip04.decrypt(pubkey, ciphertext);
+    }
+
+    async encryptNip44To(pubkey, plaintext) {
+        if (!this.canNip44()) throw new Error("NIP-44 encryption is unavailable");
+        return window.nostr.nip44.encrypt(pubkey, plaintext);
+    }
+
+    async decryptNip44From(pubkey, ciphertext) {
+        if (!this.canNip44()) throw new Error("NIP-44 decryption is unavailable");
+        return window.nostr.nip44.decrypt(pubkey, ciphertext);
     }
 
     _onServerDisplayName(message) {

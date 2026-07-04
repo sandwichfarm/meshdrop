@@ -22,6 +22,7 @@ export default class Peer {
 
         // optional signed Nostr identity
         this._setNostrIdentity(request);
+        this._setNostrPeerId();
 
         // set name
         this._setName(request);
@@ -148,6 +149,12 @@ export default class Peer {
         this.nostrIdentity = getNostrIdentityFromRequest(request);
     }
 
+    _setNostrPeerId() {
+        if (this.nostrIdentity?.pubkey) {
+            this.id = this.nostrIdentity.pubkey;
+        }
+    }
+
     _setName(req) {
         let ua = parser(req.headers['user-agent']);
 
@@ -196,6 +203,10 @@ export default class Peer {
 
     static isValidUuid(uuid) {
         return /^([0-9]|[a-f]){8}-(([0-9]|[a-f]){4}-){3}([0-9]|[a-f]){12}$/.test(uuid);
+    }
+
+    static isValidPeerId(peerId) {
+        return this.isValidUuid(peerId) || /^[0-9a-f]{64}$/.test(peerId || "");
     }
 
     isPeerIdHashValid(peerId, peerIdHash) {

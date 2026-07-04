@@ -16,7 +16,8 @@ export function createFipsConfig(env = process.env) {
         controlSocket: env.FIPS_CONTROL_SOCKET || defaultFipsSocketPath(),
         controlHost: env.FIPS_CONTROL_HOST || DEFAULT_FIPS_CONTROL_HOST,
         room: env.FIPS_ROOM || DEFAULT_FIPS_ROOM,
-        timeoutMs: parseInt(env.FIPS_CONTROL_TIMEOUT_MS, 10) || 1000
+        timeoutMs: parseInt(env.FIPS_CONTROL_TIMEOUT_MS, 10) || 1000,
+        eventCommand: env.FIPS_EVENT_COMMAND || "events"
     };
 }
 
@@ -133,6 +134,72 @@ export default class FipsControlClient {
                 error: error.message
             };
         }
+    }
+
+    listenPeerEvents(onEvent) {
+        if (!this.config.enabled) return null;
+
+        const socket = this.connect();
+        let response = "";
+        let active = true;
+        const close = () => {
+            active = false;
+            socket.destroy();
+        };
+
+        socket.on("connect", () => {
+            socket.write(`${JSON.stringify({
+                command: this.config.eventCommand,
+                params: {topics: ["peer"], child_objects: true}
+            })}\n`);
+        });
+        socket.on("data", chunk => {
+            response += chunk.toString("utf8");
+            const lines = response.split("\n");
+            response = lines.pop() || "";
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                const event = this.parsePeerEvent(line);
+                if (event) onEvent(event);
+            }
+        });
+        socket.on("error", () => {
+            active = false;
+        });
+        socket.on("close", () => {
+            active = false;
+        });
+
+        return {
+            close,
+            get active() {
+                return active;
+            }
+        };
+    }
+
+    parsePeerEvent(line) {
+        let payload;
+        try {
+            payload = JSON.parse(line);
+        } catch {
+            return null;
+        }
+
+        if (payload.status === "error") return null;
+        const data = payload.data || payload.event || payload;
+        const type = String(data.type || data.event || data.kind || "").toLowerCase();
+        const peer = data.peer || data.peer_info || data;
+        const normalizedPeer = this.normalizePeers([peer])[0];
+        if (!normalizedPeer?.ipv6Addr) return null;
+
+        const removed = /lost|left|down|removed|disconnect|expired/.test(type);
+        return {
+            type: removed ? "peer-left" : "peer-joined",
+            peer: normalizedPeer,
+            raw: payload
+        };
     }
 
     cleanTransport(value) {

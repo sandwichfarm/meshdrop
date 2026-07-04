@@ -55,7 +55,8 @@ test("FIPS config enables discovery when control socket is set", () => {
             controlSocket: "21210",
             controlHost: "127.0.0.1",
             room: "meshdrop-test",
-            timeoutMs: 2500
+            timeoutMs: 2500,
+            eventCommand: "events"
         }
     );
 });
@@ -68,6 +69,86 @@ test("FIPS config supports a TCP control host override", () => {
 
     assert.equal(config.controlSocket, "21210");
     assert.equal(config.controlHost, "host.docker.internal");
+});
+
+test("FIPS control client streams peer discovery events when daemon supports them", async () => {
+    const commands = [];
+    const server = net.createServer(socket => {
+        let request = "";
+
+        socket.on("data", chunk => {
+            request += chunk.toString("utf8");
+            if (!request.includes("\n")) return;
+
+            commands.push(JSON.parse(request));
+            socket.write(`${JSON.stringify({
+                status: "ok",
+                data: {
+                    type: "peer_discovered",
+                    peer: {
+                        npub: "npub1peer",
+                        display_name: "Peer",
+                        ipv6_addr: "fd00::2",
+                        connectivity: "connected",
+                        transport_type: "udp",
+                        transport_addr: "203.0.113.9:2121"
+                    }
+                }
+            })}\n`);
+        });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+
+    try {
+        const events = [];
+        const client = new FipsControlClient({
+            enabled: true,
+            controlSocket: String(server.address().port),
+            controlHost: "127.0.0.1",
+            room: "meshdrop-test",
+            timeoutMs: 1000,
+            eventCommand: "events"
+        });
+        const listener = client.listenPeerEvents(event => events.push(event));
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+        listener.close();
+
+        assert.deepEqual(commands, [{
+            command: "events",
+            params: {topics: ["peer"], child_objects: true}
+        }]);
+        assert.deepEqual(events, [{
+            type: "peer-joined",
+            peer: {
+                npub: "npub1peer",
+                displayName: "Peer",
+                ipv6Addr: "fd00::2",
+                connectivity: "connected",
+                transportType: "udp",
+                transportAddr: "203.0.113.9:2121",
+                direction: undefined,
+                treeDepth: undefined
+            },
+            raw: {
+                status: "ok",
+                data: {
+                    type: "peer_discovered",
+                    peer: {
+                        npub: "npub1peer",
+                        display_name: "Peer",
+                        ipv6_addr: "fd00::2",
+                        connectivity: "connected",
+                        transport_type: "udp",
+                        transport_addr: "203.0.113.9:2121"
+                    }
+                }
+            }
+        }]);
+    }
+    finally {
+        await new Promise(resolve => server.close(resolve));
+    }
 });
 
 test("FIPS control client reads status and peers from line-delimited JSON", async () => {

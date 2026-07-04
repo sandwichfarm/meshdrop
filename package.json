@@ -5,6 +5,7 @@
   "description": "",
   "main": "server/index.js",
   "scripts": {
+    "build:service-worker": "node scripts/set-service-worker-version.mjs",
     "start": "node server/index.js",
     "start:prod": "node server/index.js --rate-limit --auto-restart",
     "test": "node --test",

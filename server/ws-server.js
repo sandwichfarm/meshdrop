@@ -71,6 +71,12 @@ export default class PairDropWsServer {
             case 'leave-fips-room':
                 this._leaveFipsRoom(sender);
                 break;
+            case 'join-pollen-room':
+                this._onJoinPollenRoom(sender);
+                break;
+            case 'leave-pollen-room':
+                this._leavePollenRoom(sender);
+                break;
             case 'room-secrets':
                 this._onRoomSecrets(sender, message);
                 break;
@@ -104,6 +110,7 @@ export default class PairDropWsServer {
             case 'request':
             case 'blossom-request':
             case 'hashtree-request':
+            case 'pollen-request':
             case 'header':
             case 'partition':
             case 'partition-received':
@@ -129,11 +136,14 @@ export default class PairDropWsServer {
             ? sender.ip
             : message.roomId;
 
-        // relay message to recipient
-        if (message.to && Peer.isValidUuid(message.to) && this._rooms[room]) {
+        if (message.to && Peer.isValidPeerId(message.to) && this._rooms[room]) {
             const recipient = this._rooms[room][message.to];
+            if (recipient?.isRemoteFederation) {
+                this._conf?.federationClient?.sendSignal(recipient.federation, sender.getInfo(), message);
+                return;
+            }
+
             delete message.to;
-            // add sender
             message.sender = {
                 id: sender.id,
                 rtcSupported: sender.rtcSupported
@@ -155,6 +165,7 @@ export default class PairDropWsServer {
 
         this._leaveIpRoom(sender, true);
         this._leaveFipsRoom(sender, true);
+        this._leavePollenRoom(sender, true);
         this._leaveAllSecretRooms(sender, true);
         this._leavePublicRoom(sender, true);
 
@@ -346,6 +357,26 @@ export default class PairDropWsServer {
         peer.fipsRoomId = this._conf.fips.room;
     }
 
+    async _onJoinPollenRoom(peer) {
+        if (!this._conf.pollen.enabled) {
+            this._send(peer, {type: 'pollen-status', status: await this._conf.pollenClient.status()});
+            return;
+        }
+
+        const status = await this._conf.pollenClient.status();
+        this._send(peer, {type: 'pollen-status', status});
+
+        if (!status.available) return;
+
+        this._joinPollenRoom(peer);
+    }
+
+    _joinPollenRoom(peer) {
+        this._leavePollenRoom(peer);
+        this._joinRoom(peer, 'pollen', this._conf.federation.pollen.room);
+        peer.pollenRoomId = this._conf.federation.pollen.room;
+    }
+
     _joinSecretRoom(peer, roomSecret) {
         this._joinRoom(peer, 'secret', roomSecret);
 
@@ -365,8 +396,10 @@ export default class PairDropWsServer {
     _joinRoom(peer, roomType, roomId) {
         // roomType: 'ip', 'secret' or 'public-id'
         if (this._rooms[roomId] && this._rooms[roomId][peer.id]) {
+            if (this._rooms[roomId][peer.id] === peer) return;
+
             // ensures that otherPeers never receive `peer-left` after `peer-joined` on reconnect.
-            this._leaveRoom(peer, roomType, roomId);
+            delete this._rooms[roomId][peer.id];
         }
 
         // if room doesn't exist, create it
@@ -378,6 +411,9 @@ export default class PairDropWsServer {
 
         // add peer to room
         this._rooms[roomId][peer.id] = peer;
+        if (!peer.isRemoteFederation) {
+            this._conf?.federationClient?.localPeerJoined(roomType, roomId, peer.getInfo());
+        }
     }
 
 
@@ -390,6 +426,13 @@ export default class PairDropWsServer {
 
         this._leaveRoom(peer, 'fips', peer.fipsRoomId, disconnect);
         peer.fipsRoomId = null;
+    }
+
+    _leavePollenRoom(peer, disconnect = false) {
+        if (!peer.pollenRoomId) return;
+
+        this._leaveRoom(peer, 'pollen', peer.pollenRoomId, disconnect);
+        peer.pollenRoomId = null;
     }
 
     _leaveSecretRoom(peer, roomSecret, disconnect = false) {
@@ -412,6 +455,9 @@ export default class PairDropWsServer {
 
         // remove peer from room
         delete this._rooms[roomId][peer.id];
+        if (!peer.isRemoteFederation) {
+            this._conf?.federationClient?.localPeerLeft(roomType, roomId, peer.id);
+        }
 
         // delete room if empty and abort
         if (!Object.keys(this._rooms[roomId]).length) {
@@ -422,6 +468,7 @@ export default class PairDropWsServer {
         // notify all other peers that remain in room that peer left
         for (const otherPeerId in this._rooms[roomId]) {
             const otherPeer = this._rooms[roomId][otherPeerId];
+            if (otherPeer.isRemoteFederation) continue;
 
             let msg = {
                 type: 'peer-left',
@@ -442,6 +489,7 @@ export default class PairDropWsServer {
         for (const otherPeerId in this._rooms[roomId]) {
             if (otherPeerId === peer.id) continue;
             const otherPeer = this._rooms[roomId][otherPeerId];
+            if (otherPeer.isRemoteFederation) continue;
 
             let msg = {
                 type: 'peer-joined',
@@ -457,7 +505,12 @@ export default class PairDropWsServer {
         const otherPeers = [];
         for (const otherPeerId in this._rooms[roomId]) {
             if (otherPeerId === peer.id) continue;
-            otherPeers.push(this._rooms[roomId][otherPeerId].getInfo());
+            const otherPeer = this._rooms[roomId][otherPeerId];
+            const info = otherPeer.getInfo();
+            if (otherPeer.isRemoteFederation) {
+                info.isCaller = peer.id > otherPeer.id;
+            }
+            otherPeers.push(info);
         }
 
         let msg = {
@@ -484,6 +537,7 @@ export default class PairDropWsServer {
 
     _send(peer, message) {
         if (!peer) return;
+        if (peer.isRemoteFederation) return;
         if (this._wss.readyState !== this._wss.OPEN) return;
         message = JSON.stringify(message);
         peer.socket.send(message);
@@ -521,5 +575,77 @@ export default class PairDropWsServer {
         if (this._keepAliveTimers[peer.id]?.lastBeat) {
             this._keepAliveTimers[peer.id].lastBeat = Date.now();
         }
+    }
+
+    _onFederationPeerJoined(event) {
+        if (!event.peer?.id || !event.roomType || !event.roomId) return;
+        if (!this._rooms[event.roomId]) this._rooms[event.roomId] = {};
+
+        const remotePeer = this._remoteFederationPeer(event);
+        this._rooms[event.roomId][remotePeer.id] = remotePeer;
+
+        for (const peerId in this._rooms[event.roomId]) {
+            if (peerId === remotePeer.id) continue;
+            const peer = this._rooms[event.roomId][peerId];
+            if (peer.isRemoteFederation) continue;
+
+            this._send(peer, {
+                type: 'peer-joined',
+                peer: remotePeer.getInfo(),
+                roomType: event.roomType,
+                roomId: event.roomId,
+                isCaller: peer.id > remotePeer.id
+            });
+        }
+    }
+
+    _onFederationPeerLeft(event) {
+        const room = this._rooms[event.roomId];
+        if (!room?.[event.peerId]?.isRemoteFederation) return;
+
+        delete room[event.peerId];
+        for (const peerId in room) {
+            const peer = room[peerId];
+            if (peer.isRemoteFederation) continue;
+
+            this._send(peer, {
+                type: 'peer-left',
+                peerId: event.peerId,
+                roomType: event.roomType,
+                roomId: event.roomId,
+                disconnect: event.disconnect !== false
+            });
+        }
+    }
+
+    _onFederationSignal(event) {
+        const recipient = this._rooms[event.roomId]?.[event.to];
+        if (!recipient || recipient.isRemoteFederation) return;
+
+        this._send(recipient, {
+            type: 'signal',
+            sdp: event.sdp,
+            ice: event.ice,
+            sessionId: event.sessionId,
+            sender: {
+                id: event.sender.id,
+                rtcSupported: event.sender.rtcSupported !== false
+            }
+        });
+    }
+
+    _remoteFederationPeer(event) {
+        const peerInfo = event.peer;
+        return {
+            ...peerInfo,
+            isRemoteFederation: true,
+            federation: {
+                serverId: event.serverId,
+                transport: event.transport
+            },
+            getInfo() {
+                return peerInfo;
+            }
+        };
     }
 }

@@ -1,4 +1,4 @@
-const cacheVersion = 'v1.11.6';
+const cacheVersion = 'v1.11.7';
 const cacheTitle = `meshdrop-cache-${cacheVersion}`;
 const relativePathsToCache = [
     './',
@@ -16,6 +16,15 @@ const relativePathsToCache = [
     'scripts/util.js',
     'scripts/nostr-relays.js',
     'scripts/worker/canvas-worker.js',
+    'scripts/libs/noble-ciphers/LICENSE',
+    'scripts/libs/noble-ciphers/_polyval.js',
+    'scripts/libs/noble-ciphers/aes.js',
+    'scripts/libs/noble-ciphers/utils.js',
+    'scripts/libs/noble-hashes/LICENSE',
+    'scripts/libs/noble-hashes/_md.js',
+    'scripts/libs/noble-hashes/_u64.js',
+    'scripts/libs/noble-hashes/sha2.js',
+    'scripts/libs/noble-hashes/utils.js',
     'scripts/libs/heic2any.min.js',
     'scripts/libs/no-sleep.min.js',
     'scripts/libs/qr-code.min.js',

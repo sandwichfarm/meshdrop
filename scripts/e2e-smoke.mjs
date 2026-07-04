@@ -1,13 +1,20 @@
 import {spawn} from "node:child_process";
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
+import os from "node:os";
+import path from "node:path";
 
 import {WebSocketServer} from "ws";
 import {chromium} from "/usr/lib/node_modules/playwright/index.mjs";
 
 const repoRoot = new URL("..", import.meta.url);
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH || "/usr/bin/chromium";
+const PROOF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#1b806a"/>
+  <path d="M18 34 28 44 47 21" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
 
 const helpers = [];
 
@@ -16,10 +23,12 @@ async function main() {
     const relay = await startFakeRelay();
     const blossom = await startFakeBlossom();
     const fips = await startFakeFips();
-    const app = startApp(appPort, relay.port, blossom.port, fips.port);
+    const pollen = await startFakePollenCli();
+    const app = startApp(appPort, relay.port, blossom.port, fips.port, pollen);
     helpers.push(app);
 
     const baseUrl = `http://127.0.0.1:${appPort}`;
+    const blossomServerUrl = `http://127.0.0.1:${blossom.port}`;
     await waitForHttp(`${baseUrl}/config`);
 
     const browser = await chromium.launch({
@@ -30,38 +39,43 @@ async function main() {
     try {
         await runVisibilityScenario(browser, baseUrl);
 
-        await runTransferScenario(browser, baseUrl, {
-            name: "direct",
-            fileName: "direct.txt",
-            contents: ["direct-ok"]
+        await runProofTransferScenario(browser, baseUrl, {
+            name: "local-webrtc",
+            roomType: "ip",
+            transportId: "local"
         });
 
-        await runTransferScenario(browser, baseUrl, {
+        await runProofTransferScenario(browser, baseUrl, {
             name: "blossom",
-            fileName: "blossom.txt",
-            contents: ["blossom-ok"],
+            roomType: "ip",
+            transportId: "blossom",
+            blossomServer: blossomServerUrl,
             setupSender: async page => {
                 await connectNostrIdentity(page);
+                await setProtocolServers(page, blossomServerUrl);
                 await page.evaluate(() => globalThis.meshdropBlossomTransfer.enable());
                 await page.waitForFunction(() => globalThis.meshdropBlossomTransfer.isActive());
             }
         });
 
-        await runTransferScenario(browser, baseUrl, {
+        await runProofTransferScenario(browser, baseUrl, {
             name: "hashtree",
-            fileName: "hashtree-a.txt",
-            contents: ["hashtree-a", "hashtree-b"],
+            roomType: "ip",
+            transportId: "hashtree",
+            blossomServer: blossomServerUrl,
             setupSender: async page => {
                 await connectNostrIdentity(page);
+                await setProtocolServers(page, blossomServerUrl);
                 await page.evaluate(() => globalThis.meshdropHashtreeTransfer.enable());
                 await page.waitForFunction(() => globalThis.meshdropHashtreeTransfer.isActive());
             }
         });
 
-        await runTransferScenario(browser, baseUrl, {
-            name: "fips",
-            fileName: "fips.txt",
-            contents: ["fips-ok"],
+        await runProofTransferScenario(browser, baseUrl, {
+            name: "fips-webrtc",
+            roomType: "fips",
+            transportId: "fips",
+            disableLocal: true,
             setupBoth: async pages => {
                 await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropFipsDiscovery.enable())));
                 await Promise.all(pages.map(page => (
@@ -70,17 +84,47 @@ async function main() {
             }
         });
 
-        await runTransferScenario(browser, baseUrl, {
-            name: "nostr",
-            fileName: "nostr.txt",
-            contents: ["nostr-ok"],
+        await runProofTransferScenario(browser, baseUrl, {
+            name: "pollen-webrtc",
+            roomType: "pollen",
+            transportId: "pollen-mesh",
+            disableLocal: true,
+            setupBoth: async pages => {
+                await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropPollenTransfer.enable())));
+                await Promise.all(pages.map(page => (
+                    page.waitForFunction(() => globalThis.meshdropPollenTransfer.isActive())
+                )));
+            }
+        });
+
+        await runProofTransferScenario(browser, baseUrl, {
+            name: "pollen-storage",
+            roomType: "ip",
+            transportId: "pollen",
+            setupBoth: async pages => {
+                await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropPollenTransfer.enable())));
+                await Promise.all(pages.map(page => (
+                    page.waitForFunction(() => globalThis.meshdropPollenTransfer.isActive())
+                )));
+            }
+        });
+
+        await runProofTransferScenario(browser, baseUrl, {
+            name: "nostr-webrtc",
+            roomType: "nostr",
+            transportId: null,
             nostrOnly: true,
             setupBoth: async pages => {
                 await Promise.all(pages.map(connectNostrIdentity));
+                await Promise.all(pages.map(page => setFollowList(page)));
                 await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropNostrMesh.connect())));
                 await Promise.all(pages.map(page => page.waitForFunction(() => globalThis.meshdropNostrMesh._active)));
             }
         });
+
+        await runLocalRouteChoiceTransferScenario(browser, baseUrl);
+        await runRouteChoiceScenario(browser, baseUrl);
+        await runFederatedFipsWebRtcScenario(browser, relay.port, blossom.port, pollen);
     }
     finally {
         await browser.close();
@@ -118,8 +162,8 @@ async function runVisibilityScenario(browser, baseUrl) {
 }
 
 async function runTransferScenario(browser, baseUrl, options) {
-    const contextA = await newContext(browser, "a");
-    const contextB = await newContext(browser, "b");
+    const contextA = await newContext(browser, "a", {blossomServer: options.blossomServer || ""});
+    const contextB = await newContext(browser, "b", {blossomServer: options.blossomServer || ""});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const logs = watchPages(options.name, [pageA, pageB]);
@@ -154,15 +198,60 @@ async function runTransferScenario(browser, baseUrl, options) {
     }
 }
 
+async function runProofTransferScenario(browser, baseUrl, options) {
+    const contextA = await newContext(browser, `${options.name}-a`, {blossomServer: options.blossomServer || ""});
+    const contextB = await newContext(browser, `${options.name}-b`, {blossomServer: options.blossomServer || ""});
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const logs = watchPages(options.name, [pageA, pageB]);
+
+    try {
+        await Promise.all([
+            pageA.goto(baseUrl, {waitUntil: "domcontentloaded"}),
+            pageB.goto(baseUrl, {waitUntil: "domcontentloaded"})
+        ]);
+
+        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
+        if (options.nostrOnly) {
+            await leaveIpRoom(pageA);
+            await leaveIpRoom(pageB);
+        }
+        if (options.disableLocal) {
+            await Promise.all([pageA, pageB].map(disableLocalDiscovery));
+        }
+
+        if (options.setupBoth) await options.setupBoth([pageA, pageB]);
+        if (options.setupSender) await options.setupSender(pageA);
+        if (options.setupReceiver) await options.setupReceiver(pageB);
+
+        const peerId = await waitForConnectedPeer(pageA, options.roomType);
+        await sendProofIcon(pageA, peerId, options.transportId);
+
+        const received = await waitForReceivedFiles(pageB, 1);
+        assertReceived({
+            name: options.name,
+            fileName: "meshdrop-proof-icon.svg",
+            contents: [PROOF_ICON]
+        }, received);
+        assert(!logs.pageErrors.length, `${options.name}: page errors: ${logs.pageErrors.join("\n")}`);
+        console.log(`Proof ${options.name}: ${options.transportId || "direct"} delivered meshdrop-proof-icon.svg`);
+    }
+    finally {
+        await Promise.allSettled([contextA.close(), contextB.close()]);
+    }
+}
+
 async function newContext(browser, identityName, options = {}) {
     const context = await browser.newContext({
         serviceWorkers: "block"
     });
 
-    await context.addInitScript(({name, signer}) => {
+    await context.addInitScript(({name, signer, blossomServer}) => {
         globalThis.__meshdropDisableNostrRelayNetwork = true;
+        const originalConsoleError = console.error.bind(console);
+        console.error = (...args) => originalConsoleError(...args.map(arg => arg?.stack || arg));
 
-        const pubkey = name === "a"
+        const pubkey = name === "a" || name.endsWith("-a")
             ? "1".repeat(64)
             : "2".repeat(64);
         const displayName = `npub ${pubkey.slice(0, 8)}`;
@@ -188,7 +277,10 @@ async function newContext(browser, identityName, options = {}) {
                 displayName,
                 picture: "",
                 relays: {read: [], write: []},
-                blossomServers: [],
+                blossomServers: blossomServer ? [blossomServer] : [],
+                blossomServerListStatus: blossomServer ? "found" : "missing",
+                followPubkeys: ["1".repeat(64), "2".repeat(64)],
+                followListStatus: "found",
                 event: {
                     kind: 27235,
                     created_at: Math.floor(Date.now() / 1000),
@@ -242,7 +334,7 @@ async function newContext(browser, identityName, options = {}) {
             })));
             globalThis.__meshdropE2E.received.push({peerId: event.detail.peerId, files});
         });
-    }, {name: identityName, signer: options.signer !== false});
+    }, {name: identityName, signer: options.signer !== false, blossomServer: options.blossomServer || ""});
 
     return context;
 }
@@ -252,12 +344,14 @@ function watchPages(name, pages) {
 
     pages.forEach((page, index) => {
         const label = `${name}:${index === 0 ? "sender" : "receiver"}`;
-        page.on("pageerror", error => pageErrors.push(`${label}: ${error.message}`));
+        page.on("pageerror", error => pageErrors.push(`${label}: ${error.stack || error.message}`));
         page.on("console", message => {
             if (message.type() !== "error") return;
             const text = message.text();
             if (text.includes("RTCErrorEvent")) return;
-            console.warn(`${label} console error: ${text}`);
+            const location = message.location();
+            const source = location.url ? `${location.url}:${location.lineNumber}:${location.columnNumber}` : "";
+            console.warn(`${label} console error: ${text}${source ? ` @ ${source}` : ""}`);
         });
     });
 
@@ -270,11 +364,169 @@ async function waitForHydration(page) {
         && globalThis.meshdropNostrMesh
         && globalThis.meshdropBlossomTransfer
         && globalThis.meshdropHashtreeTransfer
+        && globalThis.meshdropPollenTransfer
         && globalThis.meshdropFipsDiscovery
         && globalThis.__meshdropE2E.configLoaded
         && globalThis.__meshdropE2E.wsConnected
         && document.querySelector("x-peers")
     ));
+}
+
+async function runRouteChoiceScenario(browser, baseUrl) {
+    const contextA = await newContext(browser, "route-a");
+    const contextB = await newContext(browser, "route-b");
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const logs = watchPages("routes", [pageA, pageB]);
+
+    try {
+        await Promise.all([
+            pageA.goto(baseUrl, {waitUntil: "domcontentloaded"}),
+            pageB.goto(baseUrl, {waitUntil: "domcontentloaded"})
+        ]);
+        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
+        await Promise.all([
+            pageA.evaluate(() => globalThis.meshdropFipsDiscovery.enable()),
+            pageB.evaluate(() => globalThis.meshdropFipsDiscovery.enable()),
+            pageA.evaluate(() => globalThis.meshdropPollenTransfer.enable()),
+            pageB.evaluate(() => globalThis.meshdropPollenTransfer.enable())
+        ]);
+        await Promise.all([
+            pageA.waitForFunction(() => document.querySelector("x-peer.type-fips")),
+            pageA.waitForFunction(() => document.querySelector("x-peer.type-pollen"))
+        ]);
+
+        const options = await pageA.evaluate(() => {
+            const peer = document.querySelector("x-peer.type-fips.type-pollen");
+            const file = new File(["route"], "route.txt", {type: "text/plain"});
+            window.dispatchEvent(new CustomEvent("select-files-transport", {
+                detail: {to: peer.id, files: [file]}
+            }));
+
+            return [...document.querySelectorAll(".transport-choice-option")].map(option => ({
+                id: option.dataset.transportId,
+                label: option.querySelector(".transport-choice-label")?.textContent,
+                privacy: option.querySelector(".transport-choice-privacy")?.textContent,
+                details: [...option.querySelectorAll(".transport-choice-detail")].map(detail => detail.textContent)
+            }));
+        });
+
+        const pollen = options.find(option => option.id === "pollen-mesh");
+        const fips = options.find(option => option.id === "fips");
+        assert(pollen, "Pollen mesh route was not selectable");
+        assert(fips, "FIPS mesh route was not selectable");
+        assert(pollen.privacy === "Direct after Pollen discovery", "Pollen mesh privacy copy missing");
+        assert(fips.privacy === "Direct after FIPS discovery", "FIPS mesh privacy copy missing");
+        assert(!logs.pageErrors.length, `routes: page errors: ${logs.pageErrors.join("\n")}`);
+    }
+    finally {
+        await Promise.allSettled([contextA.close(), contextB.close()]);
+    }
+}
+
+async function runLocalRouteChoiceTransferScenario(browser, baseUrl) {
+    const contextA = await newContext(browser, "local-route-a");
+    const contextB = await newContext(browser, "local-route-b");
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const logs = watchPages("local-route", [pageA, pageB]);
+
+    try {
+        await Promise.all([
+            pageA.goto(baseUrl, {waitUntil: "domcontentloaded"}),
+            pageB.goto(baseUrl, {waitUntil: "domcontentloaded"})
+        ]);
+        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
+        await Promise.all([
+            pageA.evaluate(() => globalThis.meshdropFipsDiscovery.enable()),
+            pageB.evaluate(() => globalThis.meshdropFipsDiscovery.enable())
+        ]);
+
+        const peerId = await waitForConnectedPeer(pageA, "ip");
+        await pageA.evaluate(({to, payload}) => {
+            const file = new File([payload], "local-route.txt", {type: "text/plain"});
+            window.dispatchEvent(new CustomEvent("select-files-transport", {
+                detail: {to, files: [file]}
+            }));
+            document.querySelector('[data-transport-id="local"]')?.click();
+        }, {to: peerId, payload: "local-route-ok"});
+
+        const received = await waitForReceivedFiles(pageB, 1);
+        assertReceived({
+            name: "local-route",
+            fileName: "local-route.txt",
+            contents: ["local-route-ok"]
+        }, received);
+        assert(!logs.pageErrors.length, `local-route: page errors: ${logs.pageErrors.join("\n")}`);
+    }
+    finally {
+        await Promise.allSettled([contextA.close(), contextB.close()]);
+    }
+}
+
+async function runFederatedFipsWebRtcScenario(browser, relayPort, blossomPort, pollen) {
+    const portA = await freePort();
+    const portB = await freePort();
+    const fipsA = await startFakeFips({ipv6Addr: "::1", peerName: "Server B"});
+    const fipsB = await startFakeFips({ipv6Addr: "::1", peerName: "Server A"});
+    const appA = startApp(portA, relayPort, blossomPort, fipsA.port, pollen, {
+        args: [],
+        serverId: "fed-a",
+        fipsFederationPort: portB,
+        fipsFederationUrl: `http://127.0.0.1:${portA}`,
+        federationPollMs: 200
+    });
+    const appB = startApp(portB, relayPort, blossomPort, fipsB.port, pollen, {
+        args: [],
+        serverId: "fed-b",
+        fipsFederationPort: portA,
+        fipsFederationUrl: `http://127.0.0.1:${portB}`,
+        federationPollMs: 200
+    });
+    helpers.push(appA, appB);
+
+    const contextA = await newContext(browser, "fed-a");
+    const contextB = await newContext(browser, "fed-b");
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const logs = watchPages("federated-fips", [pageA, pageB]);
+
+    try {
+        await Promise.all([
+            waitForHttp(`http://127.0.0.1:${portA}/config`),
+            waitForHttp(`http://127.0.0.1:${portB}/config`)
+        ]);
+        await Promise.all([
+            pageA.goto(`http://127.0.0.1:${portA}`, {waitUntil: "domcontentloaded"}),
+            pageB.goto(`http://127.0.0.1:${portB}`, {waitUntil: "domcontentloaded"})
+        ]);
+        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
+        await Promise.all([
+            pageA.evaluate(() => globalThis.meshdropFipsDiscovery.enable()),
+            pageB.evaluate(() => globalThis.meshdropFipsDiscovery.enable())
+        ]);
+
+        let peerId;
+        try {
+            peerId = await waitForConnectedPeer(pageA, "fips");
+        } catch (error) {
+            const [stateA, stateB] = await Promise.all([debugPageState(pageA), debugPageState(pageB)]);
+            throw new Error(`${error.message}\nserverA=${JSON.stringify(stateA)}\nserverB=${JSON.stringify(stateB)}`);
+        }
+        await sendProofIcon(pageA, peerId, "fips");
+
+        const received = await waitForReceivedFiles(pageB, 1);
+        assertReceived({
+            name: "federated-fips",
+            fileName: "meshdrop-proof-icon.svg",
+            contents: [PROOF_ICON]
+        }, received);
+        assert(!logs.pageErrors.length, `federated-fips: page errors: ${logs.pageErrors.join("\n")}`);
+        console.log("Proof federated-fips-webrtc: fips delivered meshdrop-proof-icon.svg across two MeshDrop servers");
+    }
+    finally {
+        await Promise.allSettled([contextA.close(), contextB.close()]);
+    }
 }
 
 async function assertMeshDropBranding(page) {
@@ -308,6 +560,25 @@ async function connectNostrIdentity(page) {
     await page.waitForFunction(() => !!globalThis.meshdropNostrIdentity.getIdentity());
 }
 
+async function setProtocolServers(page, serverUrl) {
+    await page.evaluate(url => {
+        const identity = globalThis.meshdropNostrIdentity.getIdentity();
+        identity.blossomServers = [url];
+        identity.blossomServerListStatus = "found";
+        globalThis.ProtocolServerPreferences.setProtocolEnabled(url, "blossom", true);
+        globalThis.ProtocolServerPreferences.setProtocolEnabled(url, "hashtree", true);
+        window.dispatchEvent(new CustomEvent("nostr-server-list-changed"));
+    }, serverUrl);
+}
+
+async function setFollowList(page) {
+    await page.evaluate(() => {
+        const identity = globalThis.meshdropNostrIdentity.getIdentity();
+        identity.followPubkeys = ["1".repeat(64), "2".repeat(64)];
+        identity.followListStatus = "found";
+    });
+}
+
 async function leaveIpRoom(page) {
     await page.evaluate(() => {
         const peerIds = [...document.querySelectorAll("x-peer.type-ip")].map(peer => peer.id);
@@ -317,16 +588,54 @@ async function leaveIpRoom(page) {
     });
 }
 
-async function waitForConnectedPeer(page, roomType) {
-    const peerId = await page.waitForFunction(type => {
-        const selector = type ? `x-peer.type-${type}` : "x-peer";
-        const peer = document.querySelector(selector);
-        if (!peer) return "";
-        if (!globalThis.__meshdropE2E.connected.includes(peer.id)) return "";
-        return peer.id;
-    }, roomType, {timeout: 20000});
+async function disableLocalDiscovery(page) {
+    await page.evaluate(() => globalThis.meshdropLocalDiscovery.setEnabled(false));
+    try {
+        await page.waitForFunction(() => !document.querySelector("x-peer.type-ip"), {timeout: 10000});
+    } catch (error) {
+        const state = await debugPageState(page);
+        throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);
+    }
+}
 
-    return peerId.jsonValue();
+async function waitForConnectedPeer(page, roomType) {
+    try {
+        const peerId = await page.waitForFunction(type => {
+            const selector = type ? `x-peer.type-${type}` : "x-peer";
+            const peer = document.querySelector(selector);
+            if (!peer) return "";
+            if (!globalThis.__meshdropE2E.connected.includes(peer.id)) return "";
+            return peer.id;
+        }, roomType, {timeout: 20000});
+
+        return peerId.jsonValue();
+    } catch (error) {
+        const state = await debugPageState(page);
+        throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);
+    }
+}
+
+async function debugPageState(page) {
+    return page.evaluate(() => ({
+        selfPeerId: sessionStorage.getItem("peer_id"),
+        connected: globalThis.__meshdropE2E.connected,
+        peers: [...document.querySelectorAll("x-peer")].map(peer => ({
+            id: peer.id,
+            classes: [...peer.classList]
+        })),
+        managerPeers: Object.values(globalThis.__meshdropE2E.peersManager?.peers || {}).map(peer => ({
+            id: peer._peerId,
+            isCaller: peer._isCaller,
+            roomIds: peer._roomIds,
+            channelState: peer._channel?.readyState || "",
+            signalingState: peer._conn?.signalingState || "",
+            iceConnectionState: peer._conn?.iceConnectionState || "",
+            connectionState: peer._conn?.connectionState || "",
+            signalSessionId: peer._signalSessionId || ""
+        })),
+        nostrActive: globalThis.meshdropNostrMesh?._active,
+        relaySockets: globalThis.meshdropNostrMesh?._sockets?.size
+    }));
 }
 
 async function sendFiles(page, peerId, firstFileName, contents) {
@@ -343,6 +652,29 @@ async function sendFiles(page, peerId, firstFileName, contents) {
         to: peerId,
         fileName: firstFileName,
         payloads: contents
+    });
+}
+
+async function sendProofIcon(page, peerId, transportId) {
+    await page.evaluate(({to, transport, icon}) => {
+        const file = new File([icon], "meshdrop-proof-icon.svg", {type: "image/svg+xml"});
+        if (!transport) {
+            window.dispatchEvent(new CustomEvent("files-selected", {
+                detail: {to, files: [file]}
+            }));
+            return;
+        }
+
+        window.dispatchEvent(new CustomEvent("select-files-transport", {
+            detail: {to, files: [file]}
+        }));
+        const button = document.querySelector(`[data-transport-id="${transport}"]`);
+        if (!button) throw new Error(`Missing transport option ${transport}`);
+        button.click();
+    }, {
+        to: peerId,
+        transport: transportId,
+        icon: PROOF_ICON
     });
 }
 
@@ -369,17 +701,24 @@ function assertReceived(options, received) {
     );
 }
 
-function startApp(port, relayPort, blossomPort, fipsPort) {
-    const child = spawn("node", ["server/index.js", "--localhost-only"], {
+function startApp(port, relayPort, blossomPort, fipsPort, pollen, options = {}) {
+    const child = spawn("node", ["server/index.js", ...(options.args || ["--localhost-only"])], {
         cwd: repoRoot,
         env: {
             ...process.env,
             PORT: String(port),
+            MESHDROP_SERVER_ID: options.serverId || `e2e-${port}`,
             NOSTR_RELAYS: `ws://127.0.0.1:${relayPort}`,
             NOSTR_ROOM: "e2e",
             BLOSSOM_SERVERS: `http://127.0.0.1:${blossomPort}`,
             FIPS_CONTROL_SOCKET: String(fipsPort),
             FIPS_ROOM: "e2e-fips",
+            FIPS_FEDERATION_PORT: String(options.fipsFederationPort || port),
+            FIPS_FEDERATION_URL: options.fipsFederationUrl || "",
+            MESHDROP_FEDERATION_POLL_MS: String(options.federationPollMs || 15000),
+            PLN_BIN: pollen.bin,
+            PLN_DIR: pollen.dir,
+            POLLEN_NOSTR_BOOTSTRAP: "false",
             RTC_CONFIG: "false"
         },
         stdio: ["ignore", "pipe", "pipe"]
@@ -395,6 +734,31 @@ function startApp(port, relayPort, blossomPort, fipsPort) {
             await stopChild(child);
         }
     };
+}
+
+async function startFakePollenCli() {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-e2e-pln-"));
+    const bin = path.join(dir, "pln");
+    await fs.writeFile(bin, `#!/bin/sh
+hash="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+case "$1" in
+  version) echo "v0.0.1-dev.21" ;;
+  status) echo "ok" ;;
+  seed) cat > "$PLN_DIR/blob-$hash"; echo "$hash" ;;
+  fetch) cp "$PLN_DIR/blob-$2" "$3" ;;
+  serve) echo "served $3" ;;
+  connect) echo "forwarding localhost:$3 -> $2 (fake:3000)" ;;
+  *) echo "ok" ;;
+esac
+`, {mode: 0o700});
+
+    helpers.push({
+        async close() {
+            await fs.rm(dir, {recursive: true, force: true});
+        }
+    });
+
+    return {bin, dir};
 }
 
 async function startFakeRelay() {
@@ -505,7 +869,10 @@ async function startFakeBlossom() {
     return {port};
 }
 
-async function startFakeFips() {
+async function startFakeFips(options = {}) {
+    const peerIpv6Addr = options.ipv6Addr || "fd00::2";
+    const localIpv6Addr = options.localIpv6Addr || "fd00::1";
+    const peerName = options.peerName || "FIPS peer";
     const port = await freePort();
     const server = net.createServer(socket => {
         let buffered = "";
@@ -519,7 +886,7 @@ async function startFakeFips() {
                     status: "ok",
                     data: {
                         npub: "npub1e2esmoke",
-                        ipv6_addr: "fd00::1",
+                        ipv6_addr: localIpv6Addr,
                         peer_count: 1,
                         estimated_mesh_size: 2
                     }
@@ -533,8 +900,8 @@ async function startFakeFips() {
                     data: {
                         peers: [{
                             npub: "npub1peer",
-                            display_name: "FIPS peer",
-                            ipv6_addr: "fd00::2",
+                            display_name: peerName,
+                            ipv6_addr: peerIpv6Addr,
                             connectivity: "direct",
                             transport_type: "webrtc",
                             transport_addr: "127.0.0.1",

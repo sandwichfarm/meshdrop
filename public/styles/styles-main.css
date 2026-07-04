@@ -213,7 +213,8 @@ header > a[href="#about"] {
 #nostr-mesh,
 #fips-discovery,
 #blossom-transfer,
-#hashtree-transfer {
+#hashtree-transfer,
+#pollen-transfer {
     order: 20;
 }
 
@@ -613,6 +614,10 @@ footer .logo {
     --badge-color: #00a69c;
 }
 
+.badge-room-pollen {
+    --badge-color: #6d8f00;
+}
+
 .known-as-wrapper {
     font-size: 16px; /* prevents auto-zoom on edit */
 }
@@ -1008,6 +1013,10 @@ header > a.icon-button:focus:before,
 
 #hashtree-transfer {
     --protocol-color: #2f8a4c;
+}
+
+#pollen-transfer {
+    --protocol-color: #b89b2c;
 }
 
 #protocol-settings {

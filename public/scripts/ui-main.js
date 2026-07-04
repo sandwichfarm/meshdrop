@@ -205,6 +205,24 @@ class CenterUI {
     }
 }
 
+const FooterDiscoveryProtocol = {
+    badges(state = {}) {
+        const badges = [];
+
+        if (state.local) badges.push({id: "local", selector: "ip"});
+        if (state.webrtc) badges.push({id: "webrtc", selector: "nostr"});
+        if (state.fips) badges.push({id: "fips", selector: "fips"});
+        if (state.paired) badges.push({id: "paired", selector: "secret"});
+        if (state.publicRoomId) {
+            badges.push({id: "public-room", selector: "public-id", roomId: state.publicRoomId.toUpperCase()});
+        }
+
+        return badges.length ? badges : [{id: "none", selector: "unavailable"}];
+    }
+};
+
+globalThis.FooterDiscoveryProtocol = FooterDiscoveryProtocol;
+
 class FooterUI {
 
     constructor() {
@@ -212,6 +230,15 @@ class FooterUI {
         this.$displayName = $('display-name');
         this.$displayAvatar = $('display-avatar');
         this.$discoveryWrapper = $$('footer .discovery-wrapper');
+        this.$discoveryBadges = this.$discoveryWrapper.querySelector('div:last-of-type');
+        this.$badges = {
+            local: this.$discoveryBadges.querySelector('.badge-room-ip'),
+            webrtc: this.$discoveryBadges.querySelector('.badge-room-nostr'),
+            fips: this.$discoveryBadges.querySelector('.badge-room-fips'),
+            paired: this.$discoveryBadges.querySelector('.badge-room-secret'),
+            publicRoom: this.$discoveryBadges.querySelector('.badge-room-public-id'),
+            none: this.$discoveryBadges.querySelector('.badge-unavailable')
+        };
 
         this.$displayName.addEventListener('keydown', e => this._onKeyDownDisplayName(e));
         this.$displayName.addEventListener('focus', e => this._onFocusDisplayName(e));
@@ -220,6 +247,8 @@ class FooterUI {
         Events.on('display-name', e => this._onDisplayName(e.detail));
         Events.on('self-display-name-changed', e => this._insertDisplayName(e.detail));
         Events.on('evaluate-footer-badges', _ => this._evaluateFooterBadges());
+        Events.on('footer-discovery-changed', _ => this._evaluateFooterBadges());
+        Events.on('translation-loaded', _ => this._evaluateFooterBadges());
     }
 
     async showLoading() {
@@ -231,7 +260,9 @@ class FooterUI {
     }
 
     async _evaluateFooterBadges() {
-        if (this.$discoveryWrapper.querySelectorAll('div:last-of-type > span[hidden]').length < 2) {
+        this._renderDiscoveryBadges();
+
+        if (this.$discoveryWrapper.querySelectorAll('div:last-of-type > span:not([hidden])').length > 2) {
             this.$discoveryWrapper.classList.remove('row');
             this.$discoveryWrapper.classList.add('column');
         }
@@ -240,6 +271,38 @@ class FooterUI {
             this.$discoveryWrapper.classList.add('row');
         }
         Events.fire('redraw-canvas');
+    }
+
+    _discoveryState() {
+        return {
+            local: globalThis.meshdropLocalDiscovery?.isEnabled?.() ?? true,
+            webrtc: !!globalThis.meshdropNostrMesh?._active,
+            fips: !!globalThis.meshdropFipsDiscovery?.isActive?.(),
+            paired: !this.$badges.paired.hasAttribute('hidden'),
+            publicRoomId: this.$badges.publicRoom.hasAttribute('hidden')
+                ? ""
+                : (this.$badges.publicRoom.dataset.roomId || sessionStorage.getItem('public_room_id') || "")
+        };
+    }
+
+    _renderDiscoveryBadges() {
+        const visible = new Set(FooterDiscoveryProtocol.badges(this._discoveryState()).map(badge => badge.id));
+
+        this.$badges.local.toggleAttribute('hidden', !visible.has('local'));
+        this.$badges.webrtc.toggleAttribute('hidden', !visible.has('webrtc'));
+        this.$badges.fips.toggleAttribute('hidden', !visible.has('fips'));
+        this.$badges.paired.toggleAttribute('hidden', !visible.has('paired'));
+        this.$badges.none.toggleAttribute('hidden', !visible.has('none'));
+
+        const publicRoom = FooterDiscoveryProtocol.badges(this._discoveryState())
+            .find(badge => badge.id === 'public-room');
+        this.$badges.publicRoom.toggleAttribute('hidden', !publicRoom);
+        if (publicRoom) {
+            this.$badges.publicRoom.dataset.roomId = publicRoom.roomId;
+            this.$badges.publicRoom.innerText = Localization.getTranslation("footer.public-room-devices", null, {
+                roomId: publicRoom.roomId
+            });
+        }
     }
 
     async _loadSavedDisplayName() {

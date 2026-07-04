@@ -134,6 +134,12 @@
                 <use xlink:href="#hashtree-hash-icon"></use>
             </svg>
         </div>
+        <div id="pollen-transfer" class="icon-button protocol-toggle"
+             data-i18n-key="header.pollen-transfer-enable" data-i18n-attrs="title" hidden>
+            <svg class="icon">
+                <use xlink:href="#pollen-seed-icon"></use>
+            </svg>
+        </div>
         <div class="header-divider header-divider-network" aria-hidden="true"></div>
         <div id="protocol-settings" class="icon-button protocol-toggle" title="Settings" hidden>
             <svg class="icon">
@@ -215,8 +221,11 @@
                 </div>
                 <div class="row center wrap">
                     <span class="badge badge-room-ip" data-i18n-key="footer.on-this-network" data-i18n-attrs="text title"></span>
+                    <span class="badge badge-room-nostr" data-i18n-key="footer.webrtc-discovery" data-i18n-attrs="text title" hidden></span>
+                    <span class="badge badge-room-fips" data-i18n-key="footer.fips-discovery" data-i18n-attrs="text title" hidden></span>
                     <span class="badge badge-room-secret pointer" data-i18n-key="footer.paired-devices" data-i18n-attrs="text title" hidden></span>
                     <span class="badge badge-room-public-id pointer" data-i18n-key="footer.public-room-devices" data-i18n-attrs="title" hidden>in room IAIAI</span>
+                    <span class="badge badge-unavailable" data-i18n-key="footer.not-discoverable" data-i18n-attrs="text title" hidden></span>
                 </div>
             </div>
         </div>
@@ -839,7 +848,7 @@
             <div class="about-copy font-body1">
                 <p>
                     MeshDrop is an AirDrop-like transfer experience for local networks and open protocols. It keeps
-                    direct local sharing first, then adds optional
+                    direct local WebRTC sharing first, then adds optional
                     <a href="https://nostr.com" target="_blank" rel="noreferrer">Nostr identities</a>,
                     <a href="https://github.com/hzrd149/blossom" target="_blank" rel="noreferrer">Blossom</a>
                     storage handoff,
@@ -848,9 +857,9 @@
                     <a href="https://github.com/nostr-protocol/nips/pull/363" target="_blank" rel="noreferrer">
                         WebRTC over NIP-100 relay discovery
                     </a>,
-                    and
+                    storage-backed Pollen file handoff, and mesh-discovered Pollen/FIPS WebRTC signaling through
                     <a href="https://fips.network" target="_blank" rel="noreferrer">FIPS</a>
-                    peer discovery.
+                    reachable peers.
                 </p>
                 <p class="about-credit">
                     Built from
@@ -952,6 +961,9 @@
             <path d="M8.82 3h2.05l-.72 4h4.3l.72-4h2.05l-.72 4H20v2h-3.86l-1.08 6H19v2h-4.3l-.72 4h-2.05l.72-4h-4.3l-.72 4H5.58l.72-4H3v-2h3.66l1.08-6H4V7h4.1l.72-4zm.98 6-1.08 6h4.3l1.08-6H9.8z"></path>
             <circle cx="6.2" cy="5" r="1.15"></circle>
             <circle cx="17.8" cy="19" r="1.15"></circle>
+        </symbol>
+        <symbol id="pollen-seed-icon" viewBox="0 0 24 24">
+            <path d="M12 3c3.6 2.1 5.7 5 5.7 8.1 0 4-2.5 7.4-5.7 9.9-3.2-2.5-5.7-5.9-5.7-9.9C6.3 8 8.4 5.1 12 3zm0 2.4c-2.4 1.7-3.7 3.7-3.7 5.7 0 2.7 1.4 5.2 3.7 7.3 2.3-2.1 3.7-4.6 3.7-7.3 0-2-1.3-4-3.7-5.7zm0 3.1c.9 1 1.4 2.1 1.4 3.3 0 1.5-.5 2.9-1.4 4.1-.9-1.2-1.4-2.6-1.4-4.1 0-1.2.5-2.3 1.4-3.3z"></path>
         </symbol>
         <symbol id="key-icon" viewBox="0 0 24 24">
             <path d="M7.5 14a5.5 5.5 0 1 1 5.07-7.63A5.48 5.48 0 0 1 13 9h8.5c.28 0 .5.22.5.5V13c0 .28-.22.5-.5.5H19V16c0 .28-.22.5-.5.5H16V19c0 .28-.22.5-.5.5h-3A.5.5 0 0 1 12 19v-5.36A5.48 5.48 0 0 1 7.5 14zm0-8.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"></path>

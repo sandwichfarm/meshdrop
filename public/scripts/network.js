@@ -1,3 +1,80 @@
+const SignalingRoomPriority = {
+    priority: {
+        "ip": 0,
+        "fips": 1,
+        "pollen": 2,
+        "secret": 3,
+        "public-id": 4,
+        "nostr": 5
+    },
+
+    primary(roomIds = {}) {
+        return Object.keys(roomIds)[0] || "";
+    },
+
+    shouldPrefer(currentRoomType, nextRoomType, connected = false) {
+        if (connected) return false;
+        if (!currentRoomType || !nextRoomType) return false;
+
+        const currentPriority = this.priority[currentRoomType] ?? 99;
+        const nextPriority = this.priority[nextRoomType] ?? 99;
+        return nextPriority < currentPriority;
+    },
+
+    withPreferred(roomIds = {}, roomType, roomId) {
+        const reordered = {[roomType]: roomId};
+        Object.keys(roomIds).forEach(existingType => {
+            if (existingType !== roomType) reordered[existingType] = roomIds[existingType];
+        });
+        return reordered;
+    }
+};
+
+globalThis.SignalingRoomPriority = SignalingRoomPriority;
+
+const ServerConnectionIdentityProtocol = {
+    key(identity = null) {
+        if (!identity?.pubkey) return "";
+
+        return [
+            identity.pubkey,
+            identity.event?.id || "",
+            identity.event?.sig || ""
+        ].join(":");
+    },
+
+    serverIdentity(identity = null) {
+        if (!identity?.event) return null;
+
+        return {
+            pubkey: identity.pubkey || identity.event.pubkey,
+            event: identity.event
+        };
+    },
+
+    storedKey(storage = globalThis.localStorage) {
+        if (!storage?.getItem) return "";
+
+        try {
+            return this.key(JSON.parse(storage.getItem("meshdrop_nostr_identity")) || null);
+        } catch {
+            return "";
+        }
+    },
+
+    storedServerIdentity(storage = globalThis.localStorage) {
+        if (!storage?.getItem) return null;
+
+        try {
+            return this.serverIdentity(JSON.parse(storage.getItem("meshdrop_nostr_identity")) || null);
+        } catch {
+            return null;
+        }
+    }
+};
+
+globalThis.ServerConnectionIdentityProtocol = ServerConnectionIdentityProtocol;
+
 class ServerConnection {
 
     constructor() {
@@ -13,12 +90,14 @@ class ServerConnection {
         Events.on('leave-ip-room', _ => this.send({ type: 'leave-ip-room'}));
         Events.on('join-fips-room', _ => this.send({ type: 'join-fips-room'}));
         Events.on('leave-fips-room', _ => this.send({ type: 'leave-fips-room'}));
+        Events.on('join-pollen-room', _ => this.send({ type: 'join-pollen-room'}));
+        Events.on('leave-pollen-room', _ => this.send({ type: 'leave-pollen-room'}));
         Events.on('room-secrets-deleted', e => this.send({ type: 'room-secrets-deleted', roomSecrets: e.detail}));
         Events.on('regenerate-room-secret', e => this.send({ type: 'regenerate-room-secret', roomSecret: e.detail}));
         Events.on('pair-device-initiate', _ => this._onPairDeviceInitiate());
         Events.on('pair-device-join', e => this._onPairDeviceJoin(e.detail));
         Events.on('pair-device-cancel', _ => this.send({ type: 'pair-device-cancel' }));
-        Events.on('nostr-identity-changed', _ => this._reconnect());
+        Events.on('nostr-identity-changed', e => this._onNostrIdentityChanged(e.detail));
 
         Events.on('create-public-room', _ => this._onCreatePublicRoom());
         Events.on('join-public-room', e => this._onJoinPublicRoom(e.detail.roomId, e.detail.createIfInvalid));
@@ -28,6 +107,14 @@ class ServerConnection {
         Events.on('online', _ => this._connect());
 
         this._getConfig().then(() => this._connect());
+    }
+
+    _onNostrIdentityChanged(identity) {
+        const nextIdentityKey = ServerConnectionIdentityProtocol.key(identity);
+        if (nextIdentityKey === this._serverIdentityKey) return;
+
+        this._serverIdentityKey = nextIdentityKey;
+        this._reconnect();
     }
 
     _getConfig() {
@@ -75,6 +162,7 @@ class ServerConnection {
         clearTimeout(this._reconnectTimer);
         if (!this._config) return;
         if (this._isConnected() || this._isConnecting() || this._isOffline()) return;
+        this._serverIdentityKey = ServerConnectionIdentityProtocol.storedKey();
         if (this._isReconnect) {
             Events.fire('notify-user', {
                 message: Localization.getTranslation("notifications.connecting"),
@@ -194,9 +282,13 @@ class ServerConnection {
             case 'fips-status':
                 Events.fire('fips-status', msg.status);
                 break;
+            case 'pollen-status':
+                Events.fire('pollen-status', msg.status);
+                break;
             case 'request':
             case 'blossom-request':
             case 'hashtree-request':
+            case 'pollen-request':
             case 'header':
             case 'partition':
             case 'partition-received':
@@ -276,9 +368,9 @@ class ServerConnection {
             wsUrl.searchParams.append('peer_id_hash', peerIdHash);
         }
 
-        const nostrIdentity = localStorage.getItem('meshdrop_nostr_identity');
+        const nostrIdentity = ServerConnectionIdentityProtocol.storedServerIdentity();
         if (nostrIdentity) {
-            wsUrl.searchParams.append('nostr_identity', nostrIdentity);
+            wsUrl.searchParams.append('nostr_identity', JSON.stringify(nostrIdentity));
         }
 
         return wsUrl.toString();
@@ -467,6 +559,10 @@ class Peer {
             return this.requestBlossomFileTransfer(files, selectedTransfer);
         }
 
+        if (selectedTransfer?.id === "pollen") {
+            return this.requestPollenFileTransfer(files, selectedTransfer);
+        }
+
         const request = await this._createFileTransferRequest(files, selectedTransfer);
         this._filesRequested = files;
         this._selectedTransfer = selectedTransfer;
@@ -487,29 +583,123 @@ class Peer {
             return {id: "blossom", type: "storage", label: "Blossom"};
         }
 
+        if (globalThis.meshdropPollenTransfer?.isActive()) {
+            return {id: "pollen", type: "storage", label: "Pollen"};
+        }
+
         return {id: "direct", type: "direct", label: "Direct"};
     }
 
     async requestBlossomFileTransfer(files, transfer = {id: "blossom", type: "storage", label: "Blossom"}) {
         try {
             const request = await this._createFileTransferRequest(files, transfer);
-            const blossomDescriptors = await globalThis.meshdropBlossomTransfer.uploadFiles(files, progress => {
+            const contentKey = await BlossomTransferProtocol.generateContentKey();
+            const keyDelivery = await this._createBlossomKeyDelivery(contentKey);
+            const {blossomDescriptors, blossomEncryption} = await globalThis.meshdropBlossomTransfer.uploadEncryptedFiles(
+                files,
+                request.header,
+                contentKey,
+                progress => {
                 Events.fire('set-progress', {peerId: this._peerId, progress: 0.8 + 0.2 * progress, status: 'prepare', transport: transfer});
-            });
+                }
+            );
 
             Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
             this.sendJSON({
                 type: 'blossom-request',
                 ...request,
-                blossomDescriptors
+                blossomDescriptors,
+                blossomEncryption: {
+                    ...blossomEncryption,
+                    keyDelivery
+                }
             });
             Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
         }
         catch (error) {
             console.error(error);
             Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
-            Events.fire('notify-user', Localization.getTranslation("notifications.blossom-transfer-upload-failed"));
+            Events.fire(
+                'notify-user',
+                `${Localization.getTranslation("notifications.blossom-transfer-upload-failed")}: ${error.message}`
+            );
         }
+    }
+
+    _isBlossomKeyDeliveryChannelTrusted() {
+        return false;
+    }
+
+    _isNostrPubkey(value) {
+        return /^[0-9a-f]{64}$/i.test(value || "");
+    }
+
+    async _createBlossomKeyDelivery(contentKey) {
+        const key = BlossomTransferProtocol.bytesToBase64Url(await BlossomTransferProtocol.exportContentKey(contentKey));
+        const keyEnvelope = {
+            version: BlossomTransferProtocol.keyEnvelopeVersion,
+            algorithm: BlossomTransferProtocol.contentAlgorithm,
+            key
+        };
+
+        if (this._isBlossomKeyDeliveryChannelTrusted()) {
+            return {
+                type: "rtc-data-channel",
+                version: keyEnvelope.version,
+                algorithm: keyEnvelope.algorithm,
+                key
+            };
+        }
+
+        const identityController = globalThis.meshdropNostrIdentity;
+        const senderIdentity = identityController?.getIdentity?.();
+        if (senderIdentity?.pubkey && this._isNostrPubkey(this._peerId) && identityController.canNip44?.()) {
+            return {
+                type: "nip44",
+                version: keyEnvelope.version,
+                algorithm: keyEnvelope.algorithm,
+                senderPubkey: senderIdentity.pubkey,
+                recipientPubkey: this._peerId,
+                ciphertext: await identityController.encryptNip44To(this._peerId, JSON.stringify(keyEnvelope))
+            };
+        }
+
+        throw new Error("Encrypted Blossom key delivery requires WebRTC data channel or NIP-44 signer support");
+    }
+
+    async _unwrapBlossomTransferKey(envelope) {
+        const keyDelivery = envelope?.keyDelivery;
+        if (!keyDelivery) throw new Error("Blossom key delivery envelope is missing");
+
+        if (keyDelivery.type === "rtc-data-channel") {
+            if (!this._isBlossomKeyDeliveryChannelTrusted()) {
+                throw new Error("Refusing raw Blossom key delivery on an untrusted channel");
+            }
+            return BlossomTransferProtocol.importContentKeyForDecrypt(BlossomTransferProtocol.base64UrlToBytes(keyDelivery.key));
+        }
+
+        if (keyDelivery.type === "nip44") {
+            const identityController = globalThis.meshdropNostrIdentity;
+            const identity = identityController?.getIdentity?.();
+            if (!identity?.pubkey || identity.pubkey !== keyDelivery.recipientPubkey) {
+                throw new Error("Blossom NIP-44 key delivery recipient mismatch");
+            }
+            if (!identityController.canNip44?.()) {
+                throw new Error("Blossom NIP-44 key delivery requires signer support");
+            }
+
+            const plaintext = await identityController.decryptNip44From(keyDelivery.senderPubkey, keyDelivery.ciphertext);
+            const keyEnvelope = JSON.parse(plaintext);
+            if (keyEnvelope.version !== BlossomTransferProtocol.keyEnvelopeVersion) {
+                throw new Error("Unsupported Blossom key envelope version");
+            }
+            if (keyEnvelope.algorithm !== BlossomTransferProtocol.contentAlgorithm) {
+                throw new Error("Unsupported Blossom key algorithm");
+            }
+            return BlossomTransferProtocol.importContentKeyForDecrypt(BlossomTransferProtocol.base64UrlToBytes(keyEnvelope.key));
+        }
+
+        throw new Error("Unsupported Blossom key delivery type");
     }
 
     async requestHashtreeFileTransfer(files, transfer = {id: "hashtree", type: "storage", label: "Hashtree"}) {
@@ -531,6 +721,31 @@ class Peer {
             console.error(error);
             Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
             Events.fire('notify-user', Localization.getTranslation("notifications.hashtree-transfer-upload-failed"));
+        }
+    }
+
+    async requestPollenFileTransfer(files, transfer = {id: "pollen", type: "storage", label: "Pollen"}) {
+        try {
+            const request = await this._createFileTransferRequest(files, transfer);
+            const pollenDescriptors = await globalThis.meshdropPollenTransfer.uploadFiles(files, progress => {
+                Events.fire('set-progress', {peerId: this._peerId, progress: 0.8 + 0.2 * progress, status: 'prepare', transport: transfer});
+            });
+
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
+            this.sendJSON({
+                type: 'pollen-request',
+                ...request,
+                pollenDescriptors
+            });
+            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
+        }
+        catch (error) {
+            console.error(error);
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
+            Events.fire(
+                'notify-user',
+                `${Localization.getTranslation("notifications.pollen-transfer-upload-failed")}: ${error.message}`
+            );
         }
     }
 
@@ -636,6 +851,9 @@ class Peer {
             case 'hashtree-request':
                 this._onHashtreeFilesTransferRequest(messageJSON);
                 break;
+            case 'pollen-request':
+                this._onPollenFilesTransferRequest(messageJSON);
+                break;
             case 'header':
                 this._onFileHeader(messageJSON);
                 break;
@@ -716,7 +934,7 @@ class Peer {
 
         try {
             const parsed = JSON.parse(message);
-            if (["request", "blossom-request", "hashtree-request"].includes(parsed.type)) {
+            if (["request", "blossom-request", "hashtree-request", "pollen-request"].includes(parsed.type)) {
                 this.sendJSON({type: 'files-transfer-response', accepted: false, reason: 'not-followed'});
             }
         } catch {
@@ -727,12 +945,23 @@ class Peer {
     }
 
     _onBlossomFilesTransferRequest(request) {
+        if (!request.blossomEncryption?.version) {
+            this.sendJSON({type: 'files-transfer-response', accepted: false, reason: 'blossom-encryption-required'});
+            Events.fire('notify-user', Localization.getTranslation("notifications.blossom-transfer-encryption-required"));
+            return;
+        }
+
         request.blossom = true;
         this._onFilesTransferRequest(request);
     }
 
     _onHashtreeFilesTransferRequest(request) {
         request.hashtree = true;
+        this._onFilesTransferRequest(request);
+    }
+
+    _onPollenFilesTransferRequest(request) {
+        request.pollen = true;
         this._onFilesTransferRequest(request);
     }
 
@@ -743,7 +972,8 @@ class Peer {
             type: 'files-transfer-response',
             accepted: accepted,
             blossom: !!pendingRequest?.blossom,
-            hashtree: !!pendingRequest?.hashtree
+            hashtree: !!pendingRequest?.hashtree,
+            pollen: !!pendingRequest?.pollen
         });
         if (accepted) {
             this._requestAccepted = pendingRequest;
@@ -759,6 +989,10 @@ class Peer {
 
         if (accepted && pendingRequest?.hashtree) {
             this._downloadHashtreeFiles(pendingRequest);
+        }
+
+        if (accepted && pendingRequest?.pollen) {
+            this._downloadPollenFiles(pendingRequest);
         }
     }
 
@@ -836,10 +1070,21 @@ class Peer {
 
     async _downloadBlossomFiles(request) {
         try {
+            const blossomEncryption = BlossomTransferProtocol.validateEncryptionEnvelope(
+                request.blossomEncryption,
+                request.header
+            );
+            const contentKey = await this._unwrapBlossomTransferKey(blossomEncryption);
+
             for (let i = 0; i < request.blossomDescriptors.length; i++) {
                 const file = await globalThis.meshdropBlossomTransfer.downloadDescriptor(
                     request.blossomDescriptors[i],
-                    request.header[i]
+                    request.header[i],
+                    {
+                        envelope: blossomEncryption,
+                        contentKey,
+                        index: i
+                    }
                 );
 
                 this._totalBytesReceived += file.size;
@@ -862,7 +1107,10 @@ class Peer {
         }
         catch (error) {
             console.error(error);
-            Events.fire('notify-user', Localization.getTranslation("notifications.blossom-transfer-download-failed"));
+            Events.fire(
+                'notify-user',
+                `${Localization.getTranslation("notifications.blossom-transfer-download-failed")}: ${error.message}`
+            );
             Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
             this._busy = false;
             this._filesReceived = [];
@@ -903,6 +1151,47 @@ class Peer {
         }
     }
 
+    async _downloadPollenFiles(request) {
+        try {
+            const files = [];
+            for (let i = 0; i < request.pollenDescriptors.length; i++) {
+                const file = await globalThis.meshdropPollenTransfer.downloadDescriptor(
+                    request.pollenDescriptors[i],
+                    request.header[i]
+                );
+
+                this._totalBytesReceived += file.size;
+                this._onDownloadProgress(this._totalBytesReceived / request.totalSize);
+                Events.fire('file-received', file);
+                files.push(file);
+            }
+
+            this._filesReceived = files;
+            this._busy = false;
+            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
+            Events.fire('files-received', {
+                peerId: this._peerId,
+                files: this._filesReceived,
+                imagesOnly: request.imagesOnly,
+                totalSize: request.totalSize
+            });
+            this._filesReceived = [];
+            this._requestAccepted = null;
+            this.sendJSON({type: 'file-transfer-complete'});
+        }
+        catch (error) {
+            console.error(error);
+            Events.fire(
+                'notify-user',
+                `${Localization.getTranslation("notifications.pollen-transfer-download-failed")}: ${error.message}`
+            );
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
+            this._busy = false;
+            this._filesReceived = [];
+            this._requestAccepted = null;
+        }
+    }
+
     _onFileTransferCompleted() {
         this._chunker = null;
         if (!this._filesQueue.length) {
@@ -924,11 +1213,14 @@ class Peer {
             if (message.reason === 'ios-memory-limit') {
                 Events.fire('notify-user', Localization.getTranslation("notifications.ios-memory-limit"));
             }
+            else if (message.reason === 'blossom-encryption-required') {
+                Events.fire('notify-user', Localization.getTranslation("notifications.blossom-transfer-encryption-required"));
+            }
             return;
         }
         Events.fire('file-transfer-accepted');
         Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'transfer', transport: this._selectedTransfer});
-        if (message.blossom || message.hashtree) {
+        if (message.blossom || message.hashtree || message.pollen) {
             return;
         }
         this.sendFiles();
@@ -974,6 +1266,9 @@ class RTCPeer extends Peer {
         this.rtcSupported = true;
         this.rtcConfig = rtcConfig
         this._intentionalDisconnect = false;
+        this._signalSessionId = "";
+        this._pendingIceCandidates = [];
+        this._remoteOfferSdp = "";
 
         if (!this._isCaller) return; // we will listen for a caller
         this._connect();
@@ -996,6 +1291,9 @@ class RTCPeer extends Peer {
         this._conn.onicecandidateerror = e => this._onError(e);
         this._conn.onconnectionstatechange = _ => this._onConnectionStateChange();
         this._conn.oniceconnectionstatechange = e => this._onIceConnectionStateChange(e);
+        this._pendingIceCandidates = [];
+        this._remoteOfferSdp = "";
+        this._signalSessionId = this._isCaller ? this._createSignalSessionId() : "";
     }
 
     _openChannel() {
@@ -1031,22 +1329,105 @@ class RTCPeer extends Peer {
         if (!this._conn) this._connect();
 
         if (message.sdp) {
-            this._conn
-                .setRemoteDescription(message.sdp)
-                .then(_ => {
-                    if (message.sdp.type === 'offer') {
-                        return this._conn
-                            .createAnswer()
-                            .then(d => this._onDescription(d));
-                    }
-                })
-                .catch(e => this._onError(e));
+            this._onRemoteDescription(message);
         }
         else if (message.ice) {
-            this._conn
-                .addIceCandidate(new RTCIceCandidate(message.ice))
-                .catch(e => this._onError(e));
+            this._onRemoteIceCandidate(message);
         }
+    }
+
+    _onRemoteDescription(message) {
+        if (this._shouldIgnoreSignal(message)) return;
+
+        const description = message.sdp;
+        if (description.type === 'answer' && this._conn.signalingState !== 'have-local-offer') return;
+        if (description.type === 'offer' && this._shouldIgnoreOffer(description)) return;
+
+        if (description.type === 'offer') {
+            this._signalSessionId = message.sessionId || this._createSignalSessionId();
+            this._remoteOfferSdp = description.sdp || "";
+        }
+
+        this._conn
+            .setRemoteDescription(description)
+            .then(_ => this._flushPendingIceCandidates())
+            .then(_ => {
+                if (description.type === 'offer') {
+                    return this._conn
+                        .createAnswer()
+                        .then(d => this._onDescription(d));
+                }
+            })
+            .catch(e => this._onError(e));
+    }
+
+    _shouldIgnoreOffer(description) {
+        if (this._isCaller) return true;
+        if (this._remoteOfferSdp && this._remoteOfferSdp === (description.sdp || "")) return true;
+        if (this._isConnected()) return true;
+        return this._conn.signalingState !== 'stable';
+    }
+
+    _onRemoteIceCandidate(message) {
+        if (this._shouldIgnoreSignal(message)) return;
+
+        const candidate = new RTCIceCandidate(message.ice);
+        if (!this._conn.remoteDescription) {
+            this._pendingIceCandidates.push({
+                candidate,
+                sessionId: message.sessionId || ""
+            });
+            return;
+        }
+
+        this._addIceCandidate(candidate);
+    }
+
+    _flushPendingIceCandidates() {
+        if (!this._pendingIceCandidates.length || !this._conn.remoteDescription) return;
+
+        const candidates = this._pendingIceCandidates;
+        this._pendingIceCandidates = [];
+        candidates.forEach(entry => {
+            if (this._shouldIgnoreSignalSession(entry.sessionId)) return;
+            this._addIceCandidate(entry.candidate);
+        });
+    }
+
+    _addIceCandidate(candidate) {
+        if (!this._candidateMatchesRemoteDescription(candidate)) return;
+
+        this._conn
+            .addIceCandidate(candidate)
+            .catch(e => this._onError(e));
+    }
+
+    _candidateMatchesRemoteDescription(candidate) {
+        if (!candidate.usernameFragment || !this._conn.remoteDescription?.sdp) return true;
+
+        return this._remoteIceUfrags().includes(candidate.usernameFragment);
+    }
+
+    _remoteIceUfrags() {
+        return (this._conn.remoteDescription?.sdp || "")
+            .split("\r\n")
+            .filter(line => line.startsWith("a=ice-ufrag:"))
+            .map(line => line.substring("a=ice-ufrag:".length));
+    }
+
+    _shouldIgnoreSignal(message) {
+        return this._shouldIgnoreSignalSession(message.sessionId || "");
+    }
+
+    _shouldIgnoreSignalSession(sessionId) {
+        if (sessionId) return !!this._signalSessionId && sessionId !== this._signalSessionId;
+        return false;
+    }
+
+    _createSignalSessionId() {
+        if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+
+        return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     }
 
     _onChannelOpened(event) {
@@ -1126,8 +1507,7 @@ class RTCPeer extends Peer {
         console.log('RTC: state changed:', this._conn.connectionState);
         switch (this._conn.connectionState) {
             case 'disconnected':
-                Events.fire('peer-disconnected', this._peerId);
-                this._onError('rtc connection disconnected');
+                console.warn('RTC: connection temporarily disconnected', this._peerId);
                 break;
             case 'failed':
                 Events.fire('peer-disconnected', this._peerId);
@@ -1155,9 +1535,16 @@ class RTCPeer extends Peer {
         this._channel.send(message);
     }
 
+    _isBlossomKeyDeliveryChannelTrusted() {
+        // Browser RTCDataChannel sends SCTP over DTLS. MDN documents all WebRTC data as encrypted;
+        // RFC 8831 documents SCTP-over-DTLS confidentiality, authentication, and integrity.
+        return true;
+    }
+
     _sendSignal(signal) {
         signal.type = 'signal';
         signal.to = this._peerId;
+        if (this._signalSessionId) signal.sessionId = this._signalSessionId;
         signal.roomType = this._getRoomTypes()[0];
         signal.roomId = this._roomIds[this._getRoomTypes()[0]];
         this._server.send(signal);
@@ -1179,6 +1566,27 @@ class RTCPeer extends Peer {
 
     _isConnecting() {
         return this._channel && this._channel.readyState === 'connecting';
+    }
+
+    switchSignalingRoute(isCaller, roomType, roomId, transport) {
+        this._intentionalDisconnect = true;
+        if (this._channel) {
+            this._channel.onclose = null;
+            this._channel.close();
+        }
+        if (this._conn) this._conn.close();
+
+        this._channel = null;
+        this._conn = null;
+        this._signalSessionId = "";
+        this._pendingIceCandidates = [];
+        this._remoteOfferSdp = "";
+        this._intentionalDisconnect = false;
+        this._isCaller = isCaller;
+        this._server = transport;
+        this._roomIds = SignalingRoomPriority.withPreferred(this._roomIds, roomType, roomId);
+
+        if (this._isCaller) this._connect();
     }
 
     sendDisplayName(displayName) {
@@ -1233,7 +1641,9 @@ class PeersManager {
 
     constructor(serverConnection) {
         this.peers = {};
+        this._peerAliases = {};
         this._server = serverConnection;
+        this._pendingPeerMessages = [];
         Events.on('signal', e => this._onMessage(e.detail));
         Events.on('peers', e => this._onPeers(e.detail));
         Events.on('files-selected', e => this._onFilesSelected(e.detail));
@@ -1243,6 +1653,9 @@ class PeersManager {
         Events.on('peer-joined', e => this._onPeerJoined(e.detail));
         Events.on('peer-connected', e => this._onPeerConnected(e.detail.peerId));
         Events.on('peer-disconnected', e => this._onPeerDisconnected(e.detail));
+        Events.on('leave-ip-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('ip'));
+        Events.on('leave-fips-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('fips'));
+        Events.on('leave-pollen-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('pollen'));
 
         // this device closes connection
         Events.on('room-secrets-deleted', e => this._onRoomSecretsDeleted(e.detail));
@@ -1263,10 +1676,13 @@ class PeersManager {
 
     _onWsConfig(wsConfig) {
         this._wsConfig = wsConfig;
+        const pendingPeerMessages = this._pendingPeerMessages;
+        this._pendingPeerMessages = [];
+        pendingPeerMessages.forEach(args => this._createOrRefreshPeer(...args));
     }
 
     _onMessage(message) {
-        const peerId = message.sender.id;
+        const peerId = this._resolvePeerId(message.sender.id);
         if (!this.peers[peerId]) return;
         this.peers[peerId].onServerMessage(message);
     }
@@ -1275,7 +1691,8 @@ class PeersManager {
         if (!this._peerExists(peerId)) return false;
 
         const peer = this.peers[peerId];
-        const roomTypesDiffer = Object.keys(peer._roomIds)[0] !== roomType;
+        const currentPrimaryRoomType = SignalingRoomPriority.primary(peer._roomIds);
+        const roomTypesDiffer = currentPrimaryRoomType !== roomType;
         const roomIdsDiffer = peer._roomIds[roomType] !== roomId;
 
         // if roomType or roomId for roomType differs peer is already connected
@@ -1293,12 +1710,28 @@ class PeersManager {
     }
 
     _createOrRefreshPeer(isCaller, peerId, roomType, roomId, rtcSupported, transport = this._server, peerInfo = null) {
+        if (roomType === "ip" && globalThis.meshdropLocalDiscovery?.isEnabled?.() === false) return;
+
+        if (!this._wsConfig) {
+            this._pendingPeerMessages.push([isCaller, peerId, roomType, roomId, rtcSupported, transport, peerInfo]);
+            return;
+        }
+
         const policyPeer = peerInfo || {id: peerId};
         const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
         if (globalThis.NostrFollowPolicy?.allowsPeer(policyPeer, roomType, identity) === false) return;
 
+        this._rememberPeerAliases(peerId, policyPeer);
+
         if (this._peerExists(peerId)) {
+            const peer = this.peers[peerId];
+            const currentRoomType = SignalingRoomPriority.primary(peer._roomIds);
+            const connected = peer._isConnected?.() === true;
+            const preferNewRoute = SignalingRoomPriority.shouldPrefer(currentRoomType, roomType, connected);
             this._refreshPeer(peerId, roomType, roomId);
+            if (preferNewRoute && peer.switchSignalingRoute) {
+                peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server);
+            }
             return;
         }
 
@@ -1328,7 +1761,7 @@ class PeersManager {
 
     _onPeers(message) {
         message.peers.forEach(peer => {
-            this._createOrRefreshPeer(true, peer.id, message.roomType, message.roomId, peer.rtcSupported, message.transport, peer);
+            this._createOrRefreshPeer(peer.isCaller ?? true, peer.id, message.roomType, message.roomId, peer.rtcSupported, message.transport, peer);
         })
     }
 
@@ -1337,34 +1770,35 @@ class PeersManager {
 
         const messageJSON = JSON.parse(message);
         if (messageJSON.type === 'ws-chunk') message = base64ToArrayBuffer(messageJSON.chunk);
-        this.peers[messageJSON.sender.id]._onMessage(message);
+        this.peers[this._resolvePeerId(messageJSON.sender.id)]?._onMessage(message);
     }
 
     _onRespondToFileTransferRequest(detail) {
-        this.peers[detail.to]._respondToFileTransferRequest(detail.accepted);
+        this.peers[this._resolvePeerId(detail.to)]?._respondToFileTransferRequest(detail.accepted);
     }
 
     async _onFilesSelected(message) {
-        if (!this.peers[message.to]) return;
+        const peerId = this._resolvePeerId(message.to);
+        if (!this.peers[peerId]) return;
 
         let files = mime.addMissingMimeTypesToFiles([...message.files]);
-        await this.peers[message.to].requestFileTransfer(files, message.transport || null);
+        await this.peers[peerId].requestFileTransfer(files, message.transport || null);
     }
 
     _onSendText(message) {
-        if (!this.peers[message.to]) return;
+        const peerId = this._resolvePeerId(message.to);
+        if (!this.peers[peerId]) return;
 
-        this.peers[message.to].sendText(message.text);
+        this.peers[peerId].sendText(message.text);
     }
 
     _onPeerLeft(message) {
         if (this._peerExists(message.peerId) && this._webRtcSupported(message.peerId)) {
             console.log('WSPeer left:', message.peerId);
         }
-        if (message.disconnect === true) {
-            // if user actively disconnected from PairDrop server, disconnect all peer to peer connections immediately
-            this._disconnectOrRemoveRoomTypeByPeerId(message.peerId, message.roomType);
+        this._disconnectOrRemoveRoomTypeByPeerId(message.peerId, message.roomType);
 
+        if (message.disconnect === true) {
             // If no peers are connected anymore, we can safely assume that no other tab on the same browser is connected:
             // Tidy up peerIds in localStorage
             if (Object.keys(this.peers).length === 0) {
@@ -1403,6 +1837,7 @@ class PeersManager {
     _onPeerDisconnected(peerId) {
         const peer = this.peers[peerId];
         delete this.peers[peerId];
+        this._forgetPeerAliases(peerId);
         if (!peer || !peer._conn) return;
         peer._intentionalDisconnect = true;
         if (peer._channel) peer._channel.onclose = null;
@@ -1432,6 +1867,13 @@ class PeersManager {
 
         for (let i=0; i<peerIds.length; i++) {
             this._disconnectOrRemoveRoomTypeByPeerId(peerIds[i], roomType);
+        }
+    }
+
+    _disconnectOrRemoveRoomTypeByRoomType(roomType) {
+        const peerIds = Object.keys(this.peers).filter(peerId => this.peers[peerId]._roomIds?.[roomType]);
+        for (const peerId of peerIds) {
+            this._disconnectOrRemoveRoomTypeByPeerId(peerId, roomType);
         }
     }
 
@@ -1469,9 +1911,9 @@ class PeersManager {
     }
 
     _notifyPeerDisplayNameChanged(peerId) {
-        const peer = this.peers[peerId];
+        const peer = this.peers[this._resolvePeerId(peerId)];
         if (!peer) return;
-        this.peers[peerId].sendDisplayName(this._displayName);
+        peer.sendDisplayName(this._displayName);
     }
 
     _onDisplayName(displayName) {
@@ -1501,6 +1943,28 @@ class PeersManager {
             }
         }
         return peerIds;
+    }
+
+    _rememberPeerAliases(peerId, peerInfo = {}) {
+        if (!peerId) return;
+
+        this._peerAliases[peerId] = peerId;
+        if (peerInfo.id) this._peerAliases[peerInfo.id] = peerId;
+        if (peerInfo.nostrIdentity?.pubkey) this._peerAliases[peerInfo.nostrIdentity.pubkey] = peerId;
+
+        Object.values(peerInfo._peerIdsByRoomType || {}).forEach(alias => {
+            if (alias) this._peerAliases[alias] = peerId;
+        });
+    }
+
+    _forgetPeerAliases(peerId) {
+        Object.keys(this._peerAliases).forEach(alias => {
+            if (this._peerAliases[alias] === peerId) delete this._peerAliases[alias];
+        });
+    }
+
+    _resolvePeerId(peerId) {
+        return this._peerAliases[peerId] || peerId;
     }
 }
 

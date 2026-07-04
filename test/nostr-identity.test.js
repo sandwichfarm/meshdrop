@@ -144,5 +144,12 @@ test("peer uses verified Nostr identity as display name", () => {
     );
 
     assert.equal(peer.nostrIdentity.pubkey, identity.pubkey);
+    assert.equal(peer.id, identity.pubkey);
     assert.equal(peer.name.displayName, "Alice Nostr");
+});
+
+test("peer id validation accepts UUIDs and Nostr pubkeys", () => {
+    assert.equal(Peer.isValidPeerId("01234567-89ab-4def-8123-456789abcdef"), true);
+    assert.equal(Peer.isValidPeerId("a".repeat(64)), true);
+    assert.equal(Peer.isValidPeerId("npub1invalid"), false);
 });

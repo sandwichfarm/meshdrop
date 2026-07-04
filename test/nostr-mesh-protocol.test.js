@@ -15,6 +15,7 @@ await import("../public/scripts/nostr-mesh.js");
 
 test("Nostr mesh protocol uses NIP-100 draft kind and configured room", () => {
     assert.equal(globalThis.NostrMeshProtocol.kind, 25050);
+    assert.equal(globalThis.NostrMeshProtocol.presenceHeartbeatMs, 25000);
     assert.equal(
         globalThis.NostrMeshProtocol.roomFromConfig({nostrMesh: {room: "mesh"}}),
         "mesh:meshdrop.test"
@@ -64,8 +65,8 @@ test("Nostr mesh protocol maps PairDrop RTC signals to draft event types", () =>
         "offer"
     );
     assert.deepEqual(
-        globalThis.NostrMeshProtocol.signalContent({ice: {candidate: "candidate"}}),
-        {ice: {candidate: "candidate"}}
+        globalThis.NostrMeshProtocol.signalContent({ice: {candidate: "candidate"}, sessionId: "session-1"}),
+        {ice: {candidate: "candidate"}, sessionId: "session-1"}
     );
 });
 
@@ -110,4 +111,119 @@ test("Nostr mesh only handles events from followed pubkeys", () => {
 
     assert.equal(mesh._shouldHandleEvent(event(followed)), true);
     assert.equal(mesh._shouldHandleEvent(event(stranger)), false);
+});
+
+test("Nostr mesh republishes ephemeral WEB-RTC presence on a heartbeat", () => {
+    const originalSetInterval = globalThis.setInterval;
+    const originalClearInterval = globalThis.clearInterval;
+    const intervals = [];
+    const cleared = [];
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+    let publishCount = 0;
+
+    globalThis.setInterval = (callback, ms) => {
+        intervals.push({callback, ms});
+        return intervals.length;
+    };
+    globalThis.clearInterval = id => cleared.push(id);
+
+    try {
+        mesh._presenceHeartbeatId = null;
+        mesh._publishPresence = type => {
+            assert.equal(type, "connect");
+            publishCount += 1;
+        };
+
+        mesh._startPresenceHeartbeat();
+        assert.equal(intervals.length, 1);
+        assert.equal(intervals[0].ms, globalThis.NostrMeshProtocol.presenceHeartbeatMs);
+
+        intervals[0].callback();
+        assert.equal(publishCount, 1);
+
+        mesh._stopPresenceHeartbeat();
+        assert.deepEqual(cleared, [1]);
+        assert.equal(mesh._presenceHeartbeatId, null);
+    }
+    finally {
+        globalThis.setInterval = originalSetInterval;
+        globalThis.clearInterval = originalClearInterval;
+    }
+});
+
+test("Nostr mesh reports relay publish rejections without treating them as events", () => {
+    const originalWarn = console.warn;
+    const warnings = [];
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+
+    console.warn = (...args) => warnings.push(args);
+
+    try {
+        mesh._onRelayMessage(JSON.stringify(["OK", "event-id", false, "blocked: unsupported kind"]));
+
+        assert.equal(warnings.length, 1);
+        assert.equal(warnings[0][0], "Nostr mesh relay rejected publish");
+        assert.equal(warnings[0][1], "event-id");
+        assert.equal(warnings[0][2], "blocked: unsupported kind");
+    }
+    finally {
+        console.warn = originalWarn;
+    }
+});
+
+test("Nostr mesh keeps active connections across same-pubkey identity hydration", () => {
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+    let disconnectCount = 0;
+
+    mesh._identity = {pubkey: "a".repeat(64), displayName: "Alice"};
+    mesh._render = () => {};
+    mesh.disconnect = () => {
+        disconnectCount += 1;
+    };
+
+    mesh._onIdentityChanged({
+        pubkey: "a".repeat(64),
+        displayName: "Alice Updated",
+        followListStatus: "found"
+    });
+
+    assert.equal(disconnectCount, 0);
+    assert.equal(mesh._identity.displayName, "Alice Updated");
+    assert.equal(mesh._identity.followListStatus, "found");
+
+    mesh._onIdentityChanged({pubkey: "b".repeat(64)});
+    assert.equal(disconnectCount, 1);
+});
+
+test("Nostr mesh disconnect removes known Nostr peers from the UI model", () => {
+    const originalEvents = globalThis.Events;
+    const fired = [];
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+
+    globalThis.Events = {
+        fire(type, detail) {
+            fired.push({type, detail});
+        }
+    };
+
+    try {
+        mesh._active = true;
+        mesh._sockets = new Map();
+        mesh._peers = new Set(["a".repeat(64), "b".repeat(64)]);
+        mesh._room = "mesh:meshdrop.test";
+        mesh._publishPresence = () => {};
+        mesh._stopPresenceHeartbeat = () => {};
+        mesh._render = () => {};
+
+        mesh.disconnect(false);
+
+        assert.deepEqual(
+            fired.filter(event => event.type === "peer-left").map(event => event.detail.peerId),
+            ["a".repeat(64), "b".repeat(64)]
+        );
+        assert.equal(mesh._peers.size, 0);
+    }
+    finally {
+        globalThis.Events = originalEvents;
+    }
 });

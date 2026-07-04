@@ -18,6 +18,7 @@ class PairDrop {
             "scripts/nostr-mesh.js",
             "scripts/blossom-transfer.js",
             "scripts/hashtree-transfer.js",
+            "scripts/pollen-transfer.js",
             "scripts/fips-discovery.js",
             "scripts/network.js",
             "scripts/ui.js",
@@ -78,11 +79,20 @@ class PairDrop {
 
     registerServiceWorker() {
         if ('serviceWorker' in navigator) {
+            const hadController = !!navigator.serviceWorker.controller;
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!hadController || refreshing) return;
+                refreshing = true;
+                window.location.reload();
+            });
+
             navigator.serviceWorker
                 .register('service-worker.js')
                 .then(serviceWorker => {
                     console.log('Service Worker registered');
-                    window.serviceWorker = serviceWorker
+                    window.serviceWorker = serviceWorker;
+                    serviceWorker?.update?.();
                 });
         }
     }
@@ -204,9 +214,13 @@ class PairDrop {
         this.nostrMesh = new NostrMeshConnection();
         this.blossomTransfer = new BlossomTransferController();
         this.hashtreeTransfer = new HashtreeTransferController();
+        this.pollenTransfer = new PollenTransferController();
         this.fipsDiscovery = new FipsDiscoveryController();
         this.server = new ServerConnection();
         this.peers = new PeersManager(this.server);
+        if (globalThis.__meshdropE2E) {
+            globalThis.__meshdropE2E.peersManager = this.peers;
+        }
     }
 
     async evaluateUrlParams() {

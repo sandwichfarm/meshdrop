@@ -1,5 +1,14 @@
 const FipsDiscoveryProtocol = {
     statusPath: "fips/status",
+    storageKey: "meshdrop_fips_discovery_enabled",
+
+    readEnabled(storage = globalThis.localStorage) {
+        return storage?.getItem?.(this.storageKey) === "true";
+    },
+
+    writeEnabled(enabled, storage = globalThis.localStorage) {
+        storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
+    },
 
     roomFromConfig(config) {
         return config?.fips?.room || "meshdrop-fips";
@@ -35,6 +44,8 @@ class FipsDiscoveryController {
         this._lastStatus = null;
         this._available = false;
         this._connecting = false;
+        this._preferredActive = FipsDiscoveryProtocol.readEnabled();
+        this._notifyNextEnabled = true;
 
         if (this.$button) {
             this.$button.addEventListener("click", _ => this.toggle());
@@ -61,13 +72,14 @@ class FipsDiscoveryController {
         await this.enable();
     }
 
-    async enable() {
+    async enable({notify = true, remember = true} = {}) {
         if (!FipsDiscoveryProtocol.enabledFromConfig(this._config)) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-server-required"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-server-required"));
             return;
         }
 
         this._connecting = true;
+        this._notifyNextEnabled = notify;
         this._render();
 
         let status;
@@ -77,7 +89,7 @@ class FipsDiscoveryController {
             this._connecting = false;
             this._available = false;
             this._render();
-            Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-unavailable"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-unavailable"));
             return;
         }
 
@@ -85,21 +97,24 @@ class FipsDiscoveryController {
             this._connecting = false;
             this._available = false;
             this._render();
-            Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-unavailable"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-unavailable"));
             return;
         }
 
+        if (remember) this._setPreferredActive(true);
         Events.fire("join-fips-room");
     }
 
-    disable(notify = true) {
+    disable(notify = true, remember = notify) {
         if (!this._active && !this._connecting) return;
 
         this._active = false;
         this._connecting = false;
+        this._notifyNextEnabled = true;
         this._render();
         Events.fire("leave-fips-room");
 
+        if (remember) this._setPreferredActive(false);
         if (notify) {
             Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-disabled"));
         }
@@ -133,6 +148,8 @@ class FipsDiscoveryController {
             this._available = false;
             this._render();
         }
+
+        await this._restorePreferredActive();
     }
 
     _onStatus(status) {
@@ -150,7 +167,22 @@ class FipsDiscoveryController {
 
         this._active = true;
         this._render();
-        Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-enabled"));
+        if (this._notifyNextEnabled) {
+            Events.fire("notify-user", Localization.getTranslation("notifications.fips-discovery-enabled"));
+        }
+        this._notifyNextEnabled = true;
+    }
+
+    _setPreferredActive(enabled) {
+        this._preferredActive = !!enabled;
+        FipsDiscoveryProtocol.writeEnabled(this._preferredActive);
+    }
+
+    async _restorePreferredActive() {
+        if (!this._preferredActive || this._active || this._connecting) return;
+        if (!FipsDiscoveryProtocol.enabledFromConfig(this._config) || !this._available) return;
+
+        await this.enable({notify: false, remember: false});
     }
 
     _render() {
@@ -175,6 +207,7 @@ class FipsDiscoveryController {
         } else {
             this.$button.removeAttribute("data-badge");
         }
+        Events.fire("footer-discovery-changed");
     }
 }
 

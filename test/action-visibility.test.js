@@ -50,6 +50,7 @@ class TestButton {
 const listeners = new Map();
 const buttons = new Map();
 let storedIdentity = null;
+let storedValues = new Map();
 
 globalThis.window = globalThis;
 globalThis.__meshdropDisableNostrRelayNetwork = true;
@@ -57,13 +58,16 @@ globalThis.location = {origin: "https://meshdrop.test"};
 globalThis.Localization = {getTranslation(key) { return key; }};
 globalThis.localStorage = {
     getItem(key) {
-        return key === "meshdrop_nostr_identity" ? storedIdentity : null;
+        if (key === "meshdrop_nostr_identity") return storedIdentity;
+        return storedValues.get(key) || null;
     },
     setItem(key, value) {
         if (key === "meshdrop_nostr_identity") storedIdentity = value;
+        else storedValues.set(key, String(value));
     },
     removeItem(key) {
         if (key === "meshdrop_nostr_identity") storedIdentity = null;
+        else storedValues.delete(key);
     }
 };
 globalThis.$ = id => buttons.get(id) || null;
@@ -83,19 +87,30 @@ await import("../public/scripts/local-discovery.js");
 await import("../public/scripts/nostr-mesh.js");
 await import("../public/scripts/blossom-transfer.js");
 await import("../public/scripts/hashtree-transfer.js");
+await import("../public/scripts/pollen-transfer.js");
 await import("../public/scripts/fips-discovery.js");
 
 function resetUi() {
     listeners.clear();
     buttons.clear();
     storedIdentity = null;
+    storedValues = new Map();
     delete globalThis.nostr;
+    delete globalThis.WebSocket;
+    delete globalThis.meshdropNostrIdentity;
+    delete globalThis.meshdropNostrMesh;
+    delete globalThis.meshdropBlossomTransfer;
+    delete globalThis.meshdropHashtreeTransfer;
+    delete globalThis.meshdropPollenTransfer;
+    delete globalThis.meshdropFipsDiscovery;
+    globalThis.window.isRtcSupported = true;
     [
         "nostr-identity",
         "local-discovery",
         "nostr-mesh",
         "blossom-transfer",
         "hashtree-transfer",
+        "pollen-transfer",
         "fips-discovery"
     ].forEach(id => buttons.set(id, new TestButton()));
 }
@@ -116,6 +131,52 @@ function installSigner(pubkey = "1".repeat(64)) {
     };
 }
 
+function installStoredIdentity(pubkey = "1".repeat(64)) {
+    storedIdentity = JSON.stringify({
+        pubkey,
+        displayName: "Stored Nostr",
+        picture: "",
+        relays: {read: [], write: []},
+        followPubkeys: [pubkey],
+        followListStatus: "found",
+        blossomServers: ["https://blossom.test"],
+        blossomServerListStatus: "found",
+        event: {
+            id: "2".repeat(64),
+            sig: "3".repeat(128),
+            pubkey
+        },
+        verified: true
+    });
+}
+
+function installOpenWebSocket() {
+    const sockets = [];
+
+    class TestWebSocket {
+        static OPEN = 1;
+
+        constructor(url) {
+            this.url = url;
+            this.readyState = TestWebSocket.OPEN;
+            this.sent = [];
+            sockets.push(this);
+        }
+
+        send(message) {
+            this.sent.push(message);
+        }
+
+        close() {
+            this.readyState = 3;
+            this.onclose?.();
+        }
+    }
+
+    globalThis.WebSocket = TestWebSocket;
+    return sockets;
+}
+
 function installPublicKeyOnlySigner(pubkey = "4".repeat(64)) {
     globalThis.nostr = {
         getPublicKey: async () => pubkey,
@@ -132,11 +193,13 @@ test("Nostr and storage actions stay hidden without a NIP-07 signer", () => {
     new globalThis.NostrMeshConnection();
     new globalThis.BlossomTransferController();
     new globalThis.HashtreeTransferController();
+    new globalThis.PollenTransferController();
 
     assert.equal(buttons.get("nostr-identity").hasAttribute("hidden"), true);
     assert.equal(buttons.get("nostr-mesh").hasAttribute("hidden"), true);
     assert.equal(buttons.get("blossom-transfer").hasAttribute("hidden"), true);
     assert.equal(buttons.get("hashtree-transfer").hasAttribute("hidden"), true);
+    assert.equal(buttons.get("pollen-transfer").hasAttribute("hidden"), true);
 });
 
 test("Local discovery is enabled by default and toggles the IP room", () => {
@@ -161,11 +224,188 @@ test("Local discovery is enabled by default and toggles the IP room", () => {
 
         controller.setEnabled(true);
         assert.equal(controller.isEnabled(), true);
-        assert.deepEqual(fired.slice(-1), ["join-ip-room"]);
+        assert.equal(fired.includes("join-ip-room"), true);
+
+        fired.length = 0;
+        controller.setEnabled(false);
+        assert.equal(fired.includes("leave-ip-room"), true);
+    } finally {
+        globalThis.Events.fire = originalFire;
+    }
+});
+
+test("Local discovery rejoins after the server display-name handshake on each websocket connection", () => {
+    resetUi();
+    const fired = [];
+    const originalFire = globalThis.Events.fire;
+    globalThis.Events.fire = (type, detail = {}) => {
+        fired.push(type);
+        originalFire(type, detail);
+    };
+
+    try {
+        const controller = new globalThis.LocalDiscoveryController();
+
+        globalThis.Events.fire("ws-connected");
+        assert.equal(fired.includes("join-ip-room"), false);
+
+        globalThis.Events.fire("display-name", {displayName: "Device"});
+        assert.equal(fired.includes("join-ip-room"), true);
+
+        fired.length = 0;
+        globalThis.Events.fire("ws-connected");
+        globalThis.Events.fire("display-name", {displayName: "Device"});
+        assert.equal(fired.includes("join-ip-room"), true);
+        assert.equal(controller.isEnabled(), true);
+    } finally {
+        globalThis.Events.fire = originalFire;
+    }
+});
+
+test("Local discovery does not rejoin after websocket reconnect when disabled", () => {
+    resetUi();
+    const fired = [];
+    const originalFire = globalThis.Events.fire;
+    globalThis.Events.fire = (type, detail = {}) => {
+        fired.push(type);
+        originalFire(type, detail);
+    };
+
+    try {
+        const controller = new globalThis.LocalDiscoveryController();
+        controller.setEnabled(false);
+        fired.length = 0;
+
+        globalThis.Events.fire("ws-connected");
+        globalThis.Events.fire("display-name", {displayName: "Device"});
+        assert.equal(fired.includes("join-ip-room"), false);
+    } finally {
+        globalThis.Events.fire = originalFire;
+    }
+});
+
+test("Local discovery disable always asks the server to leave the IP room", () => {
+    resetUi();
+    const fired = [];
+    const originalFire = globalThis.Events.fire;
+    globalThis.Events.fire = (type, detail = {}) => {
+        fired.push(type);
+        originalFire(type, detail);
+    };
+
+    try {
+        const controller = new globalThis.LocalDiscoveryController();
 
         controller.setEnabled(false);
-        assert.deepEqual(fired.slice(-1), ["leave-ip-room"]);
+
+        assert.equal(fired.includes("leave-ip-room"), true);
     } finally {
+        globalThis.Events.fire = originalFire;
+    }
+});
+
+test("Nostr mesh selection is restored after refresh", async () => {
+    resetUi();
+    const pubkey = "a".repeat(64);
+    installSigner(pubkey);
+    installStoredIdentity(pubkey);
+    const sockets = installOpenWebSocket();
+    storedValues.set("meshdrop_nostr_mesh_enabled", "true");
+
+    const identity = new globalThis.NostrIdentityController();
+    const controller = new globalThis.NostrMeshConnection();
+
+    try {
+        globalThis.Events.fire("config", {nostrMesh: {relays: ["wss://relay.test"], room: "meshdrop"}});
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        assert.equal(identity.getIdentity().pubkey, pubkey);
+        assert.equal(controller._active, true);
+        assert.equal(buttons.get("nostr-mesh").classList.contains("selected"), true);
+        assert.equal(sockets.length, 1);
+    } finally {
+        controller.disconnect(false, false);
+    }
+});
+
+test("Blossom, Hashtree, and Pollen transfer selections are restored after refresh", async () => {
+    resetUi();
+    storedValues.set("meshdrop_blossom_transfer_enabled", "true");
+    storedValues.set("meshdrop_hashtree_transfer_enabled", "true");
+    storedValues.set("meshdrop_pollen_transfer_enabled", "true");
+    globalThis.meshdropNostrIdentity = {
+        getIdentity() {
+            return {
+                blossomServerListStatus: "found",
+                blossomServers: ["https://blossom.test"]
+            };
+        }
+    };
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async url => {
+        assert.equal(url, "pollen/status");
+        return new Response(JSON.stringify({
+            enabled: true,
+            available: true,
+            version: "v0.0.1-dev.21"
+        }), {status: 200});
+    };
+
+    try {
+        const blossom = new globalThis.BlossomTransferController();
+        const hashtree = new globalThis.HashtreeTransferController();
+        const pollen = new globalThis.PollenTransferController();
+        globalThis.Events.fire("config", {
+            blossom: {servers: ["https://blossom.test"]},
+            pollen: {enabled: true}
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        assert.equal(blossom.isActive(), true);
+        assert.equal(hashtree.isActive(), true);
+        assert.equal(pollen.isActive(), true);
+        assert.equal(buttons.get("blossom-transfer").classList.contains("selected"), true);
+        assert.equal(buttons.get("hashtree-transfer").classList.contains("selected"), true);
+        assert.equal(buttons.get("pollen-transfer").classList.contains("selected"), true);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test("FIPS discovery selection is restored after refresh when daemon is available", async () => {
+    resetUi();
+    const fired = [];
+    const originalFire = globalThis.Events.fire;
+    const originalFetch = globalThis.fetch;
+    storedValues.set("meshdrop_fips_discovery_enabled", "true");
+    globalThis.fetch = async url => {
+        assert.equal(url, "fips/status");
+        return new Response(JSON.stringify({
+            enabled: true,
+            available: true,
+            peerCount: 1,
+            room: "meshdrop-fips"
+        }), {status: 200});
+    };
+    globalThis.Events.fire = (type, detail = {}) => {
+        fired.push(type);
+        originalFire(type, detail);
+    };
+
+    try {
+        const controller = new globalThis.FipsDiscoveryController();
+        await controller._onConfig({fips: {enabled: true, room: "meshdrop-fips"}});
+
+        assert.equal(fired.includes("join-fips-room"), true);
+        globalThis.Events.fire("fips-status", {enabled: true, available: true, peerCount: 1});
+
+        assert.equal(controller.isActive(), true);
+        assert.equal(buttons.get("fips-discovery").classList.contains("selected"), true);
+        assert.equal(fired.includes("notifications.fips-discovery-enabled"), false);
+    } finally {
+        globalThis.fetch = originalFetch;
         globalThis.Events.fire = originalFire;
     }
 });

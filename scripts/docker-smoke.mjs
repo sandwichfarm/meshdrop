@@ -32,11 +32,22 @@ async function main() {
         const config = await getJson(`${baseUrl}/config`);
         assert(config.nostrMesh?.room === "docker-smoke", "Nostr mesh config was not exposed");
         assert(config.fips?.enabled === true, "FIPS config was not enabled in container");
+        assert(config.pollen?.enabled === true, "Pollen config was not enabled in container");
+        assert(config.pollen?.room === "meshdrop-pollen", "Pollen federation room was not exposed");
         assert(Array.isArray(config.blossom?.servers), "Blossom config was not exposed");
 
         const fipsStatus = await getJson(`${baseUrl}/fips/status`);
         assert(fipsStatus.enabled === true, "FIPS status did not reflect configured discovery");
         assert(fipsStatus.available === false, "Smoke container should not have an attached FIPS daemon");
+
+        const pollenStatus = await getJson(`${baseUrl}/pollen/status`);
+        assert(pollenStatus.enabled === true, "Pollen status did not reflect configured transfer");
+        assert(pollenStatus.available === true, "Container-local Pollen daemon was not reachable");
+        assert(pollenStatus.version, "Container-local Pollen version was not reported");
+
+        const federation = await getJson(`${baseUrl}/.well-known/meshdrop-federation`);
+        assert(federation.kind === "meshdrop-federation", "Federation descriptor missing");
+        assert(federation.pollen?.serviceName, "Pollen federation service was not advertised");
 
         const page = await getText(baseUrl);
         assert(page.includes("<title>MeshDrop"), "MeshDrop title missing from served page");

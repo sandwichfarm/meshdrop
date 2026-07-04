@@ -25,8 +25,11 @@ class LocalDiscoveryController {
             this._render();
         }
 
-        Events.on("display-name", _ => this._onDisplayName());
-        Events.on("ws-connected", _ => this._onDisplayName());
+        Events.on("display-name", _ => this._onServerReady());
+        Events.on("ws-connected", _ => {
+            this._joined = false;
+            this._render();
+        });
         Events.on("ws-disconnected", _ => {
             this._joined = false;
             this._render();
@@ -63,12 +66,11 @@ class LocalDiscoveryController {
     }
 
     leave() {
-        if (!this._joined) return;
         this._joined = false;
         Events.fire("leave-ip-room");
     }
 
-    _onDisplayName() {
+    _onServerReady() {
         if (!this._enabled) return;
         this.join();
     }
@@ -81,6 +83,7 @@ class LocalDiscoveryController {
         this.$button.title = this._enabled
             ? "Local network discovery enabled"
             : "Local network discovery disabled";
+        Events.fire("footer-discovery-changed");
     }
 }
 

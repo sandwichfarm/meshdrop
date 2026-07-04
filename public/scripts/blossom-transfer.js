@@ -1,6 +1,28 @@
+const blossomTransferScriptSrc = (() => {
+    try {
+        return globalThis.document?.currentScript?.src
+            || globalThis.document?.querySelector?.('script[src$="scripts/blossom-transfer.js"]')?.src
+            || "";
+    } catch {
+        return "";
+    }
+})();
+
 const BlossomTransferProtocol = {
     authorizationKind: 24242,
     uploadExpirationSeconds: 10 * 60,
+    encryptionVersion: "BLOSSOM-E2EE-01",
+    keyEnvelopeVersion: "BLOSSOM-KEY-01",
+    contentAlgorithm: "AES-256-GCM",
+    storageKey: "meshdrop_blossom_transfer_enabled",
+
+    readEnabled(storage = globalThis.localStorage) {
+        return storage?.getItem?.(this.storageKey) === "true";
+    },
+
+    writeEnabled(enabled, storage = globalThis.localStorage) {
+        storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
+    },
 
     serverUrlsFromConfig(config) {
         const servers = config?.blossom?.servers || [];
@@ -10,10 +32,44 @@ const BlossomTransferProtocol = {
             .map(server => server.replace(/\/+$/, ""));
     },
 
+    hasWebCrypto() {
+        return !!(globalThis.crypto?.subtle && globalThis.crypto?.getRandomValues);
+    },
+
+    hasSubtleCrypto() {
+        return !!globalThis.crypto?.subtle;
+    },
+
+    webCrypto() {
+        if (!this.hasWebCrypto()) {
+            throw new Error("Encrypted Blossom transfers require Web Crypto. Open MeshDrop over HTTPS or localhost.");
+        }
+
+        return globalThis.crypto;
+    },
+
     async sha256Hex(blob) {
         const buffer = await blob.arrayBuffer();
-        const digest = await crypto.subtle.digest("SHA-256", buffer);
+        const digest = await this.webCrypto().subtle.digest("SHA-256", buffer);
         return this.bytesToHex(new Uint8Array(digest));
+    },
+
+    async sha256HexForEncryptedDownload(blob) {
+        const buffer = await blob.arrayBuffer();
+
+        if (this.hasSubtleCrypto()) {
+            const digest = await globalThis.crypto.subtle.digest("SHA-256", buffer);
+            return this.bytesToHex(new Uint8Array(digest));
+        }
+
+        try {
+            const sha256 = await this.fallbackSha256();
+            return this.bytesToHex(sha256(new Uint8Array(buffer)));
+        } catch (error) {
+            throw new Error(
+                `Blossom encrypted download requires Web Crypto or bundled SHA-256 fallback: ${error.message}`
+            );
+        }
     },
 
     bytesToHex(bytes) {
@@ -25,6 +81,202 @@ const BlossomTransferProtocol = {
             .replace(/\+/g, "-")
             .replace(/\//g, "_")
             .replace(/=+$/, "");
+    },
+
+    bytesToBase64Url(bytes) {
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+            binary += String.fromCharCode(...bytes.slice(i, i + 0x8000));
+        }
+        return this.base64UrlEncode(binary);
+    },
+
+    base64UrlToBytes(value) {
+        if (typeof value !== "string" || !value) throw new Error("Base64url value is missing");
+
+        const base64 = value
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+        const padded = base64 + "=".repeat((4 - base64.length % 4) % 4);
+        return Uint8Array.from(atob(padded), char => char.charCodeAt(0));
+    },
+
+    randomBytes(size) {
+        const bytes = new Uint8Array(size);
+        this.webCrypto().getRandomValues(bytes);
+        return bytes;
+    },
+
+    createTransferId() {
+        return this.bytesToBase64Url(this.randomBytes(16));
+    },
+
+    async generateContentKey() {
+        return this.webCrypto().subtle.generateKey(
+            {name: "AES-GCM", length: 256},
+            true,
+            ["encrypt", "decrypt"]
+        );
+    },
+
+    async exportContentKey(contentKey) {
+        return new Uint8Array(await this.webCrypto().subtle.exportKey("raw", contentKey));
+    },
+
+    async importContentKey(rawKey) {
+        return this.webCrypto().subtle.importKey(
+            "raw",
+            rawKey,
+            {name: "AES-GCM"},
+            false,
+            ["encrypt", "decrypt"]
+        );
+    },
+
+    async importContentKeyForDecrypt(rawKey) {
+        if (!(rawKey instanceof Uint8Array) || rawKey.length !== 32) {
+            throw new Error("Blossom AES-256-GCM key is invalid");
+        }
+
+        if (!this.hasSubtleCrypto()) return {rawKey};
+
+        return {
+            rawKey,
+            cryptoKey: await globalThis.crypto.subtle.importKey(
+                "raw",
+                rawKey,
+                {name: "AES-GCM"},
+                false,
+                ["decrypt"]
+            )
+        };
+    },
+
+    fileAad({transferId, index, header}) {
+        return new TextEncoder().encode(JSON.stringify({
+            version: this.encryptionVersion,
+            transferId,
+            index,
+            name: header?.name || "",
+            mime: header?.mime || "",
+            size: Number(header?.size) || 0
+        }));
+    },
+
+    async encryptFile(file, contentKey, {transferId, index, header}) {
+        const iv = this.randomBytes(12);
+        const ciphertext = await this.webCrypto().subtle.encrypt({
+            name: "AES-GCM",
+            iv,
+            additionalData: this.fileAad({transferId, index, header}),
+            tagLength: 128
+        }, contentKey, await file.arrayBuffer());
+
+        return {
+            blob: new Blob([ciphertext], {type: "application/octet-stream"}),
+            envelope: {
+                index,
+                iv: this.bytesToBase64Url(iv),
+                tagLength: 128
+            }
+        };
+    },
+
+    async decryptFile(blob, contentKey, {transferId, index, header, fileEnvelope}) {
+        if (!fileEnvelope || fileEnvelope.index !== index) throw new Error("Blossom encryption file envelope mismatch");
+
+        const data = await blob.arrayBuffer();
+        const iv = this.base64UrlToBytes(fileEnvelope.iv);
+        const aad = this.fileAad({transferId, index, header});
+        const tagLength = fileEnvelope.tagLength || 128;
+        let plaintext;
+
+        if (this.hasSubtleCrypto()) {
+            const cryptoKey = contentKey?.cryptoKey
+                || (contentKey instanceof Uint8Array
+                    ? await globalThis.crypto.subtle.importKey("raw", contentKey, {name: "AES-GCM"}, false, ["decrypt"])
+                    : contentKey);
+            plaintext = await globalThis.crypto.subtle.decrypt({
+                name: "AES-GCM",
+                iv,
+                additionalData: aad,
+                tagLength
+            }, cryptoKey, data);
+        } else {
+            plaintext = await this.decryptFileWithFallback({
+                rawKey: contentKey?.rawKey || contentKey,
+                iv,
+                aad,
+                ciphertextWithTag: new Uint8Array(data),
+                tagLength
+            });
+        }
+
+        if (plaintext.byteLength !== header.size) throw new Error("Blossom plaintext size mismatch");
+
+        return new File([plaintext], header.name, {
+            type: header.mime || "application/octet-stream"
+        });
+    },
+
+    async decryptFileWithFallback({rawKey, iv, aad, ciphertextWithTag, tagLength}) {
+        if (!(rawKey instanceof Uint8Array) || rawKey.length !== 32) {
+            throw new Error("Blossom encrypted download requires raw AES-256 key bytes for JS fallback");
+        }
+        if (tagLength !== 128) throw new Error("Blossom fallback decrypt requires AES-GCM 128-bit tag");
+
+        try {
+            const aesGcm = await this.fallbackAesGcm();
+            return aesGcm(rawKey, iv, aad).decrypt(ciphertextWithTag);
+        } catch (error) {
+            if (/Blossom encrypted download requires/.test(error.message)) throw error;
+            if (/invalid ghash tag|invalid tag|tag/i.test(error.message)) {
+                throw new Error("Blossom encrypted download authentication failed");
+            }
+            throw new Error(`Blossom encrypted download fallback failed: ${error.message}`);
+        }
+    },
+
+    fallbackModuleUrl(relativePath) {
+        if (globalThis.meshdropBlossomFallbackBaseUrl) {
+            return new URL(relativePath, globalThis.meshdropBlossomFallbackBaseUrl).href;
+        }
+        if (blossomTransferScriptSrc) {
+            return new URL(relativePath, blossomTransferScriptSrc).href;
+        }
+        return relativePath;
+    },
+
+    async fallbackAesGcm() {
+        if (globalThis.meshdropBlossomAesGcmFallback) {
+            return globalThis.meshdropBlossomAesGcmFallback();
+        }
+
+        const module = await import(this.fallbackModuleUrl("libs/noble-ciphers/aes.js"));
+        return module.gcm;
+    },
+
+    async fallbackSha256() {
+        if (globalThis.meshdropBlossomSha256Fallback) {
+            return globalThis.meshdropBlossomSha256Fallback();
+        }
+
+        const module = await import(this.fallbackModuleUrl("libs/noble-hashes/sha2.js"));
+        return module.sha256;
+    },
+
+    validateEncryptionEnvelope(envelope, headers = []) {
+        if (!envelope || typeof envelope !== "object") throw new Error("Blossom encryption envelope is missing");
+        if (envelope.version !== this.encryptionVersion) throw new Error("Unsupported Blossom encryption envelope version");
+        if (envelope.algorithm !== this.contentAlgorithm) throw new Error("Unsupported Blossom encryption algorithm");
+        if (!envelope.transferId) throw new Error("Blossom encryption transfer id is missing");
+        if (!Array.isArray(envelope.files) || envelope.files.length !== headers.length) {
+            throw new Error("Blossom encryption file envelope mismatch");
+        }
+        if (!envelope.keyDelivery || typeof envelope.keyDelivery !== "object") {
+            throw new Error("Blossom encryption key delivery is missing");
+        }
+        return envelope;
     },
 
     serverHost(serverUrl) {
@@ -73,6 +325,7 @@ class BlossomTransferController {
         this.$button = $("blossom-transfer");
         this._active = false;
         this._config = {};
+        this._preferredActive = BlossomTransferProtocol.readEnabled();
 
         if (this.$button) {
             this.$button.addEventListener("click", _ => this.toggle());
@@ -82,15 +335,27 @@ class BlossomTransferController {
         Events.on("config", e => {
             this._config = e.detail || {};
             this._render();
+            this._restorePreferredActive();
         });
         Events.on("nostr-identity-changed", _ => {
-            this.disable(false);
+            this.disable(false, false);
             this._render();
+            this._restorePreferredActive();
         });
-        Events.on("nostr-server-list-changed", _ => this._render());
-        Events.on("protocol-server-preferences-changed", _ => this._render());
-        Events.on("nostr-signer-available-changed", _ => this._render());
+        Events.on("nostr-server-list-changed", _ => {
+            this._render();
+            this._restorePreferredActive();
+        });
+        Events.on("protocol-server-preferences-changed", _ => {
+            this._render();
+            this._restorePreferredActive();
+        });
+        Events.on("nostr-signer-available-changed", _ => {
+            this._render();
+            this._restorePreferredActive();
+        });
         globalThis.meshdropBlossomTransfer = this;
+        this._restorePreferredActive();
     }
 
     toggle() {
@@ -102,39 +367,46 @@ class BlossomTransferController {
         this.enable();
     }
 
-    enable() {
+    enable({notify = true, remember = true} = {}) {
         if (!globalThis.meshdropNostrIdentity?.getIdentity()) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-identity-required"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-identity-required"));
+            return;
+        }
+
+        if (!BlossomTransferProtocol.hasWebCrypto()) {
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-webcrypto-required"));
             return;
         }
 
         const serverState = this._serverListState();
         if (serverState.status === "loading") {
-            Events.fire("notify-user", "Waiting for your Blossom server list from Nostr relays.");
+            if (notify) Events.fire("notify-user", "Waiting for your Blossom server list from Nostr relays.");
             return;
         }
 
         if (serverState.status === "missing" || serverState.status === "error") {
-            Events.fire("notify-user", "No Blossom server list was found for this Nostr identity.");
+            if (notify) Events.fire("notify-user", "No Blossom server list was found for this Nostr identity.");
             return;
         }
 
         if (!this._serverUrls().length) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-server-required"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-server-required"));
             return;
         }
 
         this._active = true;
         this._render();
-        Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-enabled"));
+        if (remember) this._setPreferredActive(true);
+        if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-enabled"));
     }
 
-    disable(notify = true) {
+    disable(notify = true, remember = notify) {
         if (!this._active) return;
 
         this._active = false;
         this._render();
 
+        if (remember) this._setPreferredActive(false);
         if (notify) {
             Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-disabled"));
         }
@@ -144,17 +416,49 @@ class BlossomTransferController {
         return this._active;
     }
 
-    async uploadFiles(files, onProgress = () => {}) {
+    _setPreferredActive(enabled) {
+        this._preferredActive = !!enabled;
+        BlossomTransferProtocol.writeEnabled(this._preferredActive);
+    }
+
+    _restorePreferredActive() {
+        if (!this._preferredActive || this._active) return;
+
+        this.enable({notify: false, remember: false});
+    }
+
+    async uploadFiles() {
+        throw new Error("Raw Blossom uploads require end-to-end encryption");
+    }
+
+    async uploadEncryptedFiles(files, headers, contentKey, onProgress = () => {}) {
         const serverUrl = this._serverUrls()[0];
         if (!serverUrl) throw new Error("No Blossom server configured");
+        if (!contentKey) throw new Error("Blossom encryption key is missing");
 
+        const transferId = BlossomTransferProtocol.createTransferId();
         const descriptors = [];
+        const fileEnvelopes = [];
         for (let i = 0; i < files.length; i++) {
             onProgress(0.8 * i / files.length);
-            descriptors.push(await this.uploadFile(files[i], serverUrl));
+            const encrypted = await BlossomTransferProtocol.encryptFile(files[i], contentKey, {
+                transferId,
+                index: i,
+                header: headers[i]
+            });
+            descriptors.push(await this.uploadFile(encrypted.blob, serverUrl));
+            fileEnvelopes.push(encrypted.envelope);
         }
         onProgress(0.8);
-        return descriptors;
+        return {
+            blossomDescriptors: descriptors,
+            blossomEncryption: {
+                version: BlossomTransferProtocol.encryptionVersion,
+                algorithm: BlossomTransferProtocol.contentAlgorithm,
+                transferId,
+                files: fileEnvelopes
+            }
+        };
     }
 
     async uploadFile(file, serverUrl) {
@@ -182,14 +486,25 @@ class BlossomTransferController {
         return BlossomTransferProtocol.validateDescriptor(descriptor, file, sha256);
     }
 
-    async downloadDescriptor(descriptor, header) {
+    async downloadDescriptor(descriptor, header, encryption = null) {
         const response = await fetch(descriptor.url);
         if (!response.ok) throw new Error(`Blossom download failed with ${response.status}`);
 
         const blob = await response.blob();
-        const sha256 = await BlossomTransferProtocol.sha256Hex(blob);
+        const sha256 = encryption
+            ? await BlossomTransferProtocol.sha256HexForEncryptedDownload(blob)
+            : await BlossomTransferProtocol.sha256Hex(blob);
         if (sha256 !== descriptor.sha256) throw new Error("Blossom download hash mismatch");
         if (blob.size !== descriptor.size) throw new Error("Blossom download size mismatch");
+
+        if (encryption) {
+            return BlossomTransferProtocol.decryptFile(blob, encryption.contentKey, {
+                transferId: encryption.envelope.transferId,
+                index: encryption.index,
+                header,
+                fileEnvelope: encryption.envelope.files[encryption.index]
+            });
+        }
 
         return new File([blob], header.name, {
             type: header.mime || descriptor.type || blob.type || "application/octet-stream"

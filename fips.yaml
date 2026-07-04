@@ -1,0 +1,41 @@
+# MeshDrop container FIPS configuration
+#
+# Edit peers below, then restart the MeshDrop container:
+#   docker compose up -d --build
+#
+# This file is mounted into the container at /etc/fips/fips.yaml.
+# The FIPS control socket is internal to the container at /run/fips/control.sock.
+
+node:
+  identity:
+    # By default, FIPS will use an ephemeral keypair. Uncomment persistent if
+    # you switch this config to a writable directory mount and want stable keys.
+    # persistent: true
+    #
+    # Or set an explicit nsec here if you want a stable identity:
+    # nsec: "nsec1..."
+
+tun:
+  enabled: true
+  name: fips0
+  mtu: 1280
+
+dns:
+  enabled: false
+
+transports:
+  udp:
+    bind_addr: "0.0.0.0:2121"
+
+  tcp:
+    bind_addr: "0.0.0.0:8443"
+
+peers: []
+# Example:
+# peers:
+#   - npub: "npub1..."
+#     alias: "peer-name"
+#     addresses:
+#       - transport: udp
+#         addr: "203.0.113.10:2121"
+#     connect_policy: auto_connect

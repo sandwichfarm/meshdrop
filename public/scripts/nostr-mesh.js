@@ -1,6 +1,16 @@
 const NostrMeshProtocol = {
     kind: 25050,
     defaultRoomPrefix: "meshdrop",
+    presenceHeartbeatMs: 25000,
+    storageKey: "meshdrop_nostr_mesh_enabled",
+
+    readEnabled(storage = globalThis.localStorage) {
+        return storage?.getItem?.(this.storageKey) === "true";
+    },
+
+    writeEnabled(enabled, storage = globalThis.localStorage) {
+        storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
+    },
 
     roomFromConfig(config) {
         const configuredRoom = config?.nostrMesh?.room || this.defaultRoomPrefix;
@@ -60,8 +70,9 @@ const NostrMeshProtocol = {
     },
 
     signalContent(message) {
-        if (message.sdp) return {sdp: message.sdp};
-        if (message.ice) return {ice: message.ice};
+        const session = message.sessionId ? {sessionId: message.sessionId} : {};
+        if (message.sdp) return {sdp: message.sdp, ...session};
+        if (message.ice) return {ice: message.ice, ...session};
         return null;
     }
 };
@@ -78,18 +89,26 @@ class NostrMeshConnection {
         this._seenEvents = new Set();
         this._peers = new Set();
         this._subscriptionId = `meshdrop-${Math.random().toString(36).slice(2)}`;
+        this._presenceHeartbeatId = null;
+        this._preferredActive = NostrMeshProtocol.readEnabled();
+        this._connecting = false;
+        this._configLoaded = false;
 
         if (this.$button) {
             this.$button.addEventListener("click", _ => this.toggle());
             this._render();
         }
 
-        Events.on("config", e => this._config = e.detail || {});
-        Events.on("nostr-identity-changed", _ => {
-            this.disconnect(false);
-            this._render();
+        Events.on("config", e => {
+            this._config = e.detail || {};
+            this._configLoaded = true;
+            this._restorePreferredActive();
         });
-        Events.on("nostr-signer-available-changed", _ => this._render());
+        Events.on("nostr-identity-changed", e => this._onIdentityChanged(e.detail));
+        Events.on("nostr-signer-available-changed", _ => {
+            this._render();
+            this._restorePreferredActive();
+        });
         Events.on("relay-settings-changed", _ => this._onRelaySettingsChanged());
         Events.on("pagehide", _ => this.disconnect(false));
         globalThis.meshdropNostrMesh = this;
@@ -104,37 +123,46 @@ class NostrMeshConnection {
         await this.connect();
     }
 
-    async connect() {
+    async connect({notify = true, remember = true} = {}) {
+        if (this._active || this._connecting) return;
+
         const identityController = globalThis.meshdropNostrIdentity;
         const identity = identityController?.getIdentity();
 
         if (!identity) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-identity-required"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-identity-required"));
             return;
         }
 
         if (!window.isRtcSupported) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-webrtc-required"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-webrtc-required"));
             return;
         }
 
         if (!identityController.canEncrypt()) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-encryption-required"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-encryption-required"));
             return;
         }
 
-        const hydratedIdentity = await identityController.ensureFollowListLoaded();
-        this._identityController = identityController;
-        this._identity = hydratedIdentity || identity;
-        this._room = NostrMeshProtocol.roomFromConfig(this._config);
-        this._relayUrls = NostrMeshProtocol.relayUrlsFromConfig(this._config);
-        this._active = true;
-        this._connectRelays();
-        this._render();
-        Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-connected"));
+        this._connecting = true;
+        try {
+            const hydratedIdentity = await identityController.ensureFollowListLoaded();
+            this._identityController = identityController;
+            this._identity = hydratedIdentity || identity;
+            this._room = NostrMeshProtocol.roomFromConfig(this._config);
+            this._relayUrls = NostrMeshProtocol.relayUrlsFromConfig(this._config);
+            this._active = true;
+            this._connectRelays();
+            this._startPresenceHeartbeat();
+            this._render();
+            if (remember) this._setPreferredActive(true);
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-connected"));
+        } finally {
+            this._connecting = false;
+        }
     }
 
-    disconnect(notify = true) {
+    disconnect(notify = true, remember = notify) {
         if (!this._active && !this._sockets.size) return;
 
         if (this._active) {
@@ -142,6 +170,9 @@ class NostrMeshConnection {
         }
 
         this._active = false;
+        this._connecting = false;
+        this._stopPresenceHeartbeat();
+        this._removeKnownPeers();
         this._peers.clear();
         for (const socket of this._sockets.values()) {
             socket.onclose = null;
@@ -150,8 +181,53 @@ class NostrMeshConnection {
         this._sockets.clear();
         this._render();
 
+        if (remember) this._setPreferredActive(false);
         if (notify) {
             Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-disconnected"));
+        }
+    }
+
+    _onIdentityChanged(identity) {
+        if (!identity?.pubkey) {
+            this.disconnect(false);
+            this._identity = null;
+            this._render();
+            return;
+        }
+
+        if (this._identity?.pubkey && this._identity.pubkey !== identity.pubkey) {
+            this.disconnect(false);
+        }
+
+        this._identity = {
+            ...(this._identity || {}),
+            ...identity
+        };
+        this._render();
+        this._restorePreferredActive();
+    }
+
+    _setPreferredActive(enabled) {
+        this._preferredActive = !!enabled;
+        NostrMeshProtocol.writeEnabled(this._preferredActive);
+    }
+
+    _restorePreferredActive() {
+        if (!this._preferredActive || this._active || this._connecting || !this._configLoaded) return;
+
+        this.connect({notify: false, remember: false}).catch(error => {
+            console.warn("Nostr mesh restore failed", error);
+        });
+    }
+
+    _removeKnownPeers() {
+        for (const peerId of this._peers) {
+            Events.fire("peer-left", {
+                peerId,
+                roomType: "nostr",
+                roomId: this._room,
+                disconnect: true
+            });
         }
     }
 
@@ -167,6 +243,21 @@ class NostrMeshConnection {
 
     _connectRelays() {
         this._relayUrls.forEach(relayUrl => this._connectRelay(relayUrl));
+    }
+
+    _startPresenceHeartbeat() {
+        this._stopPresenceHeartbeat();
+        this._presenceHeartbeatId = setInterval(
+            () => this._publishPresence("connect"),
+            NostrMeshProtocol.presenceHeartbeatMs
+        );
+    }
+
+    _stopPresenceHeartbeat() {
+        if (!this._presenceHeartbeatId) return;
+
+        clearInterval(this._presenceHeartbeatId);
+        this._presenceHeartbeatId = null;
     }
 
     _connectRelay(relayUrl) {
@@ -262,6 +353,16 @@ class NostrMeshConnection {
             return;
         }
 
+        if (relayMessage[0] === "NOTICE") {
+            console.warn("Nostr mesh relay notice", relayMessage[1]);
+            return;
+        }
+
+        if (relayMessage[0] === "OK") {
+            this._onRelayPublishResult(relayMessage);
+            return;
+        }
+
         if (relayMessage[0] !== "EVENT") return;
         const event = relayMessage[2];
         if (!this._shouldHandleEvent(event)) return;
@@ -278,6 +379,15 @@ class NostrMeshConnection {
         else if (type === "offer" || type === "answer" || type === "candidate") {
             this._onSignalEvent(event, type);
         }
+    }
+
+    _onRelayPublishResult(relayMessage) {
+        const accepted = relayMessage[2] === true;
+        if (accepted) return;
+
+        const eventId = relayMessage[1] || "unknown event";
+        const reason = relayMessage[3] || "relay rejected event";
+        console.warn("Nostr mesh relay rejected publish", eventId, reason);
     }
 
     _shouldHandleEvent(event) {
@@ -385,6 +495,7 @@ class NostrMeshConnection {
         } else {
             this.$button.removeAttribute("data-badge");
         }
+        Events.fire("footer-discovery-changed");
     }
 
     async _onRelaySettingsChanged() {

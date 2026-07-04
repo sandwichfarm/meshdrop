@@ -5,6 +5,15 @@ const HashtreeTransferProtocol = {
     blobLinkType: 0,
     fileLinkType: 1,
     mediaType: "application/vnd.hashtree.node+msgpack",
+    storageKey: "meshdrop_hashtree_transfer_enabled",
+
+    readEnabled(storage = globalThis.localStorage) {
+        return storage?.getItem?.(this.storageKey) === "true";
+    },
+
+    writeEnabled(enabled, storage = globalThis.localStorage) {
+        storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
+    },
 
     async sha256Hex(bytes) {
         const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -279,21 +288,36 @@ class HashtreeTransferController {
     constructor() {
         this.$button = $("hashtree-transfer");
         this._active = false;
+        this._preferredActive = HashtreeTransferProtocol.readEnabled();
 
         if (this.$button) {
             this.$button.addEventListener("click", _ => this.toggle());
             this._render();
         }
 
-        Events.on("config", _ => this._render());
-        Events.on("nostr-identity-changed", _ => {
-            this.disable(false);
+        Events.on("config", _ => {
             this._render();
+            this._restorePreferredActive();
         });
-        Events.on("nostr-server-list-changed", _ => this._render());
-        Events.on("protocol-server-preferences-changed", _ => this._render());
-        Events.on("nostr-signer-available-changed", _ => this._render());
+        Events.on("nostr-identity-changed", _ => {
+            this.disable(false, false);
+            this._render();
+            this._restorePreferredActive();
+        });
+        Events.on("nostr-server-list-changed", _ => {
+            this._render();
+            this._restorePreferredActive();
+        });
+        Events.on("protocol-server-preferences-changed", _ => {
+            this._render();
+            this._restorePreferredActive();
+        });
+        Events.on("nostr-signer-available-changed", _ => {
+            this._render();
+            this._restorePreferredActive();
+        });
         globalThis.meshdropHashtreeTransfer = this;
+        this._restorePreferredActive();
     }
 
     toggle() {
@@ -305,39 +329,41 @@ class HashtreeTransferController {
         this.enable();
     }
 
-    enable() {
+    enable({notify = true, remember = true} = {}) {
         if (!globalThis.meshdropNostrIdentity?.getIdentity()) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-identity-required"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-identity-required"));
             return;
         }
 
         const serverState = this._serverListState();
         if (serverState.status === "loading") {
-            Events.fire("notify-user", "Waiting for your Blossom server list from Nostr relays.");
+            if (notify) Events.fire("notify-user", "Waiting for your Blossom server list from Nostr relays.");
             return;
         }
 
         if (serverState.status === "missing" || serverState.status === "error") {
-            Events.fire("notify-user", "No Blossom server list was found for this Nostr identity.");
+            if (notify) Events.fire("notify-user", "No Blossom server list was found for this Nostr identity.");
             return;
         }
 
         if (!this._serverUrls().length) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-server-required"));
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-server-required"));
             return;
         }
 
         this._active = true;
         this._render();
-        Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-enabled"));
+        if (remember) this._setPreferredActive(true);
+        if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-enabled"));
     }
 
-    disable(notify = true) {
+    disable(notify = true, remember = notify) {
         if (!this._active) return;
 
         this._active = false;
         this._render();
 
+        if (remember) this._setPreferredActive(false);
         if (notify) {
             Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-disabled"));
         }
@@ -345,6 +371,17 @@ class HashtreeTransferController {
 
     isActive() {
         return this._active;
+    }
+
+    _setPreferredActive(enabled) {
+        this._preferredActive = !!enabled;
+        HashtreeTransferProtocol.writeEnabled(this._preferredActive);
+    }
+
+    _restorePreferredActive() {
+        if (!this._preferredActive || this._active) return;
+
+        this.enable({notify: false, remember: false});
     }
 
     async uploadFiles(files, onProgress = () => {}) {
