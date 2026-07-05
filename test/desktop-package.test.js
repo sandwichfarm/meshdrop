@@ -87,7 +87,9 @@ test("Desktop Chromium shell package creates WebRTC-capable desktop shell artifa
         assert.equal(result.mode, "chromium");
         assert.equal(result.nativeShellBuilt, true);
         assert(entries.includes(`${prefix}/app/index.html`));
+        assert(entries.includes(`${prefix}/bin/meshdrop-desktop-chromium`));
         assert(entries.includes(`${prefix}/bin/meshdrop-desktop-chromium.mjs`));
+        assert(entries.includes(`${prefix}/src/meshdrop-desktop-chromium.c`));
         assert(entries.includes(`${prefix}/src/meshdrop-desktop-chromium.mjs`));
         assert(entries.includes(`${prefix}/meshdrop-target.json`));
         assert(entries.includes(`${prefix}/README-DESKTOP.md`));
@@ -100,21 +102,22 @@ test("Desktop Chromium shell package creates WebRTC-capable desktop shell artifa
         assert.equal(manifest.chromiumShellBuilt, true);
         assert.equal(manifest.runtime.platform, "desktop");
         assert.equal(manifest.runtime.hasBackend, false);
-        assert.equal(manifest.nativeShell.executable, "bin/meshdrop-desktop-chromium.mjs");
+        assert.equal(manifest.nativeShell.executable, "bin/meshdrop-desktop-chromium");
+        assert.equal(manifest.nativeShell.script, "bin/meshdrop-desktop-chromium.mjs");
         assert.equal(manifest.nativeShell.toolkit, "chromium");
+        assert.equal(manifest.nativeShell.binaryBuilt, true);
         assert.equal(manifest.transports.webrtc, true);
         assert.equal(manifest.transports.nostr, true);
         assert.deepEqual(manifest.remainingProof, [
-            "bundled Chromium engine or installer",
-            "desktop installer or signed binary"
+            "bundled Chromium engine",
+            "signed desktop installer"
         ]);
 
         await fs.mkdir(extractDir);
         await execFileAsync("tar", ["-xzf", result.artifactPath, "-C", extractDir]);
-        const launcher = path.join(extractDir, prefix, "bin", "meshdrop-desktop-chromium.mjs");
+        const launcher = path.join(extractDir, prefix, "bin", "meshdrop-desktop-chromium");
         const appDir = path.join(extractDir, prefix, "app");
-        const {stdout} = await execFileAsync(process.execPath, [
-            launcher,
+        const {stdout} = await execFileAsync(launcher, [
             "--meshdrop-print-config",
             "--app-dir",
             appDir
@@ -153,22 +156,24 @@ test("Desktop Chromium shell can bundle a Chromium engine", async () => {
         const extractDir = path.join(tempDir, "extract");
 
         assert.equal(result.chromiumEngineBundled, true);
+        assert(entries.includes(`${prefix}/bin/meshdrop-desktop-chromium`));
         assert(entries.includes(`${prefix}/bin/chromium/chrome`));
 
         const manifest = JSON.parse(await readTarEntry(result.artifactPath, `${prefix}/meshdrop-target.json`));
         assert.equal(manifest.name, "meshdrop-desktop-chromium-bundled");
         assert.equal(manifest.chromiumEngineBundled, true);
+        assert.equal(manifest.nativeShell.executable, "bin/meshdrop-desktop-chromium");
+        assert.equal(manifest.nativeShell.binaryBuilt, true);
         assert.equal(manifest.nativeShell.chromiumExecutable, "bin/chromium/chrome");
         assert.deepEqual(manifest.remainingProof, [
-            "desktop installer or signed binary"
+            "signed desktop installer"
         ]);
 
         await fs.mkdir(extractDir);
         await execFileAsync("tar", ["-xzf", result.artifactPath, "-C", extractDir]);
-        const launcher = path.join(extractDir, prefix, "bin", "meshdrop-desktop-chromium.mjs");
+        const launcher = path.join(extractDir, prefix, "bin", "meshdrop-desktop-chromium");
         const appDir = path.join(extractDir, prefix, "app");
-        const {stdout} = await execFileAsync(process.execPath, [
-            launcher,
+        const {stdout} = await execFileAsync(launcher, [
             "--meshdrop-print-config",
             "--app-dir",
             appDir

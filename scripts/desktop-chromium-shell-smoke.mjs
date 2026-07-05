@@ -47,9 +47,9 @@ async function main() {
 }
 
 async function startShell(root) {
-    const launcher = path.join(root, "bin", "meshdrop-desktop-chromium.mjs");
+    const launcher = path.join(root, "bin", "meshdrop-desktop-chromium");
     const appDir = path.join(root, "app");
-    const child = spawn(process.execPath, [launcher, "--server-only", "--app-dir", appDir], {
+    const child = spawn(launcher, ["--server-only", "--app-dir", appDir], {
         stdio: ["ignore", "pipe", "pipe"]
     });
     let stdout = "";
