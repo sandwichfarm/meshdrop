@@ -3,18 +3,18 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import {buildMobilePackage} from "./build-mobile-package.mjs";
+import {buildMobileNativeSourcePackage} from "./build-mobile-package.mjs";
 
 async function main() {
     const version = process.env.MESHDROP_IOS_XCODE_SMOKE_VERSION || "0.0.0-xcode-smoke";
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-ios-xcode-smoke-"));
 
     try {
-        const result = await buildMobilePackage({
+        const result = await buildMobileNativeSourcePackage({
             target: "ios",
-            nativeSource: true,
             version,
             outDir: workDir,
+            portableArchive: true,
             env: {
                 ...process.env,
                 MESH_DROP_BUILD_ID: "ios-xcode-smoke"
