@@ -11,16 +11,21 @@ export async function writeNativeSource(stageDir, target, manifest) {
 
 async function writeIosNativeSource(stageDir, manifest) {
     const nativeDir = path.join(stageDir, "native", "ios", "MeshDrop");
+    const shareExtensionDir = path.join(stageDir, "native", "ios", "MeshDropShareExtension");
     const resourceDir = path.join(nativeDir, "Resources", "meshdrop");
     const manifestJson = JSON.stringify(manifest, null, 2);
 
     await fs.mkdir(nativeDir, {recursive: true});
+    await fs.mkdir(shareExtensionDir, {recursive: true});
     await fs.cp(path.join(stageDir, "app"), resourceDir, {recursive: true});
     await fs.writeFile(path.join(stageDir, "native", "ios", "README.md"), iosReadme());
     await fs.writeFile(path.join(nativeDir, "MeshDropApp.swift"), iosAppSource());
     await fs.writeFile(path.join(nativeDir, "MeshDropView.swift"), iosViewSource());
     await fs.writeFile(path.join(nativeDir, "MeshDropViewController.swift"), iosViewControllerSource(manifestJson));
+    await fs.writeFile(path.join(nativeDir, "MeshDropShareInbox.swift"), iosShareInboxSource());
     await fs.writeFile(path.join(nativeDir, "Info.plist"), iosInfoPlist());
+    await fs.writeFile(path.join(shareExtensionDir, "ShareViewController.swift"), iosShareExtensionSource());
+    await fs.writeFile(path.join(shareExtensionDir, "Info.plist"), iosShareExtensionInfoPlist());
 }
 
 async function writeAndroidNativeSource(stageDir, manifest) {
@@ -51,6 +56,8 @@ function iosReadme() {
         "",
         "This source wraps the packaged `app/` directory in `WKWebView` and injects `meshdrop-target.json` at document start.",
         "WKWebView file inputs are wired to the native document picker through `WKUIDelegate`.",
+        "Share extension source is included under `MeshDropShareExtension/` and stages shared files through an App Group container.",
+        "Enable the same App Group entitlement for the app and extension before building the share-sheet path.",
         "Build and signing require Xcode on macOS. This artifact is source only and does not prove device transfer UAT.",
         ""
     ].join("\n");
@@ -139,6 +146,151 @@ function iosViewControllerSource(manifestJson) {
     ].join("\n");
 }
 
+function iosShareInboxSource() {
+    return [
+        "import Foundation",
+        "",
+        "struct MeshDropSharedFile: Codable {",
+        "    let name: String",
+        "    let path: String",
+        "    let receivedAt: String",
+        "}",
+        "",
+        "enum MeshDropShareInbox {",
+        "    static let appGroupIdentifier = \"group.farm.sandwich.meshdrop\"",
+        "    static let inboxDirectoryName = \"SharedFiles\"",
+        "    static let manifestFileName = \"share-inbox.json\"",
+        "",
+        "    static func inboxURL() -> URL? {",
+        "        FileManager.default",
+        "            .containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)?",
+        "            .appendingPathComponent(inboxDirectoryName, isDirectory: true)",
+        "    }",
+        "",
+        "    static func readManifest() throws -> [MeshDropSharedFile] {",
+        "        guard let inbox = inboxURL() else { return [] }",
+        "        let manifest = inbox.appendingPathComponent(manifestFileName)",
+        "        guard FileManager.default.fileExists(atPath: manifest.path) else { return [] }",
+        "        let data = try Data(contentsOf: manifest)",
+        "        return try JSONDecoder().decode([MeshDropSharedFile].self, from: data)",
+        "    }",
+        "}",
+        ""
+    ].join("\n");
+}
+
+function iosShareExtensionSource() {
+    return [
+        "import Foundation",
+        "import Social",
+        "import UniformTypeIdentifiers",
+        "",
+        "final class ShareViewController: SLComposeServiceViewController {",
+        "    private let appGroupIdentifier = \"group.farm.sandwich.meshdrop\"",
+        "    private let inboxDirectoryName = \"SharedFiles\"",
+        "    private let manifestFileName = \"share-inbox.json\"",
+        "",
+        ...iosShareExtensionLifecycleSource(),
+        ...iosShareExtensionStageSource(),
+        ...iosShareExtensionHelperSource(),
+        "}",
+        "",
+        "private struct StagedFile: Codable {",
+        "    let name: String",
+        "    let path: String",
+        "    let receivedAt: String",
+        "}",
+        ""
+    ].join("\n");
+}
+
+function iosShareExtensionLifecycleSource() {
+    return [
+        "    override func isContentValid() -> Bool {",
+        "        true",
+        "    }",
+        "",
+        "    override func didSelectPost() {",
+        "        stageSharedFiles { [weak self] in",
+        "            self?.extensionContext?.completeRequest(returningItems: nil)",
+        "        }",
+        "    }",
+        "",
+        "    override func configurationItems() -> [Any]! {",
+        "        []",
+        "    }",
+        ""
+    ];
+}
+
+function iosShareExtensionStageSource() {
+    return [
+        "    private func stageSharedFiles(completion: @escaping () -> Void) {",
+        "        guard let attachments = extensionContext?.inputItems",
+        "            .compactMap({ $0 as? NSExtensionItem })",
+        "            .flatMap({ $0.attachments ?? [] }),",
+        "            let inbox = FileManager.default",
+        "                .containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)?",
+        "                .appendingPathComponent(inboxDirectoryName, isDirectory: true)",
+        "        else {",
+        "            completion()",
+        "            return",
+        "        }",
+        "",
+        "        try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)",
+        "        let providers: [NSItemProvider] = attachments",
+        "        let group = DispatchGroup()",
+        "        var stagedFiles: [StagedFile] = []",
+        "        let lock = NSLock()",
+        "",
+        "        for provider in providers {",
+        "            guard provider.hasItemConformingToTypeIdentifier(UTType.item.identifier) else { continue }",
+        "            group.enter()",
+        "            provider.loadFileRepresentation(forTypeIdentifier: UTType.item.identifier) { fileURL, _ in",
+        "                defer { group.leave() }",
+        "                guard let fileURL else { return }",
+        "                let destination = inbox.appendingPathComponent(Self.safeName(for: fileURL.lastPathComponent))",
+        "                try? FileManager.default.removeItem(at: destination)",
+        "                do {",
+        "                    try FileManager.default.copyItem(at: fileURL, to: destination)",
+        "                    lock.lock()",
+        "                    stagedFiles.append(StagedFile(name: destination.lastPathComponent, path: destination.lastPathComponent, receivedAt: Self.timestamp()))",
+        "                    lock.unlock()",
+        "                }",
+        "                catch {",
+        "                    return",
+        "                }",
+        "            }",
+        "        }",
+        "",
+        "        group.notify(queue: .main) {",
+        "            Self.writeManifest(stagedFiles, in: inbox, named: self.manifestFileName)",
+        "            completion()",
+        "        }",
+        "    }",
+        ""
+    ];
+}
+
+function iosShareExtensionHelperSource() {
+    return [
+        "    private static func safeName(for name: String) -> String {",
+        "        name.components(separatedBy: CharacterSet(charactersIn: \"/:\")).joined(separator: \"-\")",
+        "    }",
+        "",
+        "    private static func timestamp() -> String {",
+        "        ISO8601DateFormatter().string(from: Date())",
+        "    }",
+        "",
+        "    private static func writeManifest(_ stagedFiles: [StagedFile], in inbox: URL, named manifestFileName: String) {",
+        "        let manifest = inbox.appendingPathComponent(manifestFileName)",
+        "        guard let data = try? JSONEncoder().encode(stagedFiles) else { return }",
+        "        try? data.write(to: manifest, options: .atomic)",
+        "    }",
+        ""
+    ];
+}
+
 function iosInfoPlist() {
     return [
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
@@ -152,6 +304,38 @@ function iosInfoPlist() {
         "  <string>farm.sandwich.meshdrop</string>",
         "  <key>WKAppBoundDomains</key>",
         "  <array/>",
+        "</dict>",
+        "</plist>",
+        ""
+    ].join("\n");
+}
+
+function iosShareExtensionInfoPlist() {
+    return [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\"",
+        "  \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",
+        "<plist version=\"1.0\">",
+        "<dict>",
+        "  <key>CFBundleDisplayName</key>",
+        "  <string>MeshDrop Share</string>",
+        "  <key>CFBundleIdentifier</key>",
+        "  <string>farm.sandwich.meshdrop.share</string>",
+        "  <key>NSExtension</key>",
+        "  <dict>",
+        "    <key>NSExtensionPointIdentifier</key>",
+        "    <string>com.apple.share-services</string>",
+        "    <key>NSExtensionPrincipalClass</key>",
+        "    <string>$(PRODUCT_MODULE_NAME).ShareViewController</string>",
+        "    <key>NSExtensionAttributes</key>",
+        "    <dict>",
+        "      <key>NSExtensionActivationRule</key>",
+        "      <dict>",
+        "        <key>NSExtensionActivationSupportsFileWithMaxCount</key>",
+        "        <integer>20</integer>",
+        "      </dict>",
+        "    </dict>",
+        "  </dict>",
         "</dict>",
         "</plist>",
         ""
