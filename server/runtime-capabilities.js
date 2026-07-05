@@ -1,3 +1,5 @@
+import {normalizeNpubDiscoveryNetworkId} from "./npub-network.js";
+
 const DEFAULT_RUNTIME_TARGET = "standalone";
 
 export function createServerRuntimeConfig(env = process.env) {
@@ -65,13 +67,13 @@ export function createRuntimeCapabilities(conf = {}) {
             pollen: {
                 supported: pollenSupported,
                 requiresBackend: true,
-                room: conf.federation?.pollen?.room || "",
+                room: normalizeNpubDiscoveryNetworkId(conf.federation?.pollen?.room),
                 maxUploadBytes: conf.pollen?.maxUploadBytes || 0
             },
             fips: {
                 supported: fipsSupported,
                 requiresBackend: true,
-                room: conf.fips?.room || ""
+                room: normalizeNpubDiscoveryNetworkId(conf.fips?.room)
             }
         },
         serverSettings: {

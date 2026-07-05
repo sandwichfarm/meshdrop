@@ -2,6 +2,7 @@ import net from "net";
 import {
     DEFAULT_NPUB_DISCOVERY_NETWORK_ID,
     createNpubDiscoveryNetwork,
+    normalizeNpubDiscoveryNetworkId,
     parseNostrPubkeys,
     pubkeyFromSecret
 } from "./npub-network.js";
@@ -33,7 +34,10 @@ export function createFipsConfig(env = process.env) {
 export default class FipsControlClient {
 
     constructor(config) {
-        this.config = config;
+        this.config = {
+            ...config,
+            room: normalizeNpubDiscoveryNetworkId(config?.room)
+        };
     }
 
     async status() {

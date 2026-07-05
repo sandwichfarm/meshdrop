@@ -1,5 +1,11 @@
 /* eslint-disable no-undef */
 
+const DEFAULT_FIPS_DISCOVERY_ROOM = "npub-network:unconfigured";
+
+function normalizeFipsDiscoveryRoom(room) {
+    return /^npub-network:[a-z0-9:-]+$/i.test(String(room || "")) ? String(room) : DEFAULT_FIPS_DISCOVERY_ROOM;
+}
+
 const FipsDiscoveryProtocol = {
     statusPath: "fips/status",
     storageKey: "meshdrop_fips_discovery_enabled",
@@ -13,7 +19,7 @@ const FipsDiscoveryProtocol = {
     },
 
     roomFromConfig(config) {
-        return config?.fips?.room || "npub-network:unconfigured";
+        return normalizeFipsDiscoveryRoom(config?.fips?.room);
     },
 
     enabledFromConfig(config) {
@@ -32,7 +38,7 @@ const FipsDiscoveryProtocol = {
             ipv6Addr: status.ipv6Addr || "",
             peerCount: Number(status.peerCount || status.peers?.length || 0),
             meshSize: Number(status.meshSize || 0),
-            room: status.room || "npub-network:unconfigured"
+            room: normalizeFipsDiscoveryRoom(status.room)
         };
     }
 };

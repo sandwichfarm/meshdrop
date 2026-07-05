@@ -3,6 +3,14 @@ import {getPublicKey, nip19, utils} from "nostr-tools";
 
 export const DEFAULT_NPUB_DISCOVERY_NETWORK_ID = "npub-network:unconfigured";
 
+export function isNpubDiscoveryNetworkId(value) {
+    return /^npub-network:[a-z0-9:-]+$/i.test(String(value || ""));
+}
+
+export function normalizeNpubDiscoveryNetworkId(value) {
+    return isNpubDiscoveryNetworkId(value) ? String(value) : DEFAULT_NPUB_DISCOVERY_NETWORK_ID;
+}
+
 export function parseNostrPubkey(value) {
     const trimmed = String(value || "").trim();
     if (/^[0-9a-f]{64}$/i.test(trimmed)) return trimmed.toLowerCase();

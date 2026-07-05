@@ -110,7 +110,7 @@ test("FIPS control client streams peer discovery events when daemon supports the
             enabled: true,
             controlSocket: String(server.address().port),
             controlHost: "127.0.0.1",
-            room: "meshdrop-test",
+            room: "npub-network:test",
             timeoutMs: 1000,
             eventCommand: "events"
         });
@@ -194,7 +194,7 @@ test("FIPS control client reads status and peers from line-delimited JSON", asyn
             enabled: true,
             controlSocket: String(port),
             controlHost: "127.0.0.1",
-            room: "meshdrop-test",
+            room: "npub-network:test",
             timeoutMs: 1000
         });
         const status = await client.status();
@@ -235,7 +235,7 @@ test("FIPS control client reports unavailable daemon without throwing", async ()
 
     assert.equal(status.enabled, true);
     assert.equal(status.available, false);
-    assert.equal(status.room, "meshdrop-test");
+    assert.equal(status.room, DEFAULT_NPUB_DISCOVERY_NETWORK_ID);
     assert.match(status.error, /ECONNREFUSED|connect/);
 });
 
@@ -249,7 +249,7 @@ test("FIPS control client saves peers then requests a server restart", async () 
             enabled: true,
             controlSocket: String(port),
             controlHost: "127.0.0.1",
-            room: "meshdrop-test",
+            room: "npub-network:test",
             timeoutMs: 1000
         });
 
@@ -286,7 +286,7 @@ test("FIPS control client reports restart command failures without losing saved 
             enabled: true,
             controlSocket: String(port),
             controlHost: "127.0.0.1",
-            room: "meshdrop-test",
+            room: "npub-network:test",
             timeoutMs: 1000
         });
 
