@@ -38,8 +38,8 @@ UAT-signed Android release APK artifact built by `npm run build:android:release-
     passes for the installed debug APK path.
 13. Confirm Android APK artifacts do not list Android share-sheet `ACTION_SEND` as remaining proof after
     `npm run test:android-share-file` passes.
-14. Confirm Android APK artifacts still list native file picker UI UAT as remaining proof until picker selection is
-    exercised on a device or emulator.
+14. Confirm Android APK artifacts do not list native file picker UI UAT as remaining proof after
+    `npm run test:android-picker-ui` passes.
 
 ## Native Source Acceptance
 
@@ -70,8 +70,8 @@ UAT-signed Android release APK artifact built by `npm run build:android:release-
    signature proof.
 5. Confirm `meshdrop-target.json` reports `nativePackage.path` as `apk/meshdrop-android-release.apk`.
 6. Confirm the release APK artifact does not list signed Android release APK proof as remaining Android proof.
-7. Confirm the release APK artifact still lists physical Android device install UAT, native file picker UI UAT, and
-   Bluetooth negotiation as remaining proof.
+7. Confirm the release APK artifact still lists physical Android device install UAT and Bluetooth negotiation as
+   remaining proof.
 8. Do not treat the generated UAT keystore as Play Store upload signing or AAB proof.
 
 ## Android Emulator Install Acceptance
@@ -118,6 +118,17 @@ UAT-signed Android release APK artifact built by `npm run build:android:release-
 7. Confirm the generated Android wrapper contains `WebChromeClient.onShowFileChooser` so file inputs are wired to the
    native Android picker. Do not treat that source check as native picker UI UAT.
 
+## Android Native Picker UI Acceptance
+
+1. Start an Android emulator or attach an Android device.
+2. Run `npm run test:android-picker-ui`.
+3. If no device is already attached, set `MESHDROP_ANDROID_AVD=<avd-name>` to launch a local AVD in headless read-only
+   mode for the smoke.
+4. Confirm the smoke prints `Proof android-picker-ui`.
+5. Confirm the proof says native picker UI selected `meshdrop-picker-proof.txt` and returned it to
+   `farm.sandwich.meshdrop/.MainActivity`.
+6. This proves picker UI selection on the Android emulator path; it does not prove physical Android device UAT.
+
 ## Native Mobile Acceptance
 
 1. Build a native iOS or Android app package from the matching native-source artifact.
@@ -143,6 +154,7 @@ node --test test/mobile-package.test.js
 npm run test:android-apk
 npm run test:android-release-apk
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-apk-install
+MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-picker-ui
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-capabilities
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-transfer
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-share-file
@@ -151,9 +163,10 @@ npm run test:target-artifacts
 
 This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
 an Android debug APK build, a UAT-signed Android release APK build with `apksigner` proof, Android emulator
-install/launch proof, Android WebView runtime capability evidence, Android WebView-to-Chromium Nostr WebRTC transfer
-through a local fake relay, Android `ACTION_SEND` file share delivery through the same WebRTC send path, and real Nostr
-WebRTC transfers between two browser peers served from the generated iOS and Android source artifacts.
+install/launch proof, native Android picker UI file selection, Android WebView runtime capability evidence, Android
+WebView-to-Chromium Nostr WebRTC transfer through a local fake relay, Android `ACTION_SEND` file share delivery through
+the same WebRTC send path, and real Nostr WebRTC transfers between two browser peers served from the generated iOS and
+Android source artifacts.
 
 ## Not Proven
 
@@ -164,6 +177,5 @@ WebRTC transfers between two browser peers served from the generated iOS and And
 - Android WebView transfer proof does not prove physical Android device install UAT.
 - These artifacts do not prove physical Android device install UAT.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
-- These artifacts do not prove Android native file picker UI selection.
 - These artifacts do not prove native iOS file-picker or share-sheet integration.
 - These artifacts do not prove Bluetooth transport support.
