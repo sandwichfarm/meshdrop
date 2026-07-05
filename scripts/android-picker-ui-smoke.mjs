@@ -172,9 +172,11 @@ async function tapPickerFile(adb, serial, fileName) {
             const activity = await topActivityLine(adb, serial);
             if (activity.includes(androidMainActivity)) return;
         }
+        await scrollPicker(adb, serial);
         await sleep(500);
     }
-    throw new Error(`Could not select ${fileName} from native picker UI`);
+    const xml = await dumpUiHierarchy(adb, serial).catch(error => `Could not dump picker UI: ${error.message}`);
+    throw new Error(`Could not select ${fileName} from native picker UI\n${xml}`);
 }
 
 async function openDownloadsRoot(adb, serial) {
@@ -195,6 +197,10 @@ async function tapUiNode(adb, serial, textOrDescription) {
     return true;
 }
 
+async function scrollPicker(adb, serial) {
+    await run(adb, ["-s", serial, "shell", "input", "swipe", "500", "1500", "500", "600", "250"]);
+}
+
 async function dumpUiHierarchy(adb, serial) {
     const remotePath = "/sdcard/meshdrop-window.xml";
     await run(adb, ["-s", serial, "shell", "uiautomator", "dump", remotePath], {timeoutMs: 10000});
@@ -204,7 +210,7 @@ async function dumpUiHierarchy(adb, serial) {
 
 function findNode(xml, needle) {
     const escaped = escapeRegExp(needle);
-    const nodePattern = new RegExp(`<node\\b[^>]*(?:text="${escaped}"|content-desc="${escaped}")[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i");
+    const nodePattern = new RegExp(`<node\\b[^>]*(?:text="[^"]*${escaped}[^"]*"|content-desc="[^"]*${escaped}[^"]*")[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i");
     const match = xml.match(nodePattern);
     if (!match) return null;
     const [, left, top, right, bottom] = match.map(Number);
