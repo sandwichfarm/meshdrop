@@ -141,6 +141,10 @@ for (const target of ["ios", "android"]) {
                     : `${nativeRoot}/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`
             );
             assert.match(wrapperSource, /__meshdropTargetManifest/);
+            if (target === "android") {
+                assert.match(wrapperSource, /ApplicationInfo\.FLAG_DEBUGGABLE/);
+                assert.match(wrapperSource, /WebView\.setWebContentsDebuggingEnabled\(true\)/);
+            }
 
             const readme = await readTarEntry(result.artifactPath, `${prefix}/README-${target.toUpperCase()}.md`);
             assert.match(readme, /not a signed app/i);

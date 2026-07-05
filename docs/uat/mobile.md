@@ -60,6 +60,17 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 4. Confirm the smoke prints `Proof android-apk-emulator-install`.
 5. Confirm the proof names `farm.sandwich.meshdrop/.MainActivity`.
 
+## Android WebView Capability Acceptance
+
+1. Start an Android emulator or attach an Android device.
+2. Run `npm run test:android-webview-capabilities`.
+3. If no device is already attached, set `MESHDROP_ANDROID_AVD=<avd-name>` to launch a local AVD in headless read-only
+   mode for the smoke.
+4. Confirm the smoke prints `Proof android-webview-capabilities`.
+5. Confirm the proof reports `RTCPeerConnection`, `WebSocket`, and an `RTCDataChannel` probe from inside the installed
+   Android WebView.
+6. Confirm the proof keeps `native transfer claim=false`; this is capability evidence, not file-transfer proof.
+
 ## Native Mobile Acceptance
 
 1. Build a native iOS or Android app package from the matching native-source artifact.
@@ -83,18 +94,20 @@ npm run build:android:apk -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobil
 node --test test/mobile-package.test.js
 npm run test:android-apk
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-apk-install
+MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-capabilities
 npm run test:target-artifacts
 ```
 
 This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
-an Android debug APK build, Android emulator install/launch proof, and real Nostr WebRTC transfers between two browser
-peers served from the generated iOS and Android source artifacts.
+an Android debug APK build, Android emulator install/launch proof, Android WebView runtime capability evidence, and real
+Nostr WebRTC transfers between two browser peers served from the generated iOS and Android source artifacts.
 
 ## Not Proven
 
 - These artifacts do not prove signed app-store packages, release APKs, AABs, or IPAs.
 - The Android debug APK artifact alone does not prove install UAT; `npm run test:android-apk-install` provides the
   emulator install proof.
+- Android WebView capability proof does not prove native Android file transfer UAT.
 - These artifacts do not prove physical Android device install UAT.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS or Android devices.
 - These artifacts do not prove native mobile file-picker or share-sheet integration.

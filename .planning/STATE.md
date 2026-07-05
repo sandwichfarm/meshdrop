@@ -66,6 +66,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-303-add-an-android-apk-package-artifact-with` | complete | Android debug APK artifact builds; `npm run test:android-apk`; `npm test`; workflow lint; changed-code slop clean |
 | 2026-07-05 | `260705-3ni-record-v014-release-proof` | complete | `v0.1.4` release assets include Android APK; GHCR target images, authenticated readback, and Docker smoke passed; anonymous GHCR still returns `unauthorized` |
 | 2026-07-05 | `260705-3wu-prove-android-apk-emulator-install` | complete | Android debug APK installs and launches on local AVD `Medium_Phone_API_36.1`; native transfer/signing/device UAT remain open |
+| 2026-07-05 | `260705-4aw-prove-android-webview-runtime-capabilities` | complete | Installed Android WebView exposes RTCPeerConnection, WebSocket, and RTCDataChannel probe over CDP; native file-transfer proof remains open |
 
 ## Active Quick Task
 
