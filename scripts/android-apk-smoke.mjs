@@ -37,20 +37,28 @@ try {
     assert.equal(manifest.transports.webrtc, true);
     assert.equal(manifest.transports.nostr, true);
     assert.equal(manifest.transports.bluetooth, false);
-    assert(manifest.remainingProof.includes("physical Android device install UAT"));
+    assert.deepEqual(manifest.remainingProof, [
+        "physical Android device install UAT",
+        "signed Android release APK or AAB package"
+    ]);
     assert(!manifest.remainingProof.includes("Android native file picker UI UAT"));
     assert(!manifest.remainingProof.includes("mobile file picker and share sheet"));
     assert(!manifest.remainingProof.includes("native Android WebView file transfer UAT"));
     assert(!manifest.remainingProof.includes("native Android WebRTC transfer UAT"));
+    assert(!manifest.remainingProof.includes("Bluetooth transport negotiation"));
 
     const proof = JSON.parse(await readTarEntry(result.artifactPath, `${prefix}/apk/build-proof.json`));
     assert.equal(proof.gradleTask, "assembleDebug");
     assert.equal(proof.apk, "meshdrop-android-debug.apk");
     assert.equal(proof.releaseSigned, false);
-    assert(proof.notProven.includes("physical Android device install UAT"));
+    assert.deepEqual(proof.notProven, [
+        "physical Android device install UAT",
+        "signed Android release APK or AAB package"
+    ]);
     assert(!proof.notProven.includes("Android native file picker UI UAT"));
     assert(!proof.notProven.includes("mobile file picker and share sheet"));
     assert(!proof.notProven.includes("native Android WebView file transfer UAT"));
+    assert(!proof.notProven.includes("Bluetooth transport negotiation"));
 
     const extractDir = path.join(tempDir, "extract");
     await fs.mkdir(extractDir);
