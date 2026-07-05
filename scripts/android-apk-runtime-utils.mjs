@@ -34,7 +34,7 @@ export async function prepareAndroidDevice(env = process.env) {
         emulatorProcess = launchEmulator(emulator, avd, port);
     }
 
-    await waitForBoot(adb, serial);
+    await waitForBoot(adb, serial, Number(env.MESHDROP_ANDROID_BOOT_TIMEOUT_MS || 120_000), emulatorProcess);
 
     return {
         adb,
@@ -144,7 +144,7 @@ async function findAttachedDevice(adb) {
 }
 
 function launchEmulator(emulator, avd, port) {
-    return spawn(emulator, [
+    const child = spawn(emulator, [
         "-avd", avd,
         "-read-only",
         "-no-window",
@@ -155,13 +155,36 @@ function launchEmulator(emulator, avd, port) {
         "-gpu", "swiftshader_indirect",
         "-port", port
     ], {
-        stdio: ["ignore", "ignore", "ignore"]
+        stdio: ["ignore", "pipe", "pipe"]
     });
+    child.output = "";
+    child.stdout.on("data", chunk => {
+        child.output = `${child.output}${chunk.toString()}`.slice(-4000);
+    });
+    child.stderr.on("data", chunk => {
+        child.output = `${child.output}${chunk.toString()}`.slice(-4000);
+    });
+    return child;
 }
 
-async function waitForBoot(adb, deviceSerial) {
-    await run(adb, ["-s", deviceSerial, "wait-for-device"], {timeoutMs: 120_000});
-    for (let i = 0; i < 120; i += 1) {
+async function waitForBoot(adb, deviceSerial, timeoutMs, emulatorProcess = null) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const {stdout} = await run(adb, ["devices"]);
+        if (stdout.split("\n").some(row => row.trim() === `${deviceSerial}\tdevice`)) break;
+        if (emulatorProcess?.exitCode !== null) {
+            throw new Error(`Android emulator exited before ADB saw ${deviceSerial}.\n${emulatorProcess.output}`);
+        }
+        await sleep(1000);
+    }
+    const {stdout} = await run(adb, ["devices"]);
+    if (!stdout.split("\n").some(row => row.trim() === `${deviceSerial}\tdevice`)) {
+        throw new Error(`Timed out waiting for ${deviceSerial} to appear in ADB.\n${emulatorProcess?.output || stdout}`);
+    }
+    while (Date.now() < deadline) {
+        if (emulatorProcess?.exitCode !== null) {
+            throw new Error(`Android emulator exited before ${deviceSerial} booted.\n${emulatorProcess.output}`);
+        }
         const {stdout} = await run(adb, ["-s", deviceSerial, "shell", "getprop", "sys.boot_completed"]);
         if (stripCarriageReturns(stdout).trim() === "1") {
             return;
