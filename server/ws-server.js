@@ -4,6 +4,8 @@ import crypto from "crypto"
 import Peer from "./peer.js";
 import {hasher, randomizer} from "./helper.js";
 
+const writeStderr = value => process.stderr.write(`${value?.stack || value?.message || value}\n`);
+
 export default class PairDropWsServer {
 
     constructor(server, conf) {
@@ -20,7 +22,7 @@ export default class PairDropWsServer {
 
     _onConnection(peer) {
         peer.socket.on('message', message => this._onMessage(peer, message));
-        peer.socket.onerror = e => console.error(e);
+        peer.socket.onerror = error => writeStderr(error);
 
         this._keepAlive(peer);
 
@@ -48,7 +50,7 @@ export default class PairDropWsServer {
         try {
             message = JSON.parse(message);
         } catch {
-            console.warn("WS: Received JSON is malformed");
+            writeStderr("WS: Received JSON is malformed");
             return;
         }
 
