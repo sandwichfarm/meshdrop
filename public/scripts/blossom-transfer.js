@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+
 const blossomTransferScriptSrc = (() => {
     try {
         return globalThis.document?.currentScript?.src
@@ -22,6 +24,12 @@ const BlossomTransferProtocol = {
 
     writeEnabled(enabled, storage = globalThis.localStorage) {
         storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
+    },
+
+    enabledFromConfig(config) {
+        return globalThis.RuntimeCapabilities
+            ? globalThis.RuntimeCapabilities.transportSupported(config, "blossom", true)
+            : true;
     },
 
     serverUrlsFromConfig(config) {
@@ -334,8 +342,9 @@ class BlossomTransferController {
 
         Events.on("config", e => {
             this._config = e.detail || {};
+            if (!BlossomTransferProtocol.enabledFromConfig(this._config)) this.disable(false, false);
             this._render();
-            this._restorePreferredActive();
+            if (BlossomTransferProtocol.enabledFromConfig(this._config)) this._restorePreferredActive();
         });
         Events.on("nostr-identity-changed", _ => {
             this.disable(false, false);
@@ -368,6 +377,11 @@ class BlossomTransferController {
     }
 
     enable({notify = true, remember = true} = {}) {
+        if (!BlossomTransferProtocol.enabledFromConfig(this._config)) {
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-runtime-unsupported"));
+            return;
+        }
+
         if (!globalThis.meshdropNostrIdentity?.getIdentity()) {
             if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.blossom-transfer-identity-required"));
             return;
@@ -532,8 +546,9 @@ class BlossomTransferController {
         if (!this.$button) return;
 
         const identity = globalThis.meshdropNostrIdentity?.getIdentity();
-        this.$button.toggleAttribute("hidden", !identity);
-        if (!identity) return;
+        const supported = BlossomTransferProtocol.enabledFromConfig(this._config);
+        this.$button.toggleAttribute("hidden", !identity || !supported);
+        if (!identity || !supported) return;
 
         const translationKey = this._active
             ? "header.blossom-transfer-disable"

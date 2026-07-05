@@ -68,6 +68,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-3wu-prove-android-apk-emulator-install` | complete | Android debug APK installs and launches on local AVD `Medium_Phone_API_36.1`; native transfer/signing/device UAT remain open |
 | 2026-07-05 | `260705-4aw-prove-android-webview-runtime-capabilities` | complete | Installed Android WebView exposes RTCPeerConnection, WebSocket, and RTCDataChannel probe over CDP; native file-transfer proof remains open |
 | 2026-07-05 | `260705-btn-bluetooth-transport-negotiation` | complete | Runtime/static config negotiates Bluetooth API/bridge availability while keeping transfer unsupported; focused 13/13; `npm test`; diff/check; changed-code slop clean |
+| 2026-07-05 | `260705-rgc-runtime-gui-capability-gates` | complete | Nostr/Blossom/Hashtree controls follow negotiated runtime capabilities; focused 19/19; `npm test`; diff/check; changed-code slop clean |
 
 ## Active Quick Task
 

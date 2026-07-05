@@ -456,6 +456,40 @@ test("Nostr sign-in appears with NIP-07 and dependent actions appear after sign-
     assert.equal(buttons.get("hashtree-transfer").hasAttribute("hidden"), false);
 });
 
+test("Nostr-dependent controls follow negotiated runtime capabilities", async () => {
+    resetUi();
+    installSigner();
+
+    const identity = new globalThis.NostrIdentityController();
+    await identity.connect();
+    const nostrMesh = new globalThis.NostrMeshConnection();
+    const blossom = new globalThis.BlossomTransferController();
+    const hashtree = new globalThis.HashtreeTransferController();
+
+    globalThis.Events.fire("config", {
+        blossom: {servers: ["https://blossom.test"]},
+        capabilities: {
+            transports: {
+                webrtc: {supported: false},
+                nostr: {supported: false},
+                blossom: {supported: false},
+                hashtree: {supported: false}
+            }
+        }
+    });
+
+    await nostrMesh.connect({notify: false});
+    blossom.enable({notify: false});
+    hashtree.enable({notify: false});
+
+    assert.equal(buttons.get("nostr-mesh").hasAttribute("hidden"), true);
+    assert.equal(buttons.get("blossom-transfer").hasAttribute("hidden"), true);
+    assert.equal(buttons.get("hashtree-transfer").hasAttribute("hidden"), true);
+    assert.equal(nostrMesh._active, false);
+    assert.equal(blossom.isActive(), false);
+    assert.equal(hashtree.isActive(), false);
+});
+
 test("Nostr storage actions appear after sign-in even before Blossom servers are known", async () => {
     resetUi();
     installSigner();
