@@ -415,7 +415,7 @@ test("FIPS discovery selection is restored after refresh when daemon is availabl
             enabled: true,
             available: true,
             peerCount: 1,
-            room: "meshdrop-fips"
+            room: "npub-network:fips"
         }), {status: 200});
     };
     globalThis.Events.fire = (type, detail = {}) => {
@@ -425,7 +425,7 @@ test("FIPS discovery selection is restored after refresh when daemon is availabl
 
     try {
         const controller = new globalThis.FipsDiscoveryController();
-        await controller._onConfig({fips: {enabled: true, room: "meshdrop-fips"}});
+        await controller._onConfig({fips: {enabled: true, room: "npub-network:fips"}});
 
         assert.equal(fired.includes("join-fips-room"), true);
         globalThis.Events.fire("fips-status", {enabled: true, available: true, peerCount: 1});
@@ -620,7 +620,7 @@ test("FIPS action stays hidden until status confirms the daemon is reachable", a
     resetUi();
     const controller = new globalThis.FipsDiscoveryController();
 
-    await controller._onConfig({fips: {enabled: true, room: "meshdrop-test"}});
+    await controller._onConfig({fips: {enabled: true, room: "npub-network:test"}});
     assert.equal(buttons.get("fips-discovery").hasAttribute("hidden"), true);
 
     globalThis.fetch = async () => ({
@@ -628,12 +628,12 @@ test("FIPS action stays hidden until status confirms the daemon is reachable", a
         json: async () => ({
             enabled: true,
             available: true,
-            room: "meshdrop-test",
+            room: "npub-network:test",
             peers: []
         })
     });
 
-    await controller._onConfig({fips: {enabled: true, room: "meshdrop-test"}});
+    await controller._onConfig({fips: {enabled: true, room: "npub-network:test"}});
     assert.equal(buttons.get("fips-discovery").hasAttribute("hidden"), false);
 });
 
@@ -654,7 +654,7 @@ test("FIPS action shows icon connecting state until room join is confirmed", asy
             json: async () => ({
                 enabled: true,
                 available: true,
-                room: "meshdrop-test",
+                room: "npub-network:test",
                 peers: []
             })
         };
@@ -663,7 +663,7 @@ test("FIPS action shows icon connecting state until room join is confirmed", asy
         joinRequests += 1;
     });
 
-    controller._config = {fips: {enabled: true, room: "meshdrop-test"}};
+    controller._config = {fips: {enabled: true, room: "npub-network:test"}};
     controller._available = true;
     controller._render();
 
@@ -684,7 +684,7 @@ test("FIPS action shows icon connecting state until room join is confirmed", asy
     globalThis.Events.fire("fips-status", {
         enabled: true,
         available: true,
-        room: "meshdrop-test",
+        room: "npub-network:test",
         peers: []
     });
 

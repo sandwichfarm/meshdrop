@@ -4,6 +4,7 @@ import {fileURLToPath} from "url";
 import path, {dirname} from "path";
 import http from "http";
 import {adminPublicConfig, createAdminConfig, verifySignedAdminRequest} from "./admin-auth.js";
+import {normalizeNpubDiscoveryNetworkId} from "./npub-network.js";
 import {createRuntimeCapabilities} from "./runtime-capabilities.js";
 
 const writeStdout = (...parts) => process.stdout.write(`${parts.join(" ")}\n`);
@@ -58,6 +59,8 @@ export default class PairDropServer {
         // By default, clients connecting to your instance use the signaling server of your instance to connect to other devices.
         // By using `WS_SERVER`, you can host an instance that uses another signaling server.
         app.get('/config', (req, res) => {
+            const fipsRoom = normalizeNpubDiscoveryNetworkId(conf.fips.room);
+            const pollenRoom = normalizeNpubDiscoveryNetworkId(conf.federation?.pollen?.room);
             res.send({
                 signalingServer: conf.signalingServer,
                 nostrMesh: conf.nostrMesh,
@@ -65,14 +68,22 @@ export default class PairDropServer {
                 pollen: {
                     enabled: conf.pollen.enabled,
                     maxUploadBytes: conf.pollen.maxUploadBytes,
-                    room: conf.federation?.pollen?.room
+                    room: pollenRoom
                 },
                 fips: {
                     enabled: conf.fips.enabled,
-                    room: conf.fips.room
+                    room: fipsRoom
                 },
                 admin: adminPublicConfig(admin),
-                capabilities: createRuntimeCapabilities({...conf, admin}),
+                capabilities: createRuntimeCapabilities({
+                    ...conf,
+                    admin,
+                    fips: {...conf.fips, room: fipsRoom},
+                    federation: {
+                        ...conf.federation,
+                        pollen: {...conf.federation?.pollen, room: pollenRoom}
+                    }
+                }),
                 buttons: conf.buttons
             });
         });
