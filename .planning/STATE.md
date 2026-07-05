@@ -73,6 +73,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-rbd-release-bundled-desktop-chromium` | complete | Release workflow builds and release-readback expects `meshdrop-desktop-chromium-bundled-<version>.tar.gz`; focused release workflow test green |
 | 2026-07-05 | `260705-cig-ci-runtime-change-gates` | complete | CI classifies runtime-affecting paths before heavyweight runtime jobs; focused CI workflow test green |
 | 2026-07-05 | `260705-dbp-desktop-chromium-binary-proof` | complete | Desktop Chromium artifacts include a compiled Linux launcher binary; bundled Chromium transfer smoke passes through the binary launcher |
+| 2026-07-05 | `260705-abw-android-webview-bluetooth-negotiation` | complete | Installed Android WebView smoke proves Bluetooth capability negotiation with `Bluetooth transfer=false`; Android APK metadata no longer lists Bluetooth negotiation as remaining proof; changed-code slop clean |
 
 ## Active Quick Task
 

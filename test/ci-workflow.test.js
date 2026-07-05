@@ -78,10 +78,10 @@ test("CI builds Android APK artifact through package script", () => {
     assert.match(ciWorkflow, /npm run test:android-apk/);
 });
 
-test("CI proves Android picker UI through an emulator", () => {
-    assert.match(ciWorkflow, /android-picker-ui-emulator:/);
-    assert.match(ciWorkflow, /name: Android picker UI emulator smoke/);
-    assertRuntimeChangeGate("android-picker-ui-emulator");
+test("CI proves Android WebView capability and picker UI through an emulator", () => {
+    assert.match(ciWorkflow, /android-webview-emulator:/);
+    assert.match(ciWorkflow, /name: Android WebView emulator smokes/);
+    assertRuntimeChangeGate("android-webview-emulator");
     assert.match(ciWorkflow, /sdkmanager="\$\{ANDROID_HOME\}\/cmdline-tools\/latest\/bin\/sdkmanager"/);
     assert.match(ciWorkflow, /ANDROID_AVD_HOME="\$\{RUNNER_TEMP\}\/android-avd"/);
     assert.match(ciWorkflow, /echo "ANDROID_AVD_HOME=\$\{ANDROID_AVD_HOME\}" >> "\$\{GITHUB_ENV\}"/);
@@ -91,6 +91,7 @@ test("CI proves Android picker UI through an emulator", () => {
     assert.match(ciWorkflow, /MESHDROP_ANDROID_AVD: meshdrop_ci_api_36/);
     assert.match(ciWorkflow, /MESHDROP_ANDROID_EMULATOR_PORT: "5554"/);
     assert.match(ciWorkflow, /MESHDROP_ANDROID_BOOT_TIMEOUT_MS: "300000"/);
+    assert.match(ciWorkflow, /npm run test:android-webview-capabilities/);
     assert.match(ciWorkflow, /npm run test:android-picker-ui/);
 });
 

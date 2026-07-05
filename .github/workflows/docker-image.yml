@@ -282,8 +282,8 @@ jobs:
       - name: Build and inspect Android APK artifact
         run: npm run test:android-apk
 
-  android-picker-ui-emulator:
-    name: Android picker UI emulator smoke
+  android-webview-emulator:
+    name: Android WebView emulator smokes
     runs-on: ubuntu-latest
     needs: [ci-change-scope, unit]
     if: needs.ci-change-scope.outputs.runtime == 'true'
@@ -323,6 +323,13 @@ jobs:
             --name meshdrop_ci_api_36 \
             --package "system-images;android-36;google_apis;x86_64" \
             --device pixel_6
+
+      - name: Run Android WebView capability smoke
+        env:
+          MESHDROP_ANDROID_AVD: meshdrop_ci_api_36
+          MESHDROP_ANDROID_EMULATOR_PORT: "5554"
+          MESHDROP_ANDROID_BOOT_TIMEOUT_MS: "300000"
+        run: npm run test:android-webview-capabilities
 
       - name: Run Android picker UI emulator smoke
         env:

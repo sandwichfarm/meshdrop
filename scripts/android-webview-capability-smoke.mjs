@@ -45,12 +45,22 @@ try {
         assert.equal(state.webSocket, "function");
         assert.equal(state.dataChannelLabel, "meshdrop-probe");
         assert.equal(state.dataChannelError, "");
+        assert.equal(state.runtimeBluetooth.supported, false);
+        assert.equal(state.runtimeBluetooth.transferSupported, false);
+        assert.equal(state.runtimeBluetooth.requiresBackend, false);
+        assert.equal(state.runtimeBluetooth.requiresNativeShell, false);
+        assert.equal(state.runtimeBluetooth.apiAvailable, state.bluetoothApiAvailable);
+        assert.equal(state.runtimeBluetooth.nativeBridgeAvailable, false);
+        assert.equal(state.runtimeBluetooth.requiresAdapter, true);
+        assert.equal(state.runtimeBluetooth.unavailableReason, "bluetooth-transfer-not-implemented");
 
         console.log(
             `Proof android-webview-capabilities: ${androidMainActivity} exposed ` +
             `RTCPeerConnection=${state.rtcPeerConnection}, WebSocket=${state.webSocket}, ` +
             `RTCDataChannel label=${state.dataChannelLabel}, manifest target=${state.manifestTarget}, ` +
-            `native transfer claim=${state.claimsNativeWebRtc} on ${device.serial}`
+            `native transfer claim=${state.claimsNativeWebRtc}, ` +
+            `Bluetooth API=${state.webBluetoothApi}, Bluetooth transfer=${state.runtimeBluetooth.transferSupported} ` +
+            `on ${device.serial}`
         );
     }
     finally {
@@ -168,7 +178,11 @@ function connectCdp(webSocketUrl) {
 async function waitForRuntimeState(cdp) {
     for (let i = 0; i < 30; i += 1) {
         const state = await evaluateRuntimeState(cdp);
-        if (state.readyState !== "loading" && state.manifestTarget === "android") {
+        if (
+            state.readyState !== "loading" &&
+            state.manifestTarget === "android" &&
+            state.runtimeCapabilities === "object"
+        ) {
             return state;
         }
         await sleep(500);
@@ -180,6 +194,10 @@ async function evaluateRuntimeState(cdp) {
     const result = await cdp.send("Runtime.evaluate", {
         expression: `(() => {
             const manifest = globalThis.__meshdropTargetManifest || {};
+            const runtimeCapabilities = typeof globalThis.RuntimeCapabilities;
+            const runtimeBluetooth = globalThis.RuntimeCapabilities
+                ? globalThis.RuntimeCapabilities.bluetoothCapabilities(manifest)
+                : null;
             let dataChannelLabel = "";
             let dataChannelError = "";
             try {
@@ -198,8 +216,12 @@ async function evaluateRuntimeState(cdp) {
                 nativeShellBuilt: manifest.nativeShellBuilt === true,
                 runtimeTarget: manifest.runtime && manifest.runtime.target || "",
                 claimsNativeWebRtc: manifest.transports && manifest.transports.webrtc === true,
+                runtimeCapabilities,
                 rtcPeerConnection: typeof RTCPeerConnection,
                 webSocket: typeof WebSocket,
+                webBluetoothApi: typeof navigator.bluetooth,
+                bluetoothApiAvailable: !!navigator.bluetooth,
+                runtimeBluetooth,
                 dataChannelLabel,
                 dataChannelError,
                 userAgent: navigator.userAgent

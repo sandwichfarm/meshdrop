@@ -70,8 +70,7 @@ UAT-signed Android release APK artifact built by `npm run build:android:release-
    signature proof.
 5. Confirm `meshdrop-target.json` reports `nativePackage.path` as `apk/meshdrop-android-release.apk`.
 6. Confirm the release APK artifact does not list signed Android release APK proof as remaining Android proof.
-7. Confirm the release APK artifact still lists physical Android device install UAT and Bluetooth negotiation as
-   remaining proof.
+7. Confirm the release APK artifact still lists physical Android device install UAT as remaining proof.
 8. Do not treat the generated UAT keystore as Play Store upload signing or AAB proof.
 
 ## Android Emulator Install Acceptance
@@ -93,6 +92,8 @@ UAT-signed Android release APK artifact built by `npm run build:android:release-
 5. Confirm the proof reports `RTCPeerConnection`, `WebSocket`, and an `RTCDataChannel` probe from inside the installed
    Android WebView.
 6. Confirm the proof reports `native transfer claim=true` after Android WebView transfer proof exists.
+7. Confirm the proof reports the actual Web Bluetooth API type and `Bluetooth transfer=false` from the negotiated
+   runtime capabilities inside the installed Android WebView.
 
 ## Android WebView Transfer Acceptance
 
@@ -163,10 +164,10 @@ npm run test:target-artifacts
 
 This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
 an Android debug APK build, a UAT-signed Android release APK build with `apksigner` proof, Android emulator
-install/launch proof, native Android picker UI file selection, Android WebView runtime capability evidence, Android
-WebView-to-Chromium Nostr WebRTC transfer through a local fake relay, Android `ACTION_SEND` file share delivery through
-the same WebRTC send path, and real Nostr WebRTC transfers between two browser peers served from the generated iOS and
-Android source artifacts.
+install/launch proof, native Android picker UI file selection, Android WebView runtime capability evidence including
+Bluetooth API negotiation with transfer disabled, Android WebView-to-Chromium Nostr WebRTC transfer through a local fake
+relay, Android `ACTION_SEND` file share delivery through the same WebRTC send path, and real Nostr WebRTC transfers
+between two browser peers served from the generated iOS and Android source artifacts.
 
 ## Not Proven
 

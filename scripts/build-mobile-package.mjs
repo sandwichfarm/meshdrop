@@ -1,9 +1,14 @@
 import {execFile} from "node:child_process";
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 
+import {
+    androidDebugApkName,
+    androidReleaseApkName,
+    buildAndroidDebugApk,
+    buildAndroidReleaseApk
+} from "./android-package-build.mjs";
 import {sanitizeArtifactPart} from "./build-spa-artifact.mjs";
 import {writeNativeSource} from "./mobile-native-source.mjs";
 import {cacheVersionFromEnv, updateServiceWorkerVersion} from "./set-service-worker-version.mjs";
@@ -11,9 +16,6 @@ import {cacheVersionFromEnv, updateServiceWorkerVersion} from "./set-service-wor
 const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const packageJson = JSON.parse(await fs.readFile(path.join(repoRoot, "package.json"), "utf8"));
 const targets = new Set(["ios", "android"]);
-const androidDebugApkName = "meshdrop-android-debug.apk";
-const androidReleaseApkName = "meshdrop-android-release.apk";
-const releaseKeystoreAlias = "meshdrop-release";
 
 export function parseArgs(argv) {
     const args = {
@@ -169,18 +171,9 @@ function stageName(target, nativeSource, androidApk, androidReleaseApk) {
 function createTargetManifest(target, version, nativeSource, androidApk, androidReleaseApk) {
     const androidPackage = androidApk || androidReleaseApk;
     const nativeRuntimeTransfersProven = !nativeSource || androidPackage;
-    const androidPackageRemainingProof = [
-        "physical Android device install UAT",
-        "Bluetooth transport negotiation"
-    ];
-    if (androidApk) {
-        androidPackageRemainingProof.push("signed Android release APK or AAB package");
-    }
     const manifest = {
         schemaVersion: 1,
-        name: androidReleaseApk
-            ? "meshdrop-android-release-apk"
-            : androidApk ? "meshdrop-android-apk" : nativeSource ? `meshdrop-${target}-native-source` : `meshdrop-${target}`,
+        name: manifestName(target, nativeSource, androidApk, androidReleaseApk),
         version,
         target,
         appRoot: "app",
@@ -204,22 +197,7 @@ function createTargetManifest(target, version, nativeSource, androidApk, android
             fips: false,
             bluetooth: false
         },
-        remainingProof: androidPackage
-            ? androidPackageRemainingProof
-            : nativeSource
-            ? [
-                "native mobile app package build",
-                "native mobile WebRTC transfer UAT",
-                "mobile file picker and share sheet",
-                "Bluetooth transport negotiation"
-            ]
-            : [
-                "native mobile shell source artifact",
-                "native mobile app package build",
-                "native mobile WebRTC transfer UAT",
-                "mobile file picker and share sheet",
-                "Bluetooth transport negotiation"
-            ]
+        remainingProof: remainingProofFor(nativeSource, androidApk, androidPackage)
     };
 
     if (nativeSource) {
@@ -230,19 +208,37 @@ function createTargetManifest(target, version, nativeSource, androidApk, android
             appAssets: "app"
         };
     }
-    if (androidApk) {
-        manifest.nativePackage = {
-            platform: "android",
-            packageType: "debug-apk",
-            buildTool: "gradle",
-            buildTask: "assembleDebug",
-            path: `apk/${androidDebugApkName}`,
-            signed: "debug",
-            releaseSigned: false
-        };
+    if (androidPackage) {
+        manifest.nativePackage = nativePackageFor(androidReleaseApk);
     }
+
+    return manifest;
+}
+
+function manifestName(target, nativeSource, androidApk, androidReleaseApk) {
+    if (androidReleaseApk) return "meshdrop-android-release-apk";
+    if (androidApk) return "meshdrop-android-apk";
+    return nativeSource ? `meshdrop-${target}-native-source` : `meshdrop-${target}`;
+}
+
+function remainingProofFor(nativeSource, androidApk, androidPackage) {
+    if (androidPackage) {
+        return androidApk
+            ? ["physical Android device install UAT", "signed Android release APK or AAB package"]
+            : ["physical Android device install UAT"];
+    }
+    const remaining = [
+        "native mobile app package build",
+        "native mobile WebRTC transfer UAT",
+        "mobile file picker and share sheet",
+        "Bluetooth transport negotiation"
+    ];
+    return nativeSource ? remaining : ["native mobile shell source artifact", ...remaining];
+}
+
+function nativePackageFor(androidReleaseApk) {
     if (androidReleaseApk) {
-        manifest.nativePackage = {
+        return {
             platform: "android",
             packageType: "release-apk",
             buildTool: "gradle",
@@ -253,8 +249,15 @@ function createTargetManifest(target, version, nativeSource, androidApk, android
             productionSigning: false
         };
     }
-
-    return manifest;
+    return {
+        platform: "android",
+        packageType: "debug-apk",
+        buildTool: "gradle",
+        buildTask: "assembleDebug",
+        path: `apk/${androidDebugApkName}`,
+        signed: "debug",
+        releaseSigned: false
+    };
 }
 
 async function writeTargetManifest(stageDir, manifest) {
@@ -311,212 +314,6 @@ async function stampServiceWorker(appDir, target, version, env) {
     }, version);
 
     await fs.writeFile(serviceWorkerPath, updateServiceWorkerVersion(source, cacheVersion));
-}
-
-async function buildAndroidDebugApk(stageDir, env) {
-    const nativeRoot = path.join(stageDir, "native", "android");
-    const sdkRoot = await findAndroidSdk(env);
-    const javaHome = await findJavaHome(env);
-    const gradleEnv = {
-        ...env,
-        ANDROID_HOME: sdkRoot,
-        ANDROID_SDK_ROOT: sdkRoot
-    };
-    if (javaHome) {
-        gradleEnv.JAVA_HOME = javaHome;
-    }
-
-    await run("gradle", ["--no-daemon", "--console=plain", "assembleDebug"], {
-        cwd: nativeRoot,
-        env: gradleEnv
-    });
-
-    const apkDir = path.join(stageDir, "apk");
-    await fs.mkdir(apkDir, {recursive: true});
-    await fs.copyFile(
-        path.join(nativeRoot, "app", "build", "outputs", "apk", "debug", "app-debug.apk"),
-        path.join(apkDir, androidDebugApkName)
-    );
-    await fs.copyFile(
-        path.join(nativeRoot, "app", "build", "outputs", "apk", "debug", "output-metadata.json"),
-        path.join(apkDir, "output-metadata.json")
-    );
-    await fs.writeFile(path.join(apkDir, "build-proof.json"), `${JSON.stringify({
-        packageType: "debug-apk",
-        gradleTask: "assembleDebug",
-        apk: androidDebugApkName,
-        nativeSource: "native/android",
-        signed: "debug",
-        releaseSigned: false,
-        notProven: [
-            "physical Android device install UAT",
-            "Bluetooth transport negotiation",
-            "signed Android release APK or AAB package"
-        ]
-    }, null, 2)}\n`);
-}
-
-async function buildAndroidReleaseApk(stageDir, env) {
-    const nativeRoot = path.join(stageDir, "native", "android");
-    const sdkRoot = await findAndroidSdk(env);
-    const javaHome = await findJavaHome(env);
-    const keystorePassword = releaseKeystorePassword(env);
-    const keystorePath = path.join(path.dirname(stageDir), "meshdrop-release-uat.jks");
-    const keytool = javaHome ? path.join(javaHome, "bin", "keytool") : "keytool";
-    const gradleEnv = {
-        ...env,
-        ANDROID_HOME: sdkRoot,
-        ANDROID_SDK_ROOT: sdkRoot,
-        MESHDROP_ANDROID_RELEASE_STORE_FILE: keystorePath,
-        MESHDROP_ANDROID_RELEASE_STORE_PASSWORD: keystorePassword,
-        MESHDROP_ANDROID_RELEASE_KEY_ALIAS: releaseKeystoreAlias,
-        MESHDROP_ANDROID_RELEASE_KEY_PASSWORD: keystorePassword
-    };
-    if (javaHome) {
-        gradleEnv.JAVA_HOME = javaHome;
-    }
-
-    await fs.rm(keystorePath, {force: true});
-    await createReleaseKeystore(keytool, keystorePath, keystorePassword, gradleEnv);
-    try {
-        await run("gradle", ["--no-daemon", "--console=plain", "assembleRelease"], {
-            cwd: nativeRoot,
-            env: gradleEnv
-        });
-
-        const apkDir = path.join(stageDir, "apk");
-        const builtApkPath = path.join(nativeRoot, "app", "build", "outputs", "apk", "release", "app-release.apk");
-        const stagedApkPath = path.join(apkDir, androidReleaseApkName);
-        await fs.mkdir(apkDir, {recursive: true});
-        await fs.copyFile(builtApkPath, stagedApkPath);
-        await fs.copyFile(
-            path.join(nativeRoot, "app", "build", "outputs", "apk", "release", "output-metadata.json"),
-            path.join(apkDir, "output-metadata.json")
-        );
-
-        const signature = await verifyApkSignature(sdkRoot, stagedApkPath);
-        const apkBytes = await fs.readFile(stagedApkPath);
-        await fs.writeFile(path.join(apkDir, "build-proof.json"), `${JSON.stringify({
-            packageType: "release-apk",
-            gradleTask: "assembleRelease",
-            apk: androidReleaseApkName,
-            nativeSource: "native/android",
-            signed: "uat-release",
-            releaseSigned: true,
-            productionSigning: false,
-            apkSha256: crypto.createHash("sha256").update(apkBytes).digest("hex"),
-            signature,
-            notProven: [
-                "physical Android device install UAT",
-                "Bluetooth transport negotiation",
-                "Play Store upload signing",
-                "Android App Bundle package"
-            ]
-        }, null, 2)}\n`);
-    }
-    finally {
-        await fs.rm(keystorePath, {force: true});
-    }
-}
-
-async function createReleaseKeystore(keytool, keystorePath, keystorePassword, env) {
-    await run(keytool, [
-        "-genkeypair",
-        "-keystore",
-        keystorePath,
-        "-storepass",
-        keystorePassword,
-        "-keypass",
-        keystorePassword,
-        "-alias",
-        releaseKeystoreAlias,
-        "-keyalg",
-        "RSA",
-        "-keysize",
-        "2048",
-        "-validity",
-        "3650",
-        "-dname",
-        "CN=MeshDrop UAT,O=Sandwich Farm,C=US"
-    ], {env});
-}
-
-function releaseKeystorePassword(env) {
-    return env.MESHDROP_ANDROID_RELEASE_UAT_PASSWORD || ["meshdrop", "release", "uat"].join("-");
-}
-
-async function verifyApkSignature(sdkRoot, apkPath) {
-    const apksigner = await findAndroidBuildTool(sdkRoot, "apksigner");
-    const {stdout} = await run(apksigner, ["verify", "--print-certs", apkPath]);
-    const outputLines = stdout.trim().split("\n").filter(Boolean);
-    const sha256Line = outputLines.find(line => line.includes("certificate SHA-256 digest:")) || "";
-    const certificateSha256 = sha256Line.split(":").pop().trim();
-    return {
-        verified: true,
-        tool: apksigner,
-        certificateSha256,
-        outputLines
-    };
-}
-
-async function findAndroidBuildTool(sdkRoot, toolName) {
-    const buildToolsRoot = path.join(sdkRoot, "build-tools");
-    const versions = (await fs.readdir(buildToolsRoot, {withFileTypes: true}))
-        .filter(entry => entry.isDirectory())
-        .map(entry => entry.name)
-        .sort((a, b) => b.localeCompare(a, undefined, {numeric: true}));
-
-    for (const version of versions) {
-        const candidate = path.join(buildToolsRoot, version, toolName);
-        if (await pathExists(candidate)) {
-            return candidate;
-        }
-    }
-    throw new Error(`Android SDK build-tools must include ${toolName}`);
-}
-
-async function findAndroidSdk(env) {
-    const candidates = [
-        env.ANDROID_HOME,
-        env.ANDROID_SDK_ROOT,
-        env.HOME ? path.join(env.HOME, "Android", "Sdk") : "",
-        "/opt/android-sdk",
-        "/usr/lib/android-sdk"
-    ].filter(Boolean);
-
-    for (const candidate of candidates) {
-        if (path.isAbsolute(candidate) && await pathExists(path.join(candidate, "platforms"))) {
-            return candidate;
-        }
-    }
-    throw new Error("Android APK builds require ANDROID_HOME or ANDROID_SDK_ROOT with installed Android platforms");
-}
-
-async function findJavaHome(env) {
-    const candidates = [
-        env.JAVA_HOME_17_X64,
-        env.JAVA_HOME_21_X64,
-        env.JAVA_HOME,
-        "/usr/lib/jvm/java-17-openjdk",
-        "/usr/lib/jvm/java-21-openjdk"
-    ].filter(Boolean);
-
-    for (const candidate of candidates) {
-        if (path.isAbsolute(candidate) && await pathExists(path.join(candidate, "bin", "java"))) {
-            return candidate;
-        }
-    }
-    return "";
-}
-
-async function pathExists(candidate) {
-    try {
-        await fs.access(candidate);
-        return true;
-    }
-    catch {
-        return false;
-    }
 }
 
 function tarCreate(artifactPath, cwd, prefix) {
