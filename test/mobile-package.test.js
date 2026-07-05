@@ -142,7 +142,15 @@ for (const target of ["ios", "android"]) {
                     : `${nativeRoot}/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`
             );
             assert.match(wrapperSource, /__meshdropTargetManifest/);
-            if (target === "android") {
+            if (target === "ios") {
+                assert.match(wrapperSource, /WKUIDelegate/);
+                assert.match(wrapperSource, /UIDocumentPickerDelegate/);
+                assert.match(wrapperSource, /@available\(iOS 18\.4, \*\)/);
+                assert.match(wrapperSource, /runOpenPanelWith/);
+                assert.match(wrapperSource, /UIDocumentPickerViewController/);
+                assert.match(wrapperSource, /documentPickerWasCancelled/);
+            }
+            else {
                 const androidManifest = await readTarEntry(
                     result.artifactPath,
                     `${nativeRoot}/app/src/main/AndroidManifest.xml`
