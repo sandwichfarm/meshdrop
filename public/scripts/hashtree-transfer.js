@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+
 const HashtreeTransferProtocol = {
     chunkSize: 2 * 1024 * 1024,
     fileType: 1,
@@ -13,6 +15,12 @@ const HashtreeTransferProtocol = {
 
     writeEnabled(enabled, storage = globalThis.localStorage) {
         storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
+    },
+
+    enabledFromConfig(config) {
+        return globalThis.RuntimeCapabilities
+            ? globalThis.RuntimeCapabilities.transportSupported(config, "hashtree", true)
+            : true;
     },
 
     async sha256Hex(bytes) {
@@ -288,6 +296,7 @@ class HashtreeTransferController {
     constructor() {
         this.$button = $("hashtree-transfer");
         this._active = false;
+        this._config = {};
         this._preferredActive = HashtreeTransferProtocol.readEnabled();
 
         if (this.$button) {
@@ -295,9 +304,11 @@ class HashtreeTransferController {
             this._render();
         }
 
-        Events.on("config", _ => {
+        Events.on("config", e => {
+            this._config = e.detail || {};
+            if (!HashtreeTransferProtocol.enabledFromConfig(this._config)) this.disable(false, false);
             this._render();
-            this._restorePreferredActive();
+            if (HashtreeTransferProtocol.enabledFromConfig(this._config)) this._restorePreferredActive();
         });
         Events.on("nostr-identity-changed", _ => {
             this.disable(false, false);
@@ -330,6 +341,11 @@ class HashtreeTransferController {
     }
 
     enable({notify = true, remember = true} = {}) {
+        if (!HashtreeTransferProtocol.enabledFromConfig(this._config)) {
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-runtime-unsupported"));
+            return;
+        }
+
         if (!globalThis.meshdropNostrIdentity?.getIdentity()) {
             if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.hashtree-transfer-identity-required"));
             return;
@@ -553,8 +569,9 @@ class HashtreeTransferController {
         if (!this.$button) return;
 
         const identity = globalThis.meshdropNostrIdentity?.getIdentity();
-        this.$button.toggleAttribute("hidden", !identity);
-        if (!identity) return;
+        const supported = HashtreeTransferProtocol.enabledFromConfig(this._config);
+        this.$button.toggleAttribute("hidden", !identity || !supported);
+        if (!identity || !supported) return;
 
         const translationKey = this._active
             ? "header.hashtree-transfer-disable"

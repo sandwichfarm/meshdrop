@@ -14,6 +14,13 @@ const NostrMeshProtocol = {
         storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
     },
 
+    enabledFromConfig(config) {
+        if (!globalThis.RuntimeCapabilities) return true;
+
+        return globalThis.RuntimeCapabilities.transportSupported(config, "nostr", true)
+            && globalThis.RuntimeCapabilities.transportSupported(config, "webrtc", true);
+    },
+
     networkId(identity) {
         return identity?.pubkey ? `nostr:${identity.pubkey}` : "nostr";
     },
@@ -122,7 +129,9 @@ class NostrMeshConnection {
         Events.on("config", e => {
             this._config = e.detail || {};
             this._configLoaded = true;
-            this._restorePreferredActive();
+            if (!NostrMeshProtocol.enabledFromConfig(this._config)) this.disconnect(false, false);
+            this._render();
+            if (NostrMeshProtocol.enabledFromConfig(this._config)) this._restorePreferredActive();
         });
         Events.on("nostr-identity-changed", e => this._onIdentityChanged(e.detail));
         Events.on("nostr-signer-available-changed", _ => {
@@ -151,6 +160,11 @@ class NostrMeshConnection {
 
         if (!identity) {
             if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-identity-required"));
+            return;
+        }
+
+        if (!NostrMeshProtocol.enabledFromConfig(this._config)) {
+            if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.nostr-mesh-runtime-unsupported"));
             return;
         }
 
@@ -499,7 +513,8 @@ class NostrMeshConnection {
         if (!this.$button) return;
 
         const identity = globalThis.meshdropNostrIdentity?.getIdentity();
-        this.$button.toggleAttribute("hidden", !identity);
+        const supported = NostrMeshProtocol.enabledFromConfig(this._config);
+        this.$button.toggleAttribute("hidden", !identity || !supported);
 
         const translationKey = this._active
             ? "header.nostr-mesh-disconnect"
