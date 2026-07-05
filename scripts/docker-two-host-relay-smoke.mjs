@@ -23,10 +23,6 @@ const containers = [
     `meshdrop-two-host-a-${process.pid}`,
     `meshdrop-two-host-b-${process.pid}`
 ];
-const proofIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#284d8f"/>
-  <path d="M18 34 28 44 47 21" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
 
 async function main() {
     if (process.env.MESHDROP_DOCKER_SKIP_BUILD !== "1") await run("docker", ["build", "-t", image, "."]);
@@ -137,15 +133,16 @@ async function runTwoHostTransferAttempt([baseUrlA, baseUrlB], relayUrls, attemp
             waitForOpenRtcPeer(pageB, receiverPeerId, "receiver")
         ]);
 
-        await sendProofIcon(pageA, senderPeerId);
+        const proofName = publicRelayUrls.length ? "docker-public-relay-two-host-webrtc" : "docker-two-host-nostr-webrtc";
+        const proofFile = createProofFile({proofName, relayUrls, attempt});
+        await sendProofFile(pageA, senderPeerId, proofFile);
         await waitForTransferAccepted(pageA, "sender");
         const received = await waitForReceivedFiles(pageB);
         await waitForFilesSent(pageA, "sender");
 
-        assertReceived(received);
+        assertReceived(received, proofFile);
         assert(!pageErrors.length, `Docker two-host relay page errors:\n${pageErrors.join("\n")}`);
-        const proofName = publicRelayUrls.length ? "docker-public-relay-two-host-webrtc" : "docker-two-host-nostr-webrtc";
-        console.log(`Proof ${proofName}: nostr delivered meshdrop-proof-icon.svg between two Docker instances`);
+        console.log(`Proof ${proofName}: nostr delivered ${proofFile.name} between two Docker instances`);
     }
     catch (error) {
         throw new Error(
@@ -300,14 +297,26 @@ async function waitForOpenRtcPeer(page, peerId, role) {
     }
 }
 
-async function sendProofIcon(page, peerId) {
-    await page.evaluate(({to, icon}) => {
-        const file = new File([icon], "meshdrop-proof-icon.svg", {type: "image/svg+xml"});
+function createProofFile({proofName, relayUrls, attempt}) {
+    return {
+        name: `meshdrop-${proofName}-proof.txt`,
+        text: [
+            "MeshDrop Docker two-host transfer proof",
+            `scenario=${proofName}`,
+            `attempt=${attempt}`,
+            `relayCount=${relayUrls.length}`
+        ].join("\n")
+    };
+}
+
+async function sendProofFile(page, peerId, proofFile) {
+    await page.evaluate(({to, proof}) => {
+        const file = new File([proof.text], proof.name, {type: "text/plain"});
         window.dispatchEvent(new CustomEvent("select-files-transport", {detail: {to, files: [file]}}));
         const button = document.querySelector('[data-transport-id="webrtc"]');
         if (!button) throw new Error("Missing Nostr relay transport option");
         button.click();
-    }, {to: peerId, icon: proofIcon});
+    }, {to: peerId, proof: proofFile});
 }
 
 async function waitForTransferAccepted(page, role) {
@@ -339,10 +348,10 @@ async function waitForReceivedFiles(page) {
     }
 }
 
-function assertReceived(received) {
+function assertReceived(received, proofFile) {
     const file = received[0];
-    assert(file.name.startsWith("meshdrop-proof-icon"), `received unexpected file ${file.name}`);
-    assert(file.text === proofIcon, "received proof file contents did not match");
+    assert(file.name === proofFile.name, `received unexpected file ${file.name}`);
+    assert(file.text === proofFile.text, "received proof file contents did not match");
 }
 
 function watchPage(name, page) {
