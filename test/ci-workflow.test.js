@@ -47,13 +47,14 @@ test("CI runs desktop and mobile target artifact transfer smoke", () => {
     assert.match(ciWorkflow, /npm run test:target-artifacts/);
 });
 
-test("CI proves Desktop Chromium shell transfers through package script", () => {
+test("CI proves Desktop Chromium shell transfers and signed installer", () => {
     assert.match(ciWorkflow, /desktop-chromium-shell:/);
-    assert.match(ciWorkflow, /name: Desktop Chromium shell transfer smoke/);
+    assert.match(ciWorkflow, /name: Desktop Chromium shell and installer smoke/);
     assertRuntimeChangeGate("desktop-chromium-shell");
     assert.match(ciWorkflow, /npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /npm run test:desktop-chromium/);
     assert.match(ciWorkflow, /npm run test:desktop-chromium-bundled/);
+    assert.match(ciWorkflow, /npm run test:desktop-installer/);
 });
 
 test("CI builds mobile native-source artifacts through package scripts", () => {
