@@ -54,6 +54,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(start9, /MESHDROP_ADMIN_NPUB/);
     assert.match(start9, /\.s9pk/);
     assert.match(start9, /npm run test:start9-package/);
+    assert.match(start9, /MESHDROP_START9_UAT_URL/);
+    assert.match(start9, /npm run test:start9-deployed/);
+    assert.match(start9, /Proof start9-deployed-device-webrtc/);
     assert.match(start9, /local WebRTC and Pollen WebRTC/);
     assert.match(start9, /Not Proven/);
 
@@ -63,6 +66,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(umbrel, /MESHDROP_DISCOVERY_NPUBS/);
     assert.match(umbrel, /MESHDROP_ADMIN_NPUB/);
     assert.match(umbrel, /npm run test:umbrel-package/);
+    assert.match(umbrel, /MESHDROP_UMBREL_UAT_URL/);
+    assert.match(umbrel, /npm run test:umbrel-deployed/);
+    assert.match(umbrel, /Proof umbrel-deployed-device-webrtc/);
     assert.match(umbrel, /local WebRTC and Pollen WebRTC/);
     assert.match(umbrel, /Not Proven/);
 
@@ -234,10 +240,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Docker \|[^|]+deployed-admin UAT exists[^|]+\|[^|]+\| None recorded for Docker \|/);
     assert.match(
         targetStatus,
-        /\| Start9 \| Generated package environment transfer smoke exists; real StartOS device UAT open \|/
+        /\| Start9 \| Generated package environment transfer smoke and deployed-device UAT harness exist; real StartOS device pass open \|/
     );
     assert.match(targetStatus, /`npm run test:start9-package` proves package build/);
-    assert.match(targetStatus, /Real StartOS device install from UI and device transfer UAT/);
+    assert.match(targetStatus, /Passing `MESHDROP_START9_UAT_URL=<url> npm run test:start9-deployed` after StartOS UI install/);
     assert.match(
         targetStatus,
         new RegExp([
@@ -257,9 +263,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /`npm run test:desktop-chromium-bundled` proves the packaged binary launcher uses bundled `bin\/chromium\/chrome`/);
     assert.match(targetStatus, /`npm run test:desktop-installer` proves the generated `\.run` installer SHA256/);
     assert.match(targetStatus, /None recorded for the signed Desktop Chromium installer path/);
-    assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke exists; real Umbrel node UAT open \|/);
+    assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke and deployed-node UAT harness exist; real Umbrel node pass open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
-    assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);
+    assert.match(targetStatus, /Passing `MESHDROP_UMBREL_UAT_URL=<url> npm run test:umbrel-deployed` after Umbrel UI install/);
     assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, unsigned device app proof, share extension source scaffold, and Bluetooth negotiation proof exist; signed\/device UAT open \|/);
     assert.match(
         targetStatus,

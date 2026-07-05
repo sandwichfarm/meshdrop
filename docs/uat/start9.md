@@ -58,6 +58,19 @@ package source artifact, reads the generated `startos/main.ts` environment plus 
 image with that generated Start9 environment, confirms `/config` reports `capabilities.runtime.target` as `start9`, and
 initiates browser transfers over local WebRTC and Pollen WebRTC.
 
+## Real Device UAT
+
+After installing the generated `.s9pk` through the StartOS UI, run:
+
+```sh
+MESHDROP_START9_UAT_URL=https://<startos-meshdrop-url> npm run test:start9-deployed
+```
+
+This harness fails closed unless `MESHDROP_START9_UAT_URL` is set. It reads the installed service `/config`, confirms
+the runtime target is `start9`, confirms backend and Pollen capability negotiation, keeps FIPS disabled until a real
+device-network FIPS path exists, and initiates local plus Pollen WebRTC transfers through the installed StartOS UI.
+Passing output must include `Proof start9-deployed-device-webrtc`.
+
 For package-source shape and typecheck coverage, run:
 
 ```sh
@@ -104,5 +117,6 @@ Current artifact evidence:
 ## Not Proven
 
 - This package-source smoke does not prove installation on a real StartOS device.
-- This package-source smoke does not prove browser transfer UAT through a real StartOS device UI.
+- This package-source smoke does not prove browser transfer UAT through a real StartOS device UI; that requires
+  `MESHDROP_START9_UAT_URL=<url> npm run test:start9-deployed` to pass after UI install.
 - FIPS is disabled by default until the target has a tested FIPS binary and device-network path.

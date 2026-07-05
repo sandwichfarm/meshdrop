@@ -81,6 +81,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-ida-ios-device-app-proof` | complete | Unsigned generic `iphoneos` device app builder, CI smoke, and release readback added after CI rejected unsigned archive validation; focused 17/17; `npm test` 206/206; diff/check; changed-code slop clean |
 | 2026-07-05 | `260705-tps-transfer-proof-specific-payloads` | complete | Docker local, Pollen, and two-host WebRTC smokes now send/assert scenario-specific proof files; `npm test` 206/206; Docker runtime proof; diff/check; changed-code slop clean |
 | 2026-07-05 | `260705-apd-android-physical-device-uat-harness` | complete | Physical Android UAT harness rejects no-device/emulator/ambiguous states and runs existing Android smokes by serial; hardware pass remains open |
+| 2026-07-05 | `260705-dtu-deployed-target-uat-harness` | complete | Start9/Umbrel deployed UAT harnesses require installed service URLs, validate `/config`, and run local/Pollen WebRTC transfer proof; real device/node pass remains open |
 
 ## Active Quick Task
 

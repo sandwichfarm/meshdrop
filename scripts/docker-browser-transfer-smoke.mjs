@@ -7,6 +7,7 @@ const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/nod
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const adminSecretKey = secretKeyFromHex(process.env.MESHDROP_DOCKER_ADMIN_SECRET_KEY || "");
 const adminFipsPeerNpub = process.env.MESHDROP_DOCKER_ADMIN_FIPS_PEER_NPUB || "npub1peer";
+const proofPrefix = process.env.MESHDROP_DOCKER_TRANSFER_PROOF_PREFIX || "docker";
 
 async function main() {
     if (!baseUrl) throw new Error("MESHDROP_DOCKER_TRANSFER_BASE_URL or base URL argument is required");
@@ -18,12 +19,12 @@ async function main() {
     try {
         if (adminSecretKey) await runAdminSettingsProof(browser, adminSecretKey);
         await runProofTransfer(browser, {
-            name: "docker-local-webrtc",
+            name: `${proofPrefix}-local-webrtc`,
             roomType: "ip",
             transportId: "local"
         });
         await runProofTransfer(browser, {
-            name: "docker-pollen-webrtc",
+            name: `${proofPrefix}-pollen-webrtc`,
             roomType: "pollen",
             transportId: "pollen-mesh",
             setupBoth: async pages => {
