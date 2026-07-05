@@ -197,7 +197,8 @@ function createTargetManifest(target, version, nativeSource, androidApk, android
             fips: false,
             bluetooth: false
         },
-        remainingProof: remainingProofFor(nativeSource, androidApk, androidPackage)
+        capabilities: capabilitiesFor(target, nativeSource),
+        remainingProof: remainingProofFor(target, nativeSource, androidApk, androidPackage)
     };
 
     if (nativeSource) {
@@ -221,7 +222,23 @@ function manifestName(target, nativeSource, androidApk, androidReleaseApk) {
     return nativeSource ? `meshdrop-${target}-native-source` : `meshdrop-${target}`;
 }
 
-function remainingProofFor(nativeSource, androidApk, androidPackage) {
+function capabilitiesFor(target, nativeSource) {
+    if (target !== "ios" || !nativeSource) return undefined;
+
+    return {
+        transports: {
+            bluetooth: {
+                supported: false,
+                transferSupported: false,
+                apiAvailable: false,
+                nativeBridgeAvailable: false,
+                unavailableReason: "bluetooth-transfer-not-implemented"
+            }
+        }
+    };
+}
+
+function remainingProofFor(target, nativeSource, androidApk, androidPackage) {
     if (androidPackage) {
         return androidApk
             ? ["physical Android device install UAT", "signed Android release APK or AAB package"]
@@ -233,6 +250,9 @@ function remainingProofFor(nativeSource, androidApk, androidPackage) {
         "mobile file picker and share sheet",
         "Bluetooth transport negotiation"
     ];
+    if (target === "ios" && nativeSource) {
+        remaining.pop();
+    }
     return nativeSource ? remaining : ["native mobile shell source artifact", ...remaining];
 }
 

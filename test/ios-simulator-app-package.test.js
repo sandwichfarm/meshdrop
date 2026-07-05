@@ -61,8 +61,7 @@ printf 'fake xcodebuild\\n'
             "App Group entitlement provisioning",
             "iOS device file-picker UAT",
             "iOS share-sheet device UAT",
-            "native iOS WebRTC transfer UAT",
-            "Bluetooth transport negotiation"
+            "native iOS WebRTC transfer UAT"
         ]);
     }
     finally {

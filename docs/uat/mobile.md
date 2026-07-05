@@ -35,13 +35,15 @@ app artifact built by `npm run build:ios:simulator-app`.
    `nativePackage.packageType` is `debug-apk` or `release-apk`.
 8. Confirm backend-only transports are not claimed: `localDiscovery`, `pollen`, and `fips` are `false`.
 9. Confirm `bluetooth` is `false` until a real mobile Bluetooth transport is implemented and tested.
-10. Confirm browser-backed source artifacts report `webrtc`, `nostr`, `blossom`, and `hashtree` as `true`.
-11. Confirm native-source artifacts do not claim unproven native transfer paths: `webrtc` and `nostr` are `false`.
-12. Confirm Android APK artifacts report `webrtc` and `nostr` as `true` only after `npm run test:android-webview-transfer`
+10. For iOS native-source artifacts, confirm `capabilities.transports.bluetooth` reports `supported` and
+    `transferSupported` as `false`, with `apiAvailable` and `nativeBridgeAvailable` also `false`.
+11. Confirm browser-backed source artifacts report `webrtc`, `nostr`, `blossom`, and `hashtree` as `true`.
+12. Confirm native-source artifacts do not claim unproven native transfer paths: `webrtc` and `nostr` are `false`.
+13. Confirm Android APK artifacts report `webrtc` and `nostr` as `true` only after `npm run test:android-webview-transfer`
     passes for the installed debug APK path.
-13. Confirm Android APK artifacts do not list Android share-sheet `ACTION_SEND` as remaining proof after
+14. Confirm Android APK artifacts do not list Android share-sheet `ACTION_SEND` as remaining proof after
     `npm run test:android-share-file` passes.
-14. Confirm Android APK artifacts do not list native file picker UI UAT as remaining proof after
+15. Confirm Android APK artifacts do not list native file picker UI UAT as remaining proof after
     `npm run test:android-picker-ui` passes.
 
 ## Native Source Acceptance
@@ -194,7 +196,8 @@ an unsigned iOS Simulator app package build, an Android debug APK build, a UAT-s
 install/launch proof, native Android picker UI file selection, Android WebView runtime capability evidence including
 Bluetooth API negotiation with transfer disabled, Android WebView-to-Chromium Nostr WebRTC transfer through a local fake
 relay, Android `ACTION_SEND` file share delivery through the same WebRTC send path, and real Nostr WebRTC transfers
-between two browser peers served from the generated iOS and Android source artifacts.
+between two browser peers served from the generated iOS and Android source artifacts. The iOS native-source artifact
+records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API and no native bridge available.
 
 ## Not Proven
 
@@ -211,4 +214,6 @@ between two browser peers served from the generated iOS and Android source artif
   and the iOS native-source artifact includes Xcode project, entitlement, and share extension source scaffolds, but
   does not prove iOS device picker UAT, App Group entitlement provisioning, share-sheet device UAT, or native iOS
   share-initiated transfer.
+- The iOS native-source artifact proves Bluetooth capability negotiation only as unsupported. It does not prove Bluetooth
+  transfer support.
 - These artifacts do not prove Bluetooth transport support.

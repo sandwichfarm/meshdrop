@@ -21,6 +21,7 @@ async function main() {
         assert.equal(proof.target, "ios");
         assert.equal(proof.packageType, "unsigned-simulator-app");
         assert.equal(proof.codeSigningAllowed, false);
+        assert(!proof.remainingProof.includes("Bluetooth transport negotiation"));
 
         console.log(`Proof ios-simulator-app-package:${version}: unsigned MeshDrop.app simulator package built and inspected`);
     }
