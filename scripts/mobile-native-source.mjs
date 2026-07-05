@@ -186,6 +186,8 @@ async function writeAndroidManifestFiles(appSrc) {
     await fs.writeFile(path.join(appSrc, "AndroidManifest.xml"), androidManifestXml());
     await fs.mkdir(path.join(appSrc, "res", "values"), {recursive: true});
     await fs.writeFile(path.join(appSrc, "res", "values", "styles.xml"), androidStylesXml());
+    await fs.mkdir(path.join(appSrc, "res", "xml"), {recursive: true});
+    await fs.writeFile(path.join(appSrc, "res", "xml", "network_security_config.xml"), androidNetworkSecurityConfigXml());
 }
 
 function androidManifestXml() {
@@ -193,7 +195,7 @@ function androidManifestXml() {
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
         "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">",
         "  <uses-permission android:name=\"android.permission.INTERNET\" />",
-        "  <application android:theme=\"@style/AppTheme\" android:label=\"MeshDrop\" android:usesCleartextTraffic=\"false\">",
+        "  <application android:theme=\"@style/AppTheme\" android:label=\"MeshDrop\" android:usesCleartextTraffic=\"false\" android:networkSecurityConfig=\"@xml/network_security_config\">",
         "    <activity android:name=\".MainActivity\" android:exported=\"true\">",
         "      <intent-filter>",
         "        <action android:name=\"android.intent.action.MAIN\" />",
@@ -202,6 +204,19 @@ function androidManifestXml() {
         "    </activity>",
         "  </application>",
         "</manifest>",
+        ""
+    ].join("\n");
+}
+
+function androidNetworkSecurityConfigXml() {
+    return [
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
+        "<network-security-config>",
+        "  <domain-config cleartextTrafficPermitted=\"true\">",
+        "    <domain includeSubdomains=\"false\">127.0.0.1</domain>",
+        "    <domain includeSubdomains=\"false\">localhost</domain>",
+        "  </domain-config>",
+        "</network-security-config>",
         ""
     ].join("\n");
 }
@@ -250,10 +265,11 @@ function androidActivitySource(escapedManifest) {
         "        settings.setJavaScriptEnabled(true);",
         "        settings.setDomStorageEnabled(true);",
         "        settings.setAllowFileAccess(true);",
+        "        settings.setAllowFileAccessFromFileURLs(true);",
         "        webView.setWebViewClient(new WebViewClient() {",
         "            @Override",
         "            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {",
-        "                view.evaluateJavascript(\"globalThis.__meshdropTargetManifest = \" + TARGET_MANIFEST + \";\", null);",
+        "                view.evaluateJavascript(\"if (globalThis.HTMLCanvasElement) { delete HTMLCanvasElement.prototype.transferControlToOffscreen; } globalThis.__meshdropTargetManifest = \" + TARGET_MANIFEST + \";\", null);",
         "            }",
         "        });",
         "        setContentView(webView);",

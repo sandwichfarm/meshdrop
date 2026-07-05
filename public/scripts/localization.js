@@ -80,7 +80,7 @@ class Localization {
             `Selected language: ${locale}`
         );
 
-        Events.fire("translation-loaded");
+        window.dispatchEvent(new CustomEvent("translation-loaded"));
     }
 
     static async fetchDefaultTranslations() {
@@ -107,15 +107,27 @@ class Localization {
     }
 
     static async fetchTranslationsFor(newLocale) {
-        const response = await fetch(`lang/${newLocale}.json`, {
-            method: 'GET',
-            credentials: 'include',
-            mode: 'no-cors',
+        return new Promise(resolve => {
+            const xhr = new XMLHttpRequest();
+            xhr.addEventListener("load", () => {
+                const loaded = xhr.status === 200
+                    || (location.protocol === "file:" && xhr.status === 0 && xhr.responseText);
+                if (!loaded) {
+                    resolve(false);
+                    return;
+                }
+
+                try {
+                    resolve(JSON.parse(xhr.responseText));
+                }
+                catch {
+                    resolve(false);
+                }
+            });
+            xhr.addEventListener("error", () => resolve(false));
+            xhr.open("GET", `lang/${newLocale}.json`);
+            xhr.send();
         });
-
-        if (response.redirected === true || response.status !== 200) return false;
-
-        return await response.json();
     }
 
     static async translatePage() {
@@ -238,3 +250,5 @@ class Localization {
         return div.innerHTML;
     }
 }
+
+globalThis.Localization = Localization;

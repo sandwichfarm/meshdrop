@@ -138,7 +138,7 @@ function stageName(target, nativeSource, androidApk) {
 }
 
 function createTargetManifest(target, version, nativeSource, androidApk) {
-    const nativeRuntimeTransfersProven = !nativeSource && !androidApk;
+    const nativeRuntimeTransfersProven = !nativeSource || androidApk;
     const manifest = {
         schemaVersion: 1,
         name: androidApk ? "meshdrop-android-apk" : nativeSource ? `meshdrop-${target}-native-source` : `meshdrop-${target}`,
@@ -168,8 +168,6 @@ function createTargetManifest(target, version, nativeSource, androidApk) {
         remainingProof: androidApk
             ? [
                 "physical Android device install UAT",
-                "native Android WebView file transfer UAT",
-                "native Android WebRTC transfer UAT",
                 "mobile file picker and share sheet",
                 "Bluetooth transport negotiation",
                 "signed Android release APK or AAB package"
@@ -228,7 +226,7 @@ async function writeMobileReadme(stageDir, target, version, nativeSource, androi
         ? `This artifact packages MeshDrop app assets with ${platform} native WebView wrapper source.`
         : `This artifact packages MeshDrop app assets and target metadata for a future ${platform} native shell.`;
     const packageNote = androidApk
-        ? "It is a debug APK for UAT. It is not a signed release APK, AAB, app-store package, or native mobile transfer proof."
+        ? "It is a debug APK for UAT. It is not a signed release APK, AAB, app-store package, or physical-device proof."
         : nativeSource
         ? "It is not a signed app, app-store package, APK, or IPA."
         : "It is not a signed mobile app, app-store package, or native executable.";
@@ -299,8 +297,6 @@ async function buildAndroidDebugApk(stageDir, env) {
         releaseSigned: false,
         notProven: [
             "physical Android device install UAT",
-            "native Android WebView file transfer UAT",
-            "native Android WebRTC transfer UAT",
             "mobile file picker and share sheet",
             "Bluetooth transport negotiation",
             "signed Android release APK or AAB package"

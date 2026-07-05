@@ -113,6 +113,7 @@ for (const target of ["ios", "android"]) {
                 assert(entries.includes(`${nativeRoot}/settings.gradle`));
                 assert(entries.includes(`${nativeRoot}/app/build.gradle`));
                 assert(entries.includes(`${nativeRoot}/app/src/main/AndroidManifest.xml`));
+                assert(entries.includes(`${nativeRoot}/app/src/main/res/xml/network_security_config.xml`));
                 assert(entries.includes(`${nativeRoot}/app/src/main/assets/meshdrop/index.html`));
                 assert(entries.includes(`${nativeRoot}/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`));
             }
@@ -142,8 +143,23 @@ for (const target of ["ios", "android"]) {
             );
             assert.match(wrapperSource, /__meshdropTargetManifest/);
             if (target === "android") {
+                const androidManifest = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/app/src/main/AndroidManifest.xml`
+                );
+                const networkConfig = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/app/src/main/res/xml/network_security_config.xml`
+                );
                 assert.match(wrapperSource, /ApplicationInfo\.FLAG_DEBUGGABLE/);
                 assert.match(wrapperSource, /WebView\.setWebContentsDebuggingEnabled\(true\)/);
+                assert.match(wrapperSource, /setAllowFileAccessFromFileURLs\(true\)/);
+                assert.match(wrapperSource, /delete HTMLCanvasElement\.prototype\.transferControlToOffscreen/);
+                assert.match(androidManifest, /android:usesCleartextTraffic="false"/);
+                assert.match(androidManifest, /android:networkSecurityConfig="@xml\/network_security_config"/);
+                assert.match(networkConfig, /cleartextTrafficPermitted="true"/);
+                assert.match(networkConfig, /127\.0\.0\.1/);
+                assert.match(networkConfig, /localhost/);
             }
 
             const readme = await readTarEntry(result.artifactPath, `${prefix}/README-${target.toUpperCase()}.md`);
