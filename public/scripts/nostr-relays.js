@@ -434,7 +434,7 @@ const ProtocolServerPreferences = {
 
     write(preferences) {
         localStorage.setItem(this.storageKey, JSON.stringify(preferences));
-        Events.fire("protocol-server-preferences-changed", preferences);
+        globalThis.Events.fire("protocol-server-preferences-changed", preferences);
     },
 
     serverPreferences(serverUrl) {

@@ -1,10 +1,10 @@
 class PairDrop {
 
     constructor() {
-        this.$headerNotificationBtn = $('notification');
-        this.$headerEditPairedDevicesBtn = $('edit-paired-devices');
-        this.$footerPairedDevicesBadge = $$('.discovery-wrapper .badge-room-secret');
-        this.$headerInstallBtn = $('install');
+        this.$headerNotificationBtn = globalThis.$('notification');
+        this.$headerEditPairedDevicesBtn = globalThis.$('edit-paired-devices');
+        this.$footerPairedDevicesBadge = globalThis.$$('.discovery-wrapper .badge-room-secret');
+        this.$headerInstallBtn = globalThis.$('install');
 
         this.deferredStyles = [
             "styles/styles-deferred.css"
@@ -30,15 +30,15 @@ class PairDrop {
 
         this.registerServiceWorker();
 
-        Events.on('beforeinstallprompt', e => this.onPwaInstallable(e));
+        globalThis.Events.on('beforeinstallprompt', e => this.onPwaInstallable(e));
 
-        this.persistentStorage = new PersistentStorage();
-        this.localization = new Localization();
-        this.themeUI = new ThemeUI();
-        this.backgroundCanvas = new BackgroundCanvas();
-        this.headerUI = new HeaderUI();
-        this.centerUI = new CenterUI();
-        this.footerUI = new FooterUI();
+        this.persistentStorage = new globalThis.PersistentStorage();
+        this.localization = new globalThis.Localization();
+        this.themeUI = new globalThis.ThemeUI();
+        this.backgroundCanvas = new globalThis.BackgroundCanvas();
+        this.headerUI = new globalThis.HeaderUI();
+        this.centerUI = new globalThis.CenterUI();
+        this.footerUI = new globalThis.FooterUI();
 
         this.initialize()
             .then(_ => {
@@ -74,7 +74,7 @@ class PairDrop {
 
         // Evaluate url params as soon as ws is connected
         console.log("Evaluate URL params as soon as websocket connection is established.");
-        Events.on('ws-connected', _ => this.evaluateUrlParams(), {once: true});
+        globalThis.Events.on('ws-connected', _ => this.evaluateUrlParams(), {once: true});
     }
 
     registerServiceWorker() {
@@ -115,7 +115,7 @@ class PairDrop {
             this.$headerNotificationBtn.removeAttribute('hidden');
         }
 
-        let roomSecrets = await PersistentStorage.getAllRoomSecrets();
+        let roomSecrets = await globalThis.PersistentStorage.getAllRoomSecrets();
         if (roomSecrets.length > 0) {
             this.$headerEditPairedDevicesBtn.removeAttribute('hidden');
             this.$footerPairedDevicesBadge.removeAttribute('hidden');
@@ -152,16 +152,13 @@ class PairDrop {
         });
     }
 
-    loadAndApplyStylesheet(url) {
-        return new Promise( async (resolve) => {
-            try {
-                await this.loadStyleSheet(url);
-                console.log(`Stylesheet loaded successfully: ${url}`);
-                resolve();
-            } catch (error) {
-                console.error('Error loading stylesheet:', error);
-            }
-        });
+    async loadAndApplyStylesheet(url) {
+        try {
+            await this.loadStyleSheet(url);
+            console.log(`Stylesheet loaded successfully: ${url}`);
+        } catch (error) {
+            console.error('Error loading stylesheet:', error);
+        }
     }
 
     loadScript(url) {
@@ -175,49 +172,46 @@ class PairDrop {
         });
     }
 
-    loadAndApplyScript(url) {
-        return new Promise( async (resolve) => {
-            try {
-                await this.loadScript(url);
-                console.log(`Script loaded successfully: ${url}`);
-                resolve();
-            } catch (error) {
-                console.error('Error loading script:', error);
-            }
-        });
+    async loadAndApplyScript(url) {
+        try {
+            await this.loadScript(url);
+            console.log(`Script loaded successfully: ${url}`);
+        } catch (error) {
+            console.error('Error loading script:', error);
+        }
     }
 
     async hydrate() {
-        this.aboutUI = new AboutUI();
-        this.peersUI = new PeersUI();
-        this.languageSelectDialog = new LanguageSelectDialog();
-        this.receiveFileDialog = new ReceiveFileDialog();
-        this.receiveRequestDialog = new ReceiveRequestDialog();
-        this.sendTextDialog = new SendTextDialog();
-        this.receiveTextDialog = new ReceiveTextDialog();
-        this.pairDeviceDialog = new PairDeviceDialog();
-        this.clearDevicesDialog = new EditPairedDevicesDialog();
-        this.publicRoomDialog = new PublicRoomDialog();
-        this.base64Dialog = new Base64Dialog();
-        this.shareTextDialog = new ShareTextDialog();
-        this.protocolSettingsDialog = new ProtocolSettingsDialog();
-        this.transferChoiceDialog = new TransferChoiceDialog();
-        this.toast = new Toast();
-        this.notifications = new Notifications();
-        this.networkStatusUI = new NetworkStatusUI();
-        this.webShareTargetUI = new WebShareTargetUI();
-        this.webFileHandlersUI = new WebFileHandlersUI();
-        this.noSleepUI = new NoSleepUI();
-        this.broadCast = new BrowserTabsConnector();
-        this.nostrIdentity = new NostrIdentityController();
-        this.localDiscovery = new LocalDiscoveryController();
-        this.nostrMesh = new NostrMeshConnection();
-        this.blossomTransfer = new BlossomTransferController();
-        this.hashtreeTransfer = new HashtreeTransferController();
-        this.pollenTransfer = new PollenTransferController();
-        this.fipsDiscovery = new FipsDiscoveryController();
-        this.server = new ServerConnection();
-        this.peers = new PeersManager(this.server);
+        this.aboutUI = new globalThis.AboutUI();
+        this.peersUI = new globalThis.PeersUI();
+        this.languageSelectDialog = new globalThis.LanguageSelectDialog();
+        this.receiveFileDialog = new globalThis.ReceiveFileDialog();
+        this.receiveRequestDialog = new globalThis.ReceiveRequestDialog();
+        this.sendTextDialog = new globalThis.SendTextDialog();
+        this.receiveTextDialog = new globalThis.ReceiveTextDialog();
+        this.pairDeviceDialog = new globalThis.PairDeviceDialog();
+        this.clearDevicesDialog = new globalThis.EditPairedDevicesDialog();
+        this.publicRoomDialog = new globalThis.PublicRoomDialog();
+        this.base64Dialog = new globalThis.Base64Dialog();
+        this.shareTextDialog = new globalThis.ShareTextDialog();
+        this.protocolSettingsDialog = new globalThis.ProtocolSettingsDialog();
+        this.transferChoiceDialog = new globalThis.TransferChoiceDialog();
+        this.toast = new globalThis.Toast();
+        this.notifications = new globalThis.Notifications();
+        this.networkStatusUI = new globalThis.NetworkStatusUI();
+        this.webShareTargetUI = new globalThis.WebShareTargetUI();
+        this.webFileHandlersUI = new globalThis.WebFileHandlersUI();
+        this.noSleepUI = new globalThis.NoSleepUI();
+        this.broadCast = new globalThis.BrowserTabsConnector();
+        this.nostrIdentity = new globalThis.NostrIdentityController();
+        this.localDiscovery = new globalThis.LocalDiscoveryController();
+        this.nostrMesh = new globalThis.NostrMeshConnection();
+        this.blossomTransfer = new globalThis.BlossomTransferController();
+        this.hashtreeTransfer = new globalThis.HashtreeTransferController();
+        this.pollenTransfer = new globalThis.PollenTransferController();
+        this.fipsDiscovery = new globalThis.FipsDiscoveryController();
+        this.server = new globalThis.ServerConnection();
+        this.peers = new globalThis.PeersManager(this.server);
         if (globalThis.__meshdropE2E) {
             globalThis.__meshdropE2E.peersManager = this.peers;
         }
@@ -266,11 +260,11 @@ class PairDrop {
         }
 
         // remove url params from url
-        const urlWithoutParams = getUrlWithoutArguments();
+        const urlWithoutParams = globalThis.getUrlWithoutArguments();
         window.history.replaceState({}, "Rewrite URL", urlWithoutParams);
 
         console.log("URL params evaluated.");
     }
 }
 
-const pairDrop = new PairDrop();
+new PairDrop();

@@ -4,7 +4,7 @@ class NostrIdentityController {
     static bech32Charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
     constructor() {
-        this.$button = $("nostr-identity");
+        this.$button = globalThis.$("nostr-identity");
         this._identity = this._withServerListState(this.getStoredIdentity());
         this._signerAvailable = this.hasSigner();
         if (this._identity && !this._signerAvailable) {
@@ -18,12 +18,12 @@ class NostrIdentityController {
         }
 
         this._watchSignerAvailability();
-        Events.on("display-name", e => this._onServerDisplayName(e.detail));
+        globalThis.Events.on("display-name", e => this._onServerDisplayName(e.detail));
         globalThis.meshdropNostrIdentity = this;
-        Events.fire("nostr-signer-available-changed", this._signerAvailable);
+        globalThis.Events.fire("nostr-signer-available-changed", this._signerAvailable);
         if (this._identity) {
             this._setServerListStatus("loading", this._identity.blossomServers || [], false);
-            Events.fire("self-display-name-changed", this._identity);
+            globalThis.Events.fire("self-display-name-changed", this._identity);
             this.hydrateIdentity();
         }
     }
@@ -51,7 +51,7 @@ class NostrIdentityController {
 
     async connect() {
         if (!this.hasSigner()) {
-            Events.fire("notify-user", Localization.getTranslation("notifications.nostr-extension-required"));
+            globalThis.Events.fire("notify-user", globalThis.Localization.getTranslation("notifications.nostr-extension-required"));
             return;
         }
 
@@ -75,15 +75,15 @@ class NostrIdentityController {
             };
 
             localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(this._identity));
-            Events.fire("notify-user", Localization.getTranslation("notifications.nostr-connected"));
-            Events.fire("self-display-name-changed", this._identity);
-            Events.fire("nostr-identity-changed", this._identity);
+            globalThis.Events.fire("notify-user", globalThis.Localization.getTranslation("notifications.nostr-connected"));
+            globalThis.Events.fire("self-display-name-changed", this._identity);
+            globalThis.Events.fire("nostr-identity-changed", this._identity);
             this._render();
             this.hydrateIdentity();
         } catch (error) {
             console.error("Nostr identity login failed", error);
             const reason = error?.message || String(error);
-            Events.fire("notify-user", `${Localization.getTranslation("notifications.nostr-connect-failed")}: ${reason}`);
+            globalThis.Events.fire("notify-user", `${globalThis.Localization.getTranslation("notifications.nostr-connect-failed")}: ${reason}`);
         }
     }
 
@@ -115,9 +115,9 @@ class NostrIdentityController {
     disconnect() {
         this._identity = null;
         localStorage.removeItem("meshdrop_nostr_identity");
-        Events.fire("notify-user", Localization.getTranslation("notifications.nostr-disconnected"));
-        Events.fire("self-display-name-changed", {displayName: "", picture: ""});
-        Events.fire("nostr-identity-changed", null);
+        globalThis.Events.fire("notify-user", globalThis.Localization.getTranslation("notifications.nostr-disconnected"));
+        globalThis.Events.fire("self-display-name-changed", {displayName: "", picture: ""});
+        globalThis.Events.fire("nostr-identity-changed", null);
         this._render();
     }
 
@@ -176,7 +176,7 @@ class NostrIdentityController {
 
         this._identity.displayName = serverDisplayName;
         localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(this._identity));
-        Events.fire("self-display-name-changed", this._identity);
+        globalThis.Events.fire("self-display-name-changed", this._identity);
         this._render();
     }
 
@@ -205,8 +205,8 @@ class NostrIdentityController {
             );
 
             localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(this._identity));
-            Events.fire("self-display-name-changed", this._identity);
-            Events.fire("nostr-identity-changed", this._identity);
+            globalThis.Events.fire("self-display-name-changed", this._identity);
+            globalThis.Events.fire("nostr-identity-changed", this._identity);
             this._render();
         } catch (error) {
             this._setFollowListStatus("error", this._identity.followPubkeys || [], false);
@@ -232,7 +232,7 @@ class NostrIdentityController {
             ? "header.nostr-identity-disconnect"
             : "header.nostr-identity-connect";
 
-        this.$button.title = Localization.getTranslation(`${translationKey}_title`);
+        this.$button.title = globalThis.Localization.getTranslation(`${translationKey}_title`);
         this.$button.classList.toggle("selected", !!this._identity);
     }
 
@@ -257,16 +257,16 @@ class NostrIdentityController {
 
         this._identity.followListStatus = status;
         this._identity.followPubkeys = [...new Set((pubkeys || [])
-            .filter(pubkey => NostrDiscoveryProtocol.pubkeyRegex.test(pubkey || ""))
+            .filter(pubkey => globalThis.NostrDiscoveryProtocol.pubkeyRegex.test(pubkey || ""))
             .map(pubkey => pubkey.toLowerCase()))];
         localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(this._identity));
 
         if (notify) {
-            Events.fire("nostr-follow-list-changed", {
+            globalThis.Events.fire("nostr-follow-list-changed", {
                 status: this._identity.followListStatus,
                 pubkeys: this._identity.followPubkeys
             });
-            Events.fire("nostr-identity-changed", this._identity);
+            globalThis.Events.fire("nostr-identity-changed", this._identity);
         }
     }
 
@@ -274,15 +274,15 @@ class NostrIdentityController {
         if (!this._identity) return;
 
         this._identity.blossomServerListStatus = status;
-        this._identity.blossomServers = ProtocolServerPreferences.normalizeServers(servers);
+        this._identity.blossomServers = globalThis.ProtocolServerPreferences.normalizeServers(servers);
         localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(this._identity));
 
         if (notify) {
-            Events.fire("nostr-server-list-changed", {
+            globalThis.Events.fire("nostr-server-list-changed", {
                 status: this._identity.blossomServerListStatus,
                 servers: this._identity.blossomServers
             });
-            Events.fire("nostr-identity-changed", this._identity);
+            globalThis.Events.fire("nostr-identity-changed", this._identity);
         }
     }
 
@@ -391,7 +391,7 @@ class NostrIdentityController {
                 this._signerAvailable = signerAvailable;
                 if (!signerAvailable && this._identity) this.disconnect();
                 this._render();
-                Events.fire("nostr-signer-available-changed", signerAvailable);
+                globalThis.Events.fire("nostr-signer-available-changed", signerAvailable);
             }
 
             if (!signerAvailable && checksRemaining-- > 0) {
