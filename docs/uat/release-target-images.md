@@ -90,8 +90,8 @@ Repeat with `target=start9` and `target=umbrel`.
   REST API. Making `ghcr.io/sandwichfarm/meshdrop` public is still required before anonymous manifest readback can pass.
 - The iOS source and native-source artifacts are not complete native targets until installable packages and transfer UAT
   pass.
-- Android APK artifacts are not complete until physical-device install UAT, native picker UI UAT, and Bluetooth proof
-  pass. The release APK artifact uses generated UAT signing and is not Play Store upload signing or AAB proof.
+- Android APK artifacts are not complete until physical-device install UAT and Bluetooth proof pass. The release APK
+  artifact uses generated UAT signing and is not Play Store upload signing or AAB proof.
 - The Desktop Native Linux shell artifact is not complete until native transfer UAT and installer/signing proof pass.
 - The Start9 package is not complete until device install and transfer UAT pass on StartOS.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.

@@ -171,7 +171,6 @@ function createTargetManifest(target, version, nativeSource, androidApk, android
     const nativeRuntimeTransfersProven = !nativeSource || androidPackage;
     const androidPackageRemainingProof = [
         "physical Android device install UAT",
-        "Android native file picker UI UAT",
         "Bluetooth transport negotiation"
     ];
     if (androidApk) {
@@ -351,7 +350,6 @@ async function buildAndroidDebugApk(stageDir, env) {
         releaseSigned: false,
         notProven: [
             "physical Android device install UAT",
-            "Android native file picker UI UAT",
             "Bluetooth transport negotiation",
             "signed Android release APK or AAB package"
         ]
@@ -410,7 +408,6 @@ async function buildAndroidReleaseApk(stageDir, env) {
             signature,
             notProven: [
                 "physical Android device install UAT",
-                "Android native file picker UI UAT",
                 "Bluetooth transport negotiation",
                 "Play Store upload signing",
                 "Android App Bundle package"

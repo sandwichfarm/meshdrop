@@ -40,7 +40,7 @@ try {
     assert.equal(manifest.transports.nostr, true);
     assert.equal(manifest.transports.bluetooth, false);
     assert(manifest.remainingProof.includes("physical Android device install UAT"));
-    assert(manifest.remainingProof.includes("Android native file picker UI UAT"));
+    assert(!manifest.remainingProof.includes("Android native file picker UI UAT"));
     assert(manifest.remainingProof.includes("Bluetooth transport negotiation"));
     assert(!manifest.remainingProof.includes("signed Android release APK or AAB package"));
     assert(!manifest.remainingProof.includes("mobile file picker and share sheet"));
@@ -57,7 +57,7 @@ try {
     assert.match(proof.signature.certificateSha256, /^[0-9A-F]{64}$/i);
     assert(proof.signature.outputLines.some(line => line.includes("certificate SHA-256 digest:")));
     assert(proof.notProven.includes("physical Android device install UAT"));
-    assert(proof.notProven.includes("Android native file picker UI UAT"));
+    assert(!proof.notProven.includes("Android native file picker UI UAT"));
     assert(proof.notProven.includes("Bluetooth transport negotiation"));
     assert(proof.notProven.includes("Play Store upload signing"));
     assert(proof.notProven.includes("Android App Bundle package"));
