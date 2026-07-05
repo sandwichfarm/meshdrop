@@ -82,9 +82,9 @@ Repeat with `target=start9` and `target=umbrel`.
 
 ## Not proven
 
-- Anonymous local readback is not proven for `v0.1.2`: the release readback job failed at anonymous GHCR after Docker
-  smoke passed, and `npm run verify:ghcr-anonymous -- v0.1.2` currently fails with GHCR `unauthorized` for
-  `ghcr.io/sandwichfarm/meshdrop:v0.1.2-standalone`.
+- Anonymous local readback is not proven for `v0.1.3`: the release readback job failed at anonymous GHCR after Docker
+  smoke passed, and `npm run verify:ghcr-anonymous -- v0.1.3` currently fails with GHCR `unauthorized` for
+  `ghcr.io/sandwichfarm/meshdrop:v0.1.3-standalone`.
 - The local GitHub token lacks `read:packages`, so this session cannot inspect package visibility through the Packages
   REST API. Making `ghcr.io/sandwichfarm/meshdrop` public is still required before anonymous manifest readback can pass.
 - The iOS and Android source and native-source artifacts are not complete native targets until installable packages and
@@ -95,25 +95,21 @@ Repeat with `target=start9` and `target=umbrel`.
 
 ## Current Verified Release
 
-`v0.1.2` release assets and authenticated GHCR readback are proven by release run `28721154277`. It was published on
+`v0.1.3` release assets and authenticated GHCR readback are proven by release run `28723597015`. It was published on
 2026-07-04 and verified with these readbacks before the strict anonymous GHCR gate failed:
 
-- GitHub release: https://github.com/sandwichfarm/meshdrop/releases/tag/v0.1.2
-- Release workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28721154277
-- Assets: `meshdrop-android-0.1.2.tar.gz`, `meshdrop-desktop-0.1.2.tar.gz`,
-  `meshdrop-ios-0.1.2.tar.gz`, `meshdrop-node-0.1.2.tar.gz`, `meshdrop-source-0.1.2.tar.gz`,
-  `meshdrop-spa-0.1.2.tar.gz`, `meshdrop-start9-0.1.2.tar.gz`, `meshdrop-umbrel-0.1.2.tar.gz`,
-  and `SHA256SUMS`.
-- Desktop Native Linux shell artifacts are added after `v0.1.2`; the next release verification must include
-  `meshdrop-desktop-linux-<version>.tar.gz`.
-- Desktop Chromium shell artifacts are added after `v0.1.2`; the next release verification must include
-  `meshdrop-desktop-chromium-<version>.tar.gz`.
-- iOS and Android native-source artifacts are added after `v0.1.2`; the next release verification must include
-  `meshdrop-ios-native-source-<version>.tar.gz` and `meshdrop-android-native-source-<version>.tar.gz`.
+- GitHub release: https://github.com/sandwichfarm/meshdrop/releases/tag/v0.1.3
+- Release workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28723597015
+- Assets: `meshdrop-android-0.1.3.tar.gz`, `meshdrop-android-native-source-0.1.3.tar.gz`,
+  `meshdrop-desktop-0.1.3.tar.gz`, `meshdrop-desktop-chromium-0.1.3.tar.gz`,
+  `meshdrop-desktop-linux-0.1.3.tar.gz`, `meshdrop-ios-0.1.3.tar.gz`,
+  `meshdrop-ios-native-source-0.1.3.tar.gz`, `meshdrop-node-0.1.3.tar.gz`,
+  `meshdrop-source-0.1.3.tar.gz`, `meshdrop-spa-0.1.3.tar.gz`, `meshdrop-start9-0.1.3.tar.gz`,
+  `meshdrop-umbrel-0.1.3.tar.gz`, and `SHA256SUMS`.
 - GHCR target image jobs passed for `start9`, `standalone`, and `umbrel`.
-- GHCR tags checked by `release-verify.yml`: `v0.1.2-standalone`, `0.1.2-standalone`, `v0.1.2-start9`,
-  `0.1.2-start9`, `v0.1.2-umbrel`, and `0.1.2-umbrel`.
+- GHCR tags checked by `release-verify.yml`: `v0.1.3-standalone`, `0.1.3-standalone`, `v0.1.3-start9`,
+  `0.1.3-start9`, `v0.1.3-umbrel`, and `0.1.3-umbrel`.
 - `release-verify.yml` confirmed `linux/amd64` and `linux/arm64` manifests with GitHub Actions package permissions,
-  pulled target metadata, and Docker smoke passed for `ghcr.io/sandwichfarm/meshdrop:v0.1.2-standalone`.
+  pulled target metadata, and Docker smoke passed for `ghcr.io/sandwichfarm/meshdrop:v0.1.3-standalone`.
 - The same release readback failed at anonymous GHCR manifest readback with `unauthorized`, so the release image target
   remains incomplete until `ghcr.io/sandwichfarm/meshdrop` is public and anonymous readback passes.

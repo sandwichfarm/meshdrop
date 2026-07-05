@@ -62,6 +62,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-mns-mobile-native-shell-source-artifacts` | complete | iOS/Android native-source wrapper artifacts build and release verifier expects them; app package/device transfer UAT still open |
 | 2026-07-05 | `260705-mnci-mobile-native-source-ci` | complete | PR CI runs iOS/Android native-source package scripts and tar readbacks after unit tests |
 | 2026-07-05 | `260705-dcs-desktop-chromium-shell-uat` | complete | Chromium desktop shell artifact transfers `meshdrop-desktop-chromium-proof.txt` over Nostr WebRTC; GTK/WebKit remains gated; installer/bundled engine open |
+| 2026-07-05 | `260705-v13-release-v013-readback` | complete | `v0.1.3` release assets, GHCR target images, authenticated readback, and Docker smoke passed; anonymous GHCR still returns `unauthorized` |
 
 ## Active Quick Task
 
