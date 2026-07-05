@@ -39,6 +39,19 @@ This smoke builds the local `meshdrop:umbrel-smoke` image with `MESHDROP_TARGET=
 Umbrel package, runs the rendered package `docker-compose.yml`, confirms `/config` reports
 `capabilities.runtime.target` as `umbrel`, and initiates browser transfers over local WebRTC and Pollen WebRTC.
 
+## Real Node UAT
+
+After installing the generated Umbrel package through the Umbrel UI, run:
+
+```sh
+MESHDROP_UMBREL_UAT_URL=https://<umbrel-meshdrop-url> npm run test:umbrel-deployed
+```
+
+This harness fails closed unless `MESHDROP_UMBREL_UAT_URL` is set. It reads the installed service `/config`, confirms
+the runtime target is `umbrel`, confirms backend and Pollen capability negotiation, keeps FIPS disabled until a real
+device-network FIPS path exists, and initiates local plus Pollen WebRTC transfers through the installed Umbrel UI.
+Passing output must include `Proof umbrel-deployed-device-webrtc`.
+
 For a package-shape-only check, run:
 
 ```sh
@@ -52,5 +65,6 @@ admin-npub environment, and the absence of legacy static room environment variab
 ## Not Proven
 
 - This package smoke does not prove installation on a real Umbrel node.
-- This package smoke does not prove browser transfer UAT through a real Umbrel node UI.
+- This package smoke does not prove browser transfer UAT through a real Umbrel node UI; that requires
+  `MESHDROP_UMBREL_UAT_URL=<url> npm run test:umbrel-deployed` to pass after UI install.
 - FIPS is disabled by default in the Umbrel package until the target has a tested FIPS binary and device-network path.

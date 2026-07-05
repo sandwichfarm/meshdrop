@@ -45,8 +45,10 @@
     "test:desktop-installer": "node scripts/desktop-installer-smoke.mjs",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:spa-artifact": "node scripts/spa-artifact-smoke.mjs",
+    "test:start9-deployed": "node scripts/deployed-target-uat.mjs start9",
     "test:start9-package": "node scripts/start9-package-smoke.mjs",
     "test:target-artifacts": "node scripts/target-artifact-smoke.mjs",
+    "test:umbrel-deployed": "node scripts/deployed-target-uat.mjs umbrel",
     "test:umbrel-package": "node scripts/umbrel-package-smoke.mjs",
     "verify:ghcr-anonymous": "node scripts/ghcr-anonymous-readback.mjs"
   },

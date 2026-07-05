@@ -19,8 +19,9 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerSmoke, /MESHDROP_DOCKER_TRANSFER_BASE_URL/);
     assert.match(dockerSmoke, /scripts\/docker-browser-transfer-smoke\.mjs/);
     assert.match(dockerTransfer, /select-files-transport/);
-    assert.match(dockerTransfer, /docker-local-webrtc/);
-    assert.match(dockerTransfer, /docker-pollen-webrtc/);
+    assert.match(dockerTransfer, /MESHDROP_DOCKER_TRANSFER_PROOF_PREFIX \|\| "docker"/);
+    assert.match(dockerTransfer, /`\$\{proofPrefix\}-local-webrtc`/);
+    assert.match(dockerTransfer, /`\$\{proofPrefix\}-pollen-webrtc`/);
     assert.match(dockerTransfer, /meshdrop-\$\{options\.name\}-proof\.txt/);
     assert.match(dockerTransfer, /scenario=\$\{options\.name\}/);
     assert.match(dockerTransfer, /transport=\$\{options\.transportId\}/);
