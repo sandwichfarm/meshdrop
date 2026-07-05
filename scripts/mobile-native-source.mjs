@@ -311,8 +311,20 @@ function iosInfoPlist() {
         "<dict>",
         "  <key>CFBundleDisplayName</key>",
         "  <string>MeshDrop</string>",
+        "  <key>CFBundleExecutable</key>",
+        "  <string>$(EXECUTABLE_NAME)</string>",
         "  <key>CFBundleIdentifier</key>",
-        "  <string>farm.sandwich.meshdrop</string>",
+        "  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>",
+        "  <key>CFBundleName</key>",
+        "  <string>$(PRODUCT_NAME)</string>",
+        "  <key>CFBundlePackageType</key>",
+        "  <string>APPL</string>",
+        "  <key>CFBundleShortVersionString</key>",
+        "  <string>$(MARKETING_VERSION)</string>",
+        "  <key>CFBundleVersion</key>",
+        "  <string>$(CURRENT_PROJECT_VERSION)</string>",
+        "  <key>LSRequiresIPhoneOS</key>",
+        "  <true/>",
         "  <key>WKAppBoundDomains</key>",
         "  <array/>",
         "</dict>",
@@ -334,8 +346,18 @@ function iosShareExtensionInfoPlist() {
         "<dict>",
         "  <key>CFBundleDisplayName</key>",
         "  <string>MeshDrop Share</string>",
+        "  <key>CFBundleExecutable</key>",
+        "  <string>$(EXECUTABLE_NAME)</string>",
         "  <key>CFBundleIdentifier</key>",
-        "  <string>farm.sandwich.meshdrop.share</string>",
+        "  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>",
+        "  <key>CFBundleName</key>",
+        "  <string>$(PRODUCT_NAME)</string>",
+        "  <key>CFBundlePackageType</key>",
+        "  <string>XPC!</string>",
+        "  <key>CFBundleShortVersionString</key>",
+        "  <string>$(MARKETING_VERSION)</string>",
+        "  <key>CFBundleVersion</key>",
+        "  <string>$(CURRENT_PROJECT_VERSION)</string>",
         "  <key>NSExtension</key>",
         "  <dict>",
         "    <key>NSExtensionPointIdentifier</key>",
@@ -485,8 +507,8 @@ function iosXcodeProjectConfigurations() {
 
 function iosXcodeAppConfigurations(version) {
     return [
-        `\t\tA00000000000000000000084 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = MeshDrop/MeshDrop.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MeshDrop/Info.plist; MARKETING_VERSION = ${version}; PRODUCT_BUNDLE_IDENTIFIER = farm.sandwich.meshdrop; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug;};`,
-        `\t\tA00000000000000000000085 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = MeshDrop/MeshDrop.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MeshDrop/Info.plist; MARKETING_VERSION = ${version}; PRODUCT_BUNDLE_IDENTIFIER = farm.sandwich.meshdrop; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Release;};`
+        `\t\tA00000000000000000000084 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = MeshDrop/MeshDrop.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MeshDrop/Info.plist; MARKETING_VERSION = ${version}; PRODUCT_BUNDLE_IDENTIFIER = farm.sandwich.meshdrop; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug;};`,
+        `\t\tA00000000000000000000085 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = MeshDrop/MeshDrop.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MeshDrop/Info.plist; MARKETING_VERSION = ${version}; PRODUCT_BUNDLE_IDENTIFIER = farm.sandwich.meshdrop; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = NO; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Release;};`
     ];
 }
 

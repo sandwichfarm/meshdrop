@@ -192,6 +192,10 @@ for (const target of ["ios", "android"]) {
                     result.artifactPath,
                     `${nativeRoot}/MeshDropShareExtension/Info.plist`
                 );
+                const appPlist = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/MeshDrop/Info.plist`
+                );
                 const xcodeProject = await readTarEntry(
                     result.artifactPath,
                     `${nativeRoot}/MeshDrop.xcodeproj/project.pbxproj`
@@ -216,9 +220,15 @@ for (const target of ["ios", "android"]) {
                 assert.match(shareExtensionSource, /loadFileRepresentation/);
                 assert.match(shareExtensionSource, /containerURL\(forSecurityApplicationGroupIdentifier:/);
                 assert.match(shareExtensionSource, /group\.farm\.sandwich\.meshdrop/);
+                assert.match(appPlist, /<key>CFBundleIdentifier<\/key>\n  <string>\$\(PRODUCT_BUNDLE_IDENTIFIER\)<\/string>/);
+                assert.match(appPlist, /<key>CFBundleExecutable<\/key>\n  <string>\$\(EXECUTABLE_NAME\)<\/string>/);
+                assert.match(appPlist, /<key>CFBundlePackageType<\/key>\n  <string>APPL<\/string>/);
+                assert.match(appPlist, /<key>CFBundleVersion<\/key>\n  <string>\$\(CURRENT_PROJECT_VERSION\)<\/string>/);
                 assert.match(shareExtensionPlist, /com\.apple\.share-services/);
                 assert.match(shareExtensionPlist, /NSExtensionActivationRule/);
                 assert.match(shareExtensionPlist, /NSExtensionActivationSupportsFileWithMaxCount/);
+                assert.match(shareExtensionPlist, /<key>CFBundleIdentifier<\/key>\n  <string>\$\(PRODUCT_BUNDLE_IDENTIFIER\)<\/string>/);
+                assert.match(shareExtensionPlist, /<key>CFBundlePackageType<\/key>\n  <string>XPC!<\/string>/);
                 assert.match(xcodeProject, /PBXNativeTarget/);
                 assert.match(xcodeProject, /com\.apple\.product-type\.application/);
                 assert.match(xcodeProject, /com\.apple\.product-type\.app-extension/);
@@ -227,6 +237,7 @@ for (const target of ["ios", "android"]) {
                 assert.match(xcodeProject, /INFOPLIST_FILE = MeshDrop\/Info\.plist/);
                 assert.match(xcodeProject, /INFOPLIST_FILE = MeshDropShareExtension\/Info\.plist/);
                 assert.match(xcodeProject, /MARKETING_VERSION = 0\.0\.0-test/);
+                assert.match(xcodeProject, /SKIP_INSTALL = NO/);
                 assert.match(xcodeScheme, /MeshDrop\.app/);
                 assert.match(xcodeScheme, /MeshDropShareExtension\.appex/);
                 assert.match(appEntitlements, /com\.apple\.security\.application-groups/);
