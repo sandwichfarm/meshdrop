@@ -13,7 +13,7 @@ function flushPromises() {
     return new Promise(resolve => setTimeout(resolve, 0));
 }
 
-function createContext({responses, protocol = "https:"}) {
+function createContext({responses, protocol = "https:", bluetooth = null}) {
     const fired = [];
     const opened = [];
     const sockets = [];
@@ -63,7 +63,10 @@ function createContext({responses, protocol = "https:"}) {
             visibilityChangeEvent: "visibilitychange"
         },
         location: {protocol, host: "meshdrop.test", pathname: "/"},
-        navigator: {onLine: true},
+        navigator: {
+            onLine: true,
+            ...(bluetooth ? {bluetooth} : {})
+        },
         sessionStorage: {getItem: () => null, setItem() {}},
         localStorage: {getItem: () => null},
         crypto: {randomUUID: () => "session"},
@@ -114,6 +117,8 @@ test("server connection falls back to static SPA config when backend config is u
     assert.equal(configEvent.detail.capabilities.transports.fips.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.pollen.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.bluetooth.supported, false);
+    assert.equal(configEvent.detail.capabilities.transports.bluetooth.transferSupported, false);
+    assert.equal(configEvent.detail.capabilities.transports.bluetooth.apiAvailable, false);
     assert.equal(configEvent.detail.capabilities.serverSettings.supported, false);
     assert.deepEqual(Object.keys(configEvent.detail.buttons), [
         "donation_button",
@@ -125,6 +130,29 @@ test("server connection falls back to static SPA config when backend config is u
     ]);
     assert.equal(wsConfigEvent.detail.wsFallback, false);
     assert.deepEqual(sockets, []);
+});
+
+test("static config negotiates Web Bluetooth API presence without claiming transfer support", async () => {
+    const {context, fired} = createContext({
+        bluetooth: {requestDevice() {}},
+        responses: [
+            {status: 404, body: ""},
+            {status: 404, body: ""}
+        ]
+    });
+
+    new context.__meshdropTest.ServerConnection();
+    await flushPromises();
+    await flushPromises();
+
+    const configEvent = fired.find(event => event.type === "config");
+    const bluetooth = configEvent.detail.capabilities.transports.bluetooth;
+
+    assert.equal(bluetooth.supported, false);
+    assert.equal(bluetooth.transferSupported, false);
+    assert.equal(bluetooth.apiAvailable, true);
+    assert.equal(bluetooth.nativeBridgeAvailable, false);
+    assert.equal(bluetooth.unavailableReason, "bluetooth-transfer-not-implemented");
 });
 
 test("server connection falls back to static SPA config when a static host serves HTML for config", async () => {

@@ -8,6 +8,19 @@ export function createServerRuntimeConfig(env = process.env) {
     };
 }
 
+function createBluetoothCapabilities(conf = {}) {
+    return {
+        supported: false,
+        transferSupported: false,
+        requiresBackend: false,
+        requiresNativeShell: false,
+        apiAvailable: conf.apiAvailable === true,
+        nativeBridgeAvailable: conf.nativeBridgeAvailable === true,
+        requiresAdapter: true,
+        unavailableReason: "bluetooth-transfer-not-implemented"
+    };
+}
+
 export function createRuntimeCapabilities(conf = {}) {
     const runtime = conf.runtime || createServerRuntimeConfig();
     const hasBackend = runtime.hasBackend !== false;
@@ -48,11 +61,7 @@ export function createRuntimeCapabilities(conf = {}) {
                 requiresBackend: false,
                 requiresNostrIdentity: true
             },
-            bluetooth: {
-                supported: false,
-                requiresBackend: false,
-                requiresNativeShell: true
-            },
+            bluetooth: createBluetoothCapabilities(conf.bluetooth),
             pollen: {
                 supported: pollenSupported,
                 requiresBackend: true,

@@ -172,9 +172,11 @@ async function tapPickerFile(adb, serial, fileName) {
             const activity = await topActivityLine(adb, serial);
             if (activity.includes(androidMainActivity)) return;
         }
+        await scrollPicker(adb, serial);
         await sleep(500);
     }
-    throw new Error(`Could not select ${fileName} from native picker UI`);
+    const xml = await dumpUiHierarchy(adb, serial).catch(error => `Could not dump picker UI: ${error.message}`);
+    throw new Error(`Could not select ${fileName} from native picker UI\n${xml}`);
 }
 
 async function openDownloadsRoot(adb, serial) {
@@ -195,17 +197,38 @@ async function tapUiNode(adb, serial, textOrDescription) {
     return true;
 }
 
+async function scrollPicker(adb, serial) {
+    await run(adb, ["-s", serial, "shell", "input", "swipe", "500", "1500", "500", "600", "250"]);
+}
+
 async function dumpUiHierarchy(adb, serial) {
-    const remotePath = "/sdcard/meshdrop-window.xml";
-    await run(adb, ["-s", serial, "shell", "uiautomator", "dump", remotePath], {timeoutMs: 10000});
-    const {stdout} = await run(adb, ["-s", serial, "shell", "cat", remotePath]);
-    return stripCarriageReturns(stdout);
+    const remotePath = "/data/local/tmp/meshdrop-window.xml";
+    let lastError = "";
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        const dumped = await run(adb, ["-s", serial, "shell", "uiautomator", "dump", remotePath], {timeoutMs: 10000})
+            .catch(error => {
+                lastError = error.message;
+                return null;
+            });
+        const read = await run(adb, ["-s", serial, "shell", "cat", remotePath]).catch(error => {
+            lastError = `${dumped?.stdout || ""}\n${dumped?.stderr || ""}\n${error.message}`;
+            return null;
+        });
+        if (read?.stdout) return stripCarriageReturns(read.stdout);
+        await sleep(500);
+    }
+    throw new Error(`Could not dump Android UI hierarchy from ${remotePath}\n${lastError}`);
 }
 
 function findNode(xml, needle) {
     const escaped = escapeRegExp(needle);
-    const nodePattern = new RegExp(`<node\\b[^>]*(?:text="${escaped}"|content-desc="${escaped}")[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i");
-    const match = xml.match(nodePattern);
+    const patterns = [
+        new RegExp(`<node\\b[^>]*text="${escaped}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i"),
+        new RegExp(`<node\\b[^>]*text="[^"]*${escaped}[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i"),
+        new RegExp(`<node\\b[^>]*content-desc="${escaped}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i"),
+        new RegExp(`<node\\b[^>]*content-desc="[^"]*${escaped}[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i")
+    ];
+    const match = patterns.map(pattern => xml.match(pattern)).find(Boolean);
     if (!match) return null;
     const [, left, top, right, bottom] = match.map(Number);
     return {

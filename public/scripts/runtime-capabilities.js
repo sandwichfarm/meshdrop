@@ -62,11 +62,7 @@ const RuntimeCapabilities = {
                         requiresBackend: false,
                         requiresNostrIdentity: true
                     },
-                    bluetooth: {
-                        supported: staticTransports.bluetooth,
-                        requiresBackend: false,
-                        requiresNativeShell: true
-                    },
+                    bluetooth: this.bluetoothCapabilities(targetManifest),
                     pollen: {
                         supported: staticTransports.pollen,
                         requiresBackend: true,
@@ -122,10 +118,32 @@ const RuntimeCapabilities = {
             nostr: transports.nostr !== false,
             blossom: transports.blossom !== false,
             hashtree: transports.hashtree !== false,
-            bluetooth: transports.bluetooth === true,
+            bluetooth: false,
             pollen: transports.pollen === true,
             fips: transports.fips === true
         };
+    },
+
+    bluetoothCapabilities(targetManifest = null) {
+        const bluetooth =
+            targetManifest?.capabilities?.transports?.bluetooth ||
+            targetManifest?.bluetooth ||
+            {};
+
+        return {
+            supported: false,
+            transferSupported: false,
+            requiresBackend: false,
+            requiresNativeShell: false,
+            apiAvailable: bluetooth.apiAvailable === true || this.bluetoothApiAvailable(),
+            nativeBridgeAvailable: bluetooth.nativeBridgeAvailable === true,
+            requiresAdapter: true,
+            unavailableReason: "bluetooth-transfer-not-implemented"
+        };
+    },
+
+    bluetoothApiAvailable() {
+        return !!globalThis.navigator?.bluetooth;
     },
 
     hasBackend(config = {}) {

@@ -3,6 +3,17 @@ import assert from "node:assert/strict";
 
 import {createRuntimeCapabilities, createServerRuntimeConfig} from "../server/runtime-capabilities.js";
 
+function assertBluetoothNegotiatedUnsupported(bluetooth, {apiAvailable = false, nativeBridgeAvailable = false} = {}) {
+    assert.equal(bluetooth.supported, false);
+    assert.equal(bluetooth.transferSupported, false);
+    assert.equal(bluetooth.requiresBackend, false);
+    assert.equal(bluetooth.requiresNativeShell, false);
+    assert.equal(bluetooth.apiAvailable, apiAvailable);
+    assert.equal(bluetooth.nativeBridgeAvailable, nativeBridgeAvailable);
+    assert.equal(bluetooth.requiresAdapter, true);
+    assert.equal(bluetooth.unavailableReason, "bluetooth-transfer-not-implemented");
+}
+
 test("runtime capabilities describe backend transport support", () => {
     const capabilities = createRuntimeCapabilities({
         runtime: {target: "standalone"},
@@ -23,8 +34,7 @@ test("runtime capabilities describe backend transport support", () => {
     assert.equal(capabilities.transports.fips.room, "npub-network:fips");
     assert.equal(capabilities.transports.pollen.supported, true);
     assert.equal(capabilities.transports.pollen.maxUploadBytes, 1024);
-    assert.equal(capabilities.transports.bluetooth.supported, false);
-    assert.equal(capabilities.transports.bluetooth.requiresNativeShell, true);
+    assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
 });
 
 test("server runtime config reports the configured deployment target", () => {
@@ -84,7 +94,7 @@ test("runtime capabilities describe static SPA support without backend-only tran
     assert.equal(capabilities.transports.localDiscovery.supported, false);
     assert.equal(capabilities.transports.fips.supported, false);
     assert.equal(capabilities.transports.pollen.supported, false);
-    assert.equal(capabilities.transports.bluetooth.supported, false);
+    assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
     assert.equal(capabilities.serverSettings.supported, false);
     assert.equal(capabilities.serverSettings.actions.fipsPeers, false);
 });
@@ -113,7 +123,7 @@ test("runtime capabilities describe desktop source support without shared backen
     assert.equal(capabilities.transports.localDiscovery.supported, false);
     assert.equal(capabilities.transports.fips.supported, false);
     assert.equal(capabilities.transports.pollen.supported, false);
-    assert.equal(capabilities.transports.bluetooth.supported, false);
+    assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
     assert.equal(capabilities.serverSettings.supported, false);
 });
 
@@ -141,7 +151,25 @@ test("runtime capabilities describe mobile source support without backend-only t
     assert.equal(capabilities.transports.localDiscovery.supported, false);
     assert.equal(capabilities.transports.fips.supported, false);
     assert.equal(capabilities.transports.pollen.supported, false);
-    assert.equal(capabilities.transports.bluetooth.supported, false);
-    assert.equal(capabilities.transports.bluetooth.requiresNativeShell, true);
+    assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
     assert.equal(capabilities.serverSettings.supported, false);
+});
+
+test("runtime capabilities negotiate Bluetooth adapters without claiming transfer support", () => {
+    const capabilities = createRuntimeCapabilities({
+        runtime: {
+            target: "desktop",
+            platform: "desktop",
+            hasBackend: false
+        },
+        bluetooth: {
+            apiAvailable: true,
+            nativeBridgeAvailable: true
+        }
+    });
+
+    assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth, {
+        apiAvailable: true,
+        nativeBridgeAvailable: true
+    });
 });
