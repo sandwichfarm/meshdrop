@@ -40,7 +40,7 @@ try {
         assert.equal(state.manifestTarget, "android");
         assert.equal(state.nativeShellBuilt, true);
         assert.equal(state.runtimeTarget, "android");
-        assert.equal(state.claimsNativeWebRtc, false);
+        assert.equal(state.claimsNativeWebRtc, true);
         assert.equal(state.rtcPeerConnection, "function");
         assert.equal(state.webSocket, "function");
         assert.equal(state.dataChannelLabel, "meshdrop-probe");
