@@ -150,6 +150,8 @@ for (const target of ["ios", "android"]) {
             );
             assert.match(wrapperSource, /__meshdropTargetManifest/);
             if (target === "ios") {
+                assert.match(wrapperSource, /private let targetManifest = #"""\n\s+\{/);
+                assert.match(wrapperSource, /\n\s+"""#/);
                 assert.match(wrapperSource, /WKUIDelegate/);
                 assert.match(wrapperSource, /UIDocumentPickerDelegate/);
                 assert.match(wrapperSource, /@available\(iOS 18\.4, \*\)/);

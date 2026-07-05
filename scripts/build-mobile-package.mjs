@@ -125,7 +125,7 @@ async function buildMobileArtifact(options = {}) {
         await buildAndroidReleaseApk(stageDir, options.env || process.env);
     }
     await fs.rm(artifactPath, {force: true});
-    await tarCreate(artifactPath, stageRoot, prefix);
+    await tarCreate(artifactPath, stageRoot, prefix, {portable: options.portableArchive === true});
     await fs.rm(stageRoot, {recursive: true, force: true});
 
     return {artifactPath, prefix, target, version, nativeSource, androidApk, androidReleaseApk};
@@ -316,19 +316,22 @@ async function stampServiceWorker(appDir, target, version, env) {
     await fs.writeFile(serviceWorkerPath, updateServiceWorkerVersion(source, cacheVersion));
 }
 
-function tarCreate(artifactPath, cwd, prefix) {
-    return run("tar", [
-        "--sort=name",
-        "--mtime=UTC 2020-01-01",
-        "--owner=0",
-        "--group=0",
-        "--numeric-owner",
-        "-czf",
-        artifactPath,
-        "-C",
-        cwd,
-        prefix
-    ]);
+function tarCreate(artifactPath, cwd, prefix, options = {}) {
+    const args = options.portable === true
+        ? ["-czf", artifactPath, "-C", cwd, prefix]
+        : [
+            "--sort=name",
+            "--mtime=UTC 2020-01-01",
+            "--owner=0",
+            "--group=0",
+            "--numeric-owner",
+            "-czf",
+            artifactPath,
+            "-C",
+            cwd,
+            prefix
+        ];
+    return run("tar", args);
 }
 
 function run(command, args, options = {}) {

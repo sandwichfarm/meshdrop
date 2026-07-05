@@ -47,20 +47,22 @@ UAT-signed Android release APK artifact built by `npm run build:android:release-
 2. Confirm the iOS native-source artifact contains `native/ios/MeshDrop/Resources/meshdrop/index.html`.
 3. Confirm the iOS native-source artifact contains `native/ios/MeshDrop.xcodeproj/project.pbxproj` and a
    shared `MeshDrop.xcscheme`.
-4. Confirm the iOS native-source wrapper sets `WKUIDelegate` and uses the iOS 18.4+ `WKOpenPanelParameters` hook with
+4. On macOS with Xcode installed, run `npm run test:ios-xcode-build` and confirm the generated `MeshDrop` scheme builds
+   for iOS Simulator without code signing.
+5. Confirm the iOS native-source wrapper sets `WKUIDelegate` and uses the iOS 18.4+ `WKOpenPanelParameters` hook with
    `UIDocumentPickerViewController` for WKWebView file inputs.
-5. Confirm the iOS native-source artifact includes a share extension source scaffold at
+6. Confirm the iOS native-source artifact includes a share extension source scaffold at
    `native/ios/MeshDropShareExtension/ShareViewController.swift`.
-6. Confirm the iOS share extension `Info.plist` declares `com.apple.share-services`,
+7. Confirm the iOS share extension `Info.plist` declares `com.apple.share-services`,
    `NSExtensionActivationRule`, and `NSExtensionActivationSupportsFileWithMaxCount`.
-7. Confirm the iOS project references matching App Group entitlement files for the containing app and share extension.
-8. Confirm the iOS share extension and containing app source use the same App Group identifier and stage files through
+8. Confirm the iOS project references matching App Group entitlement files for the containing app and share extension.
+9. Confirm the iOS share extension and containing app source use the same App Group identifier and stage files through
    `share-inbox.json`.
-9. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
-10. Confirm the Android native-source artifact contains
+10. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
+11. Confirm the Android native-source artifact contains
    `native/android/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`.
-11. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
-12. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
+12. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
+13. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
 
 ## Android APK Acceptance
 
@@ -191,6 +193,6 @@ between two browser peers served from the generated iOS and Android source artif
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
 - The iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18.4+ open-panel hook,
   and the iOS native-source artifact includes Xcode project, entitlement, and share extension source scaffolds, but
-  does not prove Xcode build on macOS, iOS device picker UAT, App Group entitlement provisioning, share-sheet device UAT,
-  or native iOS share-initiated transfer.
+  does not prove iOS device picker UAT, App Group entitlement provisioning, share-sheet device UAT, or native iOS
+  share-initiated transfer.
 - These artifacts do not prove Bluetooth transport support.
