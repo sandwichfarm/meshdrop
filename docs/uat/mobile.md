@@ -171,6 +171,17 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
    `farm.sandwich.meshdrop/.MainActivity`.
 6. This proves picker UI selection on the Android emulator path; it does not prove physical Android device UAT.
 
+## Android Physical Device Acceptance
+
+1. Attach one physical Android device over ADB, or set `MESHDROP_ANDROID_SERIAL=<serial>` when multiple devices are
+   connected.
+2. Run `npm run test:android-physical-device`.
+3. Confirm the harness rejects emulator-only runs and does not launch `MESHDROP_ANDROID_AVD`.
+4. Confirm the smoke prints `Proof android-physical-device-uat`.
+5. Confirm the proof names the hardware manufacturer/model, Android release/API level, CPU ABI, selected serial, and
+   the install, WebView capability, WebView transfer, share-intent transfer, and native picker UI smoke scripts.
+6. Do not treat the physical-device UAT as proven until this command passes on physical Android hardware.
+
 ## Native Mobile Acceptance
 
 1. Build a native iOS or Android app package from the matching native-source artifact.
@@ -205,6 +216,7 @@ MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-capabili
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-transfer
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-share-file
 npm run test:target-artifacts
+npm run test:android-physical-device
 ```
 
 This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
@@ -223,7 +235,8 @@ records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API
 - The Android debug APK artifact alone does not prove install UAT; `npm run test:android-apk-install` provides the
   emulator install proof.
 - Android WebView transfer proof does not prove physical Android device install UAT.
-- These artifacts do not prove physical Android device install UAT.
+- These artifacts do not prove physical Android device install UAT; `npm run test:android-physical-device` must pass on
+  physical Android hardware for that claim.
 - The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.
 - The iOS device app artifact proves an unsigned generic `iphoneos` `.app` build product only; it does not prove a
   signed device-installable IPA, App Store/TestFlight packaging, App Group provisioning, or physical-device install.

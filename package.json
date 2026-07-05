@@ -35,6 +35,7 @@
     "test:android-webview-capabilities": "node scripts/android-webview-capability-smoke.mjs",
     "test:android-share-file": "MESHDROP_ANDROID_SHARE_INTENT=1 node scripts/android-webview-transfer-smoke.mjs",
     "test:android-webview-transfer": "node scripts/android-webview-transfer-smoke.mjs",
+    "test:android-physical-device": "node scripts/android-physical-device-uat.mjs",
     "test:ios-xcode-build": "node scripts/ios-xcode-build-smoke.mjs",
     "test:ios-simulator-app": "node scripts/ios-simulator-app-package-smoke.mjs",
     "test:ios-device-app": "node scripts/ios-device-app-package-smoke.mjs",
