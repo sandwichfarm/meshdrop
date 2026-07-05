@@ -51,6 +51,16 @@ function debugStateSource() {
         joined: globalThis.__meshdropE2E?.joined,
         lastSignal: globalThis.__meshdropE2E?.lastSignal,
         received: globalThis.__meshdropE2E?.received,
+        nativeShares: globalThis.__meshdropE2E?.nativeShares,
+        shareMode: {
+            active: globalThis.pairDrop?.ui?.shareMode?.active,
+            files: [...(globalThis.pairDrop?.ui?.shareMode?.files || [])].map(file => ({
+                name: file.name,
+                size: file.size,
+                type: file.type
+            })),
+            text: globalThis.pairDrop?.ui?.shareMode?.text || ""
+        },
         rtc: {
             supported: window.isRtcSupported,
             peerConnection: typeof RTCPeerConnection
@@ -155,6 +165,7 @@ export function initScriptSource({identity, relayUrls, targetName}) {
             connected: [],
             followPubkeys: proofIdentity.followPubkeys,
             joined: [],
+            nativeShares: [],
             received: []
         };
         globalThis.__meshdropRestoreProofFollowList = () => {
@@ -191,6 +202,9 @@ export function initScriptSource({identity, relayUrls, targetName}) {
                 text: await file.text()
             })));
             globalThis.__meshdropE2E.received.push({peerId: event.detail.peerId, files});
+        });
+        window.addEventListener("android-native-share-received", event => {
+            globalThis.__meshdropE2E.nativeShares.push(event.detail);
         });
         window.addEventListener("peer-connected", event => {
             globalThis.__meshdropE2E.connected.push(event.detail.peerId);

@@ -168,7 +168,7 @@ function createTargetManifest(target, version, nativeSource, androidApk) {
         remainingProof: androidApk
             ? [
                 "physical Android device install UAT",
-                "mobile file picker and share sheet",
+                "Android native file picker UI UAT",
                 "Bluetooth transport negotiation",
                 "signed Android release APK or AAB package"
             ]
@@ -297,7 +297,7 @@ async function buildAndroidDebugApk(stageDir, env) {
         releaseSigned: false,
         notProven: [
             "physical Android device install UAT",
-            "mobile file picker and share sheet",
+            "Android native file picker UI UAT",
             "Bluetooth transport negotiation",
             "signed Android release APK or AAB package"
         ]

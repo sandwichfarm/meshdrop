@@ -38,6 +38,8 @@ try {
     assert.equal(manifest.transports.nostr, true);
     assert.equal(manifest.transports.bluetooth, false);
     assert(manifest.remainingProof.includes("physical Android device install UAT"));
+    assert(manifest.remainingProof.includes("Android native file picker UI UAT"));
+    assert(!manifest.remainingProof.includes("mobile file picker and share sheet"));
     assert(!manifest.remainingProof.includes("native Android WebView file transfer UAT"));
     assert(!manifest.remainingProof.includes("native Android WebRTC transfer UAT"));
 
@@ -46,6 +48,8 @@ try {
     assert.equal(proof.apk, "meshdrop-android-debug.apk");
     assert.equal(proof.releaseSigned, false);
     assert(proof.notProven.includes("physical Android device install UAT"));
+    assert(proof.notProven.includes("Android native file picker UI UAT"));
+    assert(!proof.notProven.includes("mobile file picker and share sheet"));
     assert(!proof.notProven.includes("native Android WebView file transfer UAT"));
 
     const extractDir = path.join(tempDir, "extract");
