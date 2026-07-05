@@ -5,6 +5,7 @@ import path from "node:path";
 import {finalizeEvent} from "nostr-tools/pure";
 
 import {
+    androidPackageName,
     androidMainActivity,
     buildAndExtractDebugApk,
     installAndLaunchDebugApk,
@@ -29,8 +30,13 @@ const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/nod
 const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const hydrationTimeoutMs = 30000;
 const transferTimeoutMs = 45000;
-const proofFileName = "meshdrop-android-webview-proof.txt";
-const proofText = "native-android-webview-nostr-webrtc";
+const shareIntentMode = process.env.MESHDROP_ANDROID_SHARE_INTENT === "1";
+const proofFileName = shareIntentMode
+    ? "meshdrop-android-share-proof.txt"
+    : "meshdrop-android-webview-proof.txt";
+const proofText = shareIntentMode
+    ? "native-android-share-file-nostr-webrtc"
+    : "native-android-webview-nostr-webrtc";
 
 const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-android-webview-transfer-smoke-"));
 let device = null;
@@ -58,6 +64,10 @@ try {
         sdkRoot: device.sdkRoot
     });
     await installAndLaunchDebugApk(device.adb, device.serial, apkPath);
+    if (shareIntentMode) {
+        progress("launch Android share intent");
+        await launchAndroidShareIntent(device);
+    }
 
     progress("build browser peer artifact");
     const artifact = await buildMobilePackage({
@@ -158,18 +168,36 @@ try {
         });
     }
     progress("send proof file");
-    await sendAndroidProofFile(webview.cdp, androidPeerId);
-    const received = await waitForBrowserReceivedFiles(browserPeer);
+    if (shareIntentMode) {
+        await sendAndroidNativeShareProof(webview.cdp, androidPeerId);
+    }
+    else {
+        await sendAndroidProofFile(webview.cdp, androidPeerId);
+    }
+    const received = await waitForBrowserReceivedFiles(browserPeer).catch(async error => {
+        if (!shareIntentMode) throw error;
+        throw new Error(`${error.message}\nAndroid state:\n${JSON.stringify(await androidDebugState(webview.cdp), null, 2)}`, {
+            cause: error
+        });
+    });
 
     assert.equal(received[0]?.name, proofFileName);
     assert.equal(received[0]?.text, proofText);
     assert.deepEqual(androidErrors, []);
     assert.deepEqual(browserErrors, []);
 
-    console.log(
-        `Proof android-webview-nostr-webrtc: ${androidMainActivity} delivered ${proofFileName} ` +
-        `to Chromium peer through local fake relay on ${device.serial}`
-    );
+    if (shareIntentMode) {
+        console.log(
+            `Proof android-share-file-nostr-webrtc: ${androidMainActivity} received ACTION_SEND stream ${proofFileName} ` +
+            `and delivered it to Chromium peer through local fake relay on ${device.serial}`
+        );
+    }
+    else {
+        console.log(
+            `Proof android-webview-nostr-webrtc: ${androidMainActivity} delivered ${proofFileName} ` +
+            `to Chromium peer through local fake relay on ${device.serial}`
+        );
+    }
 }
 finally {
     progress("cleanup");
@@ -345,6 +373,44 @@ async function sendAndroidProofFile(cdp, peerId) {
     })()`);
 }
 
+async function launchAndroidShareIntent(device) {
+    const sharePath = `/data/data/${androidPackageName}/files/${proofFileName}`;
+    const writeCommand = `mkdir -p files && printf %s ${shellQuote(proofText)} > files/${proofFileName}`;
+    await run(device.adb, [
+        "-s", device.serial,
+        "shell", `run-as ${androidPackageName} sh -c ${shellQuote(writeCommand)}`
+    ]);
+    await run(device.adb, [
+        "-s", device.serial,
+        "shell", "am", "start", "-W",
+        "-n", androidMainActivity,
+        "-a", "android.intent.action.SEND",
+        "-t", "text/plain",
+        "--eu", "android.intent.extra.STREAM", `file://${sharePath}`,
+        "--grant-read-uri-permission"
+    ]);
+    await sleep(3000);
+}
+
+async function sendAndroidNativeShareProof(cdp, peerId) {
+    await evaluate(cdp, `(() => {
+        const payload = globalThis.__meshdropAndroidNativeSharePayload;
+        if (payload?.error) throw new Error(payload.error);
+        const shared = payload?.files?.[0];
+        if (!shared || shared.name !== ${JSON.stringify(proofFileName)}) {
+            throw new Error("Android native share payload missing expected file");
+        }
+        const raw = atob(shared.base64);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+        const file = new File([bytes], shared.name, {type: shared.type || "application/octet-stream"});
+        window.dispatchEvent(new CustomEvent("files-selected", {
+            detail: {to: ${JSON.stringify(peerId)}, files: [file]}
+        }));
+        return true;
+    })()`);
+}
+
 async function waitForBrowserReceivedFiles(page) {
     const handle = await page.waitForFunction(() => {
         const batch = globalThis.__meshdropE2E.received.at(-1);
@@ -352,6 +418,10 @@ async function waitForBrowserReceivedFiles(page) {
         return batch.files;
     }, undefined, {timeout: transferTimeoutMs});
     return handle.jsonValue();
+}
+
+function shellQuote(value) {
+    return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
 }
 
 async function waitForAndroidCondition(cdp, expression, timeoutMs = 30000) {

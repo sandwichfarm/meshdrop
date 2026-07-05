@@ -33,6 +33,10 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 11. Confirm native-source artifacts do not claim unproven native transfer paths: `webrtc` and `nostr` are `false`.
 12. Confirm Android APK artifacts report `webrtc` and `nostr` as `true` only after `npm run test:android-webview-transfer`
     passes for the installed debug APK.
+13. Confirm Android APK artifacts do not list Android share-sheet `ACTION_SEND` as remaining proof after
+    `npm run test:android-share-file` passes.
+14. Confirm Android APK artifacts still list native file picker UI UAT as remaining proof until picker selection is
+    exercised on a device or emulator.
 
 ## Native Source Acceptance
 
@@ -83,6 +87,19 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 6. Confirm the proof says `meshdrop-android-webview-proof.txt` was delivered to a Chromium peer through a local fake
    relay.
 
+## Android Share/File Input Acceptance
+
+1. Start an Android emulator or attach an Android device.
+2. Run `npm run test:android-share-file`.
+3. If no device is already attached, set `MESHDROP_ANDROID_AVD=<avd-name>` to launch a local AVD in headless read-only
+   mode for the smoke.
+4. Confirm the smoke prints `Proof android-share-file-nostr-webrtc`.
+5. Confirm the proof names `farm.sandwich.meshdrop/.MainActivity`.
+6. Confirm the proof says Android received an `ACTION_SEND` stream for `meshdrop-android-share-proof.txt` and delivered
+   it to a Chromium peer through a local fake relay.
+7. Confirm the generated Android wrapper contains `WebChromeClient.onShowFileChooser` so file inputs are wired to the
+   native Android picker. Do not treat that source check as native picker UI UAT.
+
 ## Native Mobile Acceptance
 
 1. Build a native iOS or Android app package from the matching native-source artifact.
@@ -108,13 +125,15 @@ npm run test:android-apk
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-apk-install
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-capabilities
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-transfer
+MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-share-file
 npm run test:target-artifacts
 ```
 
 This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
 an Android debug APK build, Android emulator install/launch proof, Android WebView runtime capability evidence, Android
-WebView-to-Chromium Nostr WebRTC transfer through a local fake relay, and real Nostr WebRTC transfers between two browser
-peers served from the generated iOS and Android source artifacts.
+WebView-to-Chromium Nostr WebRTC transfer through a local fake relay, Android `ACTION_SEND` file share delivery through
+the same WebRTC send path, and real Nostr WebRTC transfers between two browser peers served from the generated iOS and
+Android source artifacts.
 
 ## Not Proven
 
@@ -124,5 +143,6 @@ peers served from the generated iOS and Android source artifacts.
 - Android WebView transfer proof does not prove physical Android device install UAT.
 - These artifacts do not prove physical Android device install UAT.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
-- These artifacts do not prove native mobile file-picker or share-sheet integration.
+- These artifacts do not prove Android native file picker UI selection.
+- These artifacts do not prove native iOS file-picker or share-sheet integration.
 - These artifacts do not prove Bluetooth transport support.

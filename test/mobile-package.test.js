@@ -153,8 +153,15 @@ for (const target of ["ios", "android"]) {
                 );
                 assert.match(wrapperSource, /ApplicationInfo\.FLAG_DEBUGGABLE/);
                 assert.match(wrapperSource, /WebView\.setWebContentsDebuggingEnabled\(true\)/);
+                assert.match(wrapperSource, /WebChromeClient/);
+                assert.match(wrapperSource, /onShowFileChooser/);
+                assert.match(wrapperSource, /meshdropAndroidNativeShare/);
+                assert.match(wrapperSource, /android-native-share-received/);
                 assert.match(wrapperSource, /setAllowFileAccessFromFileURLs\(true\)/);
                 assert.match(wrapperSource, /delete HTMLCanvasElement\.prototype\.transferControlToOffscreen/);
+                assert.match(androidManifest, /android:launchMode="singleTop"/);
+                assert.match(androidManifest, /android.intent.action.SEND/);
+                assert.match(androidManifest, /android.intent.action.SEND_MULTIPLE/);
                 assert.match(androidManifest, /android:usesCleartextTraffic="false"/);
                 assert.match(androidManifest, /android:networkSecurityConfig="@xml\/network_security_config"/);
                 assert.match(networkConfig, /cleartextTrafficPermitted="true"/);

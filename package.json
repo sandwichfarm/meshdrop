@@ -26,6 +26,7 @@
     "test:android-apk": "node scripts/android-apk-smoke.mjs",
     "test:android-apk-install": "node scripts/android-apk-install-smoke.mjs",
     "test:android-webview-capabilities": "node scripts/android-webview-capability-smoke.mjs",
+    "test:android-share-file": "MESHDROP_ANDROID_SHARE_INTENT=1 node scripts/android-webview-transfer-smoke.mjs",
     "test:android-webview-transfer": "node scripts/android-webview-transfer-smoke.mjs",
     "test:desktop-native": "node scripts/desktop-native-runtime-smoke.mjs",
     "test:desktop-chromium": "node scripts/desktop-chromium-shell-smoke.mjs",
