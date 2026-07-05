@@ -43,3 +43,10 @@ test("CI builds Android APK artifact through package script", () => {
     assert.match(ciWorkflow, /needs: unit/);
     assert.match(ciWorkflow, /npm run test:android-apk/);
 });
+
+test("CI builds Android release APK artifact through package script", () => {
+    assert.match(ciWorkflow, /android-release-apk-artifact:/);
+    assert.match(ciWorkflow, /name: Android release APK artifact smoke/);
+    assert.match(ciWorkflow, /needs: unit/);
+    assert.match(ciWorkflow, /npm run test:android-release-apk/);
+});

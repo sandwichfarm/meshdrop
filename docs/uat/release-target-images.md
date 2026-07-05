@@ -36,8 +36,8 @@ Repeat with `target=start9` and `target=umbrel`.
 2. Wait for the `Release` workflow to finish.
 3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Desktop Native source tarball, Desktop Native
    Linux shell tarball, Desktop Chromium shell tarball, iOS source tarball, iOS native-source tarball, Android source
-   tarball, Android native-source tarball, Android debug APK tarball, Start9 source tarball, Umbrel package tarball,
-   and `SHA256SUMS` artifacts.
+   tarball, Android native-source tarball, Android debug APK tarball, Android release APK tarball, Start9 source
+   tarball, Umbrel package tarball, and `SHA256SUMS` artifacts.
 4. Confirm GHCR has both tag-preserving and version-only tags for each target:
    - `v0.x.y-standalone` and `0.x.y-standalone`.
    - `v0.x.y-start9` and `0.x.y-start9`.
@@ -90,8 +90,8 @@ Repeat with `target=start9` and `target=umbrel`.
   REST API. Making `ghcr.io/sandwichfarm/meshdrop` public is still required before anonymous manifest readback can pass.
 - The iOS source and native-source artifacts are not complete native targets until installable packages and transfer UAT
   pass.
-- The Android debug APK artifact is not complete until device or emulator install UAT, native transfer UAT, and release
-  signing proof pass.
+- Android APK artifacts are not complete until physical-device install UAT, native picker UI UAT, and Bluetooth proof
+  pass. The release APK artifact uses generated UAT signing and is not Play Store upload signing or AAB proof.
 - The Desktop Native Linux shell artifact is not complete until native transfer UAT and installer/signing proof pass.
 - The Start9 package is not complete until device install and transfer UAT pass on StartOS.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
