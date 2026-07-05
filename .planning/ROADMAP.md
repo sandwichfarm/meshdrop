@@ -4,6 +4,8 @@
 
 Goal: make WebRTC/discovery claims require real transfer proof and remove mock-only success paths.
 
+Current status: complete for claimed paths.
+
 - Maintain browser e2e coverage for local, FIPS, Pollen, Nostr, and federated FIPS transfers.
 - Keep Nostr/FIPS/Pollen discovery scoped to npub networks.
 - Add regression coverage when runtime proof finds signaling edge cases.
@@ -12,6 +14,8 @@ Goal: make WebRTC/discovery claims require real transfer proof and remove mock-o
 
 Goal: make GUI controls derive from runtime capabilities instead of hard-coded assumptions.
 
+Current status: complete for SPA, Docker, Desktop, iOS, Android, Start9, and Umbrel metadata/control gating.
+
 - Define capability schema for SPA, Docker, Start9/Umbrel, desktop, and mobile.
 - Expose backend capability metadata through `/config`.
 - Gate controls/toggles by capability and identity.
@@ -19,6 +23,8 @@ Goal: make GUI controls derive from runtime capabilities instead of hard-coded a
 ## Phase 3: Shared Instance Admin
 
 Goal: allow a configured Docker admin npub to manage backend settings from the GUI with backend-verified signed Nostr requests.
+
+Current status: complete for Docker shared-instance admin contract and automated/deployed-compose UAT.
 
 - Configure admin npub in compose/runtime env.
 - Verify admin Nostr events on backend before accepting settings changes.
@@ -29,6 +35,9 @@ Goal: allow a configured Docker admin npub to manage backend settings from the G
 
 Goal: make every target platform buildable and testable with explicit UAT runbooks.
 
+Current status: mostly complete. Build artifacts, automated smokes, and runbooks exist. Hardware/node UAT remains open
+for physical Android, signed iOS device packages, StartOS, and Umbrel.
+
 - Docker standalone smoke and UAT.
 - SPA capability-limited runtime.
 - Start9/Umbrel packaging path.
@@ -38,9 +47,12 @@ Goal: make every target platform buildable and testable with explicit UAT runboo
 
 Goal: make GitHub Actions and release automation reflect the real alpha shipping path.
 
+Current status: incomplete. CI/release automation exists, but current `master` is not tagged after PR #105 and anonymous
+GHCR readback fails with `unauthorized`.
+
 - PR checks cover build/test/runtime smoke surfaces.
 - Release flow avoids redundant CI when branch protection already proves the target.
 - Tagged alpha releases produce GitHub releases and image/artifact outputs.
 
 ---
-*Roadmap initialized: 2026-07-04 from goal objective.*
+*Roadmap initialized: 2026-07-04 from goal objective. Status audited: 2026-07-06.*

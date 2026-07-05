@@ -5,7 +5,31 @@
 See: `.planning/PROJECT.md` (updated 2026-07-04)
 
 **Core value:** Files must transfer between peers reliably over every negotiated transport that claims to support the path.
-**Current focus:** Continue the MeshDrop finish-line milestone from the next highest-risk gap.
+**Current focus:** finish release/public-readback and real hardware/node UAT gaps that cannot be closed by source tests alone.
+
+## Milestone Audit: 2026-07-06
+
+Merged PRs through #105 satisfy the source/runtime/harness portions of the original finish-line milestone:
+
+- Phase 1 transfer/discovery correctness is complete for claimed paths: local, FIPS, Pollen, Nostr, federated FIPS,
+  Docker local/Pollen/two-host/public relay, SPA Chromium/Firefox/WebKit, Desktop Chromium, Android WebView, and
+  target-artifact source transfers now use real transfer proof instead of mock-only success.
+- Phase 2 runtime capability negotiation is complete for current targets: `/config`, static target manifests, and GUI
+  controllers gate controls by runtime capability and identity.
+- Phase 3 Docker shared-instance admin is complete for the repo contract: compose/runtime admin npub config, `/config`
+  metadata, GUI visibility, backend signed-event validation, FIPS settings updates, and restart requests are covered by
+  focused tests plus Docker/admin UAT.
+- Phase 4 platform work is complete for automated build/run/runbook proof, but not for real hardware/node acceptance.
+- Phase 5 CI/release automation is mostly complete, but current `master` still needs a new tag and anonymous GHCR
+  readback before release proof can be called complete.
+
+Current hard gaps:
+
+- `npm run verify:ghcr-anonymous -- v0.1.4` fails with GHCR `unauthorized`.
+- `gh api /orgs/sandwichfarm/packages/container/meshdrop` fails with `403` because this token lacks `read:packages`, so
+  this session cannot inspect or change package visibility.
+- Current `master` at PR #105 is unreleased; `v0.1.4` predates the latest release artifact set.
+- Physical Android hardware UAT, deployed StartOS/Umbrel UAT, and signed iOS device package/UAT remain unproven.
 
 ## Quick Tasks Completed
 
