@@ -44,6 +44,22 @@ test("CI builds Android APK artifact through package script", () => {
     assert.match(ciWorkflow, /npm run test:android-apk/);
 });
 
+test("CI proves Android picker UI through an emulator", () => {
+    assert.match(ciWorkflow, /android-picker-ui-emulator:/);
+    assert.match(ciWorkflow, /name: Android picker UI emulator smoke/);
+    assert.match(ciWorkflow, /needs: unit/);
+    assert.match(ciWorkflow, /sdkmanager="\$\{ANDROID_HOME\}\/cmdline-tools\/latest\/bin\/sdkmanager"/);
+    assert.match(ciWorkflow, /ANDROID_AVD_HOME="\$\{RUNNER_TEMP\}\/android-avd"/);
+    assert.match(ciWorkflow, /echo "ANDROID_AVD_HOME=\$\{ANDROID_AVD_HOME\}" >> "\$\{GITHUB_ENV\}"/);
+    assert.match(ciWorkflow, /"\$\{sdkmanager\}" "platform-tools" "emulator" "platforms;android-36" "system-images;android-36;google_apis;x86_64"/);
+    assert.match(ciWorkflow, /avdmanager="\$\{ANDROID_HOME\}\/cmdline-tools\/latest\/bin\/avdmanager"/);
+    assert.match(ciWorkflow, /"\$\{avdmanager\}" create avd/);
+    assert.match(ciWorkflow, /MESHDROP_ANDROID_AVD: meshdrop_ci_api_36/);
+    assert.match(ciWorkflow, /MESHDROP_ANDROID_EMULATOR_PORT: "5554"/);
+    assert.match(ciWorkflow, /MESHDROP_ANDROID_BOOT_TIMEOUT_MS: "300000"/);
+    assert.match(ciWorkflow, /npm run test:android-picker-ui/);
+});
+
 test("CI builds Android release APK artifact through package script", () => {
     assert.match(ciWorkflow, /android-release-apk-artifact:/);
     assert.match(ciWorkflow, /name: Android release APK artifact smoke/);
