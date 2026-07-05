@@ -107,7 +107,10 @@ for (const target of ["ios", "android"]) {
             if (target === "ios") {
                 assert(entries.includes(`${nativeRoot}/MeshDrop/MeshDropApp.swift`));
                 assert(entries.includes(`${nativeRoot}/MeshDrop/MeshDropViewController.swift`));
+                assert(entries.includes(`${nativeRoot}/MeshDrop/MeshDropShareInbox.swift`));
                 assert(entries.includes(`${nativeRoot}/MeshDrop/Resources/meshdrop/index.html`));
+                assert(entries.includes(`${nativeRoot}/MeshDropShareExtension/ShareViewController.swift`));
+                assert(entries.includes(`${nativeRoot}/MeshDropShareExtension/Info.plist`));
             }
             else {
                 assert(entries.includes(`${nativeRoot}/settings.gradle`));
@@ -149,6 +152,30 @@ for (const target of ["ios", "android"]) {
                 assert.match(wrapperSource, /runOpenPanelWith/);
                 assert.match(wrapperSource, /UIDocumentPickerViewController/);
                 assert.match(wrapperSource, /documentPickerWasCancelled/);
+
+                const shareInboxSource = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/MeshDrop/MeshDropShareInbox.swift`
+                );
+                const shareExtensionSource = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/MeshDropShareExtension/ShareViewController.swift`
+                );
+                const shareExtensionPlist = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/MeshDropShareExtension/Info.plist`
+                );
+                assert.match(shareInboxSource, /containerURL\(forSecurityApplicationGroupIdentifier:/);
+                assert.match(shareInboxSource, /share-inbox\.json/);
+                assert.match(shareExtensionSource, /SLComposeServiceViewController/);
+                assert.match(shareExtensionSource, /NSExtensionItem/);
+                assert.match(shareExtensionSource, /NSItemProvider/);
+                assert.match(shareExtensionSource, /loadFileRepresentation/);
+                assert.match(shareExtensionSource, /containerURL\(forSecurityApplicationGroupIdentifier:/);
+                assert.match(shareExtensionSource, /group\.farm\.sandwich\.meshdrop/);
+                assert.match(shareExtensionPlist, /com\.apple\.share-services/);
+                assert.match(shareExtensionPlist, /NSExtensionActivationRule/);
+                assert.match(shareExtensionPlist, /NSExtensionActivationSupportsFileWithMaxCount/);
             }
             else {
                 const androidManifest = await readTarEntry(

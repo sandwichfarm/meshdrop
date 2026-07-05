@@ -47,11 +47,17 @@ UAT-signed Android release APK artifact built by `npm run build:android:release-
 2. Confirm the iOS native-source artifact contains `native/ios/MeshDrop/Resources/meshdrop/index.html`.
 3. Confirm the iOS native-source wrapper sets `WKUIDelegate` and uses the iOS 18.4+ `WKOpenPanelParameters` hook with
    `UIDocumentPickerViewController` for WKWebView file inputs.
-4. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
-5. Confirm the Android native-source artifact contains
+4. Confirm the iOS native-source artifact includes a share extension source scaffold at
+   `native/ios/MeshDropShareExtension/ShareViewController.swift`.
+5. Confirm the iOS share extension `Info.plist` declares `com.apple.share-services`,
+   `NSExtensionActivationRule`, and `NSExtensionActivationSupportsFileWithMaxCount`.
+6. Confirm the iOS share extension and containing app source use the same App Group identifier and stage files through
+   `share-inbox.json`.
+7. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
+8. Confirm the Android native-source artifact contains
    `native/android/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`.
-6. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
-7. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
+9. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
+10. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
 
 ## Android APK Acceptance
 
@@ -181,5 +187,6 @@ between two browser peers served from the generated iOS and Android source artif
 - These artifacts do not prove physical Android device install UAT.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
 - The iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18.4+ open-panel hook,
-  but does not prove iOS device picker UAT or native iOS share-sheet integration.
+  and the iOS native-source artifact includes a share extension source scaffold, but does not prove iOS device picker
+  UAT, App Group entitlement setup, share-sheet device UAT, or native iOS share-initiated transfer.
 - These artifacts do not prove Bluetooth transport support.

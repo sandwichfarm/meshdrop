@@ -146,7 +146,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /native mobile WebRTC transfer UAT/);
     assert.match(mobile, /physical Android device install UAT/);
     assert.match(mobile, /iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18\.4\+ open-panel hook/);
-    assert.match(mobile, /iOS device picker\s+UAT or native iOS share-sheet integration/);
+    assert.match(mobile, /iOS native-source artifact includes a share extension source scaffold/);
+    assert.match(mobile, /MeshDropShareExtension\/ShareViewController\.swift/);
+    assert.match(mobile, /App Group entitlement setup, share-sheet device UAT/);
+    assert.match(mobile, /iOS device picker\s+UAT, App Group entitlement setup, share-sheet device UAT/);
     assert.match(mobile, /Not Proven/);
 
     const releaseTargets = readDoc("docs/uat/release-target-images.md");
@@ -236,14 +239,15 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke exists; real Umbrel node UAT open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);
-    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke and native-source wrapper artifact exist; app package\/device UAT open \|/);
+    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, and share extension source scaffold exist; app package\/device UAT open \|/);
     assert.match(
         targetStatus,
         /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, and native picker UI proof exist; physical-device UAT open \|/
     );
     assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `node --test test\/mobile-package\.test\.js`/);
     assert.match(targetStatus, /wires iOS 18\.4\+ file inputs to `UIDocumentPickerViewController`/);
-    assert.match(targetStatus, /device file-picker UAT, share-sheet integration/);
+    assert.match(targetStatus, /includes `MeshDropShareExtension\/ShareViewController\.swift`/);
+    assert.match(targetStatus, /App Group entitlement setup, device file-picker UAT, share-sheet device UAT/);
     assert.match(targetStatus, /`npm run build:android`; `npm run build:android:native-source`; `npm run build:android:apk`/);
     assert.match(targetStatus, /`npm run build:android:release-apk`/);
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-apk-install`/);
