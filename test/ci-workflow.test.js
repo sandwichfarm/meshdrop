@@ -4,12 +4,45 @@ import fs from "node:fs";
 
 const ciWorkflow = fs.readFileSync(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 
+function assertRuntimeChangeGate(jobName) {
+    const escaped = jobName.replaceAll("-", "\\-");
+    assert.match(ciWorkflow, new RegExp(`${escaped}:\\n(?:    .+\\n)+    needs: \\[ci-change-scope, unit\\]`));
+    assert.match(ciWorkflow, new RegExp(`${escaped}:\\n(?:    .+\\n)+    if: needs\\.ci-change-scope\\.outputs\\.runtime == 'true'`));
+}
+
+test("CI classifies runtime-affecting changes before expensive runtime jobs", () => {
+    assert.match(ciWorkflow, /ci-change-scope:/);
+    assert.match(ciWorkflow, /name: CI change scope/);
+    assert.match(ciWorkflow, /runtime: \$\{\{ steps\.classify\.outputs\.runtime \}\}/);
+    assert.match(ciWorkflow, /\$\{\{ github\.event_name \}\}" == "workflow_dispatch"/);
+    assert.match(ciWorkflow, /runtime=true/);
+    assert.match(ciWorkflow, /public\/\*\*/);
+    assert.match(ciWorkflow, /server\/\*\*/);
+    assert.match(ciWorkflow, /scripts\/\*\*/);
+    assert.match(ciWorkflow, /packaging\/\*\*/);
+    assert.match(ciWorkflow, /package-lock\.json/);
+    assert.match(ciWorkflow, /Dockerfile/);
+    assert.match(ciWorkflow, /docker-compose\.yml/);
+});
+
+test("CI gates baseline browser and Docker runtime smokes by change scope", () => {
+    assert.match(ciWorkflow, /browser-transfer:/);
+    assert.match(ciWorkflow, /name: Browser transfer smoke/);
+    assertRuntimeChangeGate("browser-transfer");
+    assert.match(ciWorkflow, /spa-browser-matrix:/);
+    assert.match(ciWorkflow, /name: SPA browser matrix/);
+    assertRuntimeChangeGate("spa-browser-matrix");
+    assert.match(ciWorkflow, /docker-smoke:/);
+    assert.match(ciWorkflow, /name: Docker smoke/);
+    assertRuntimeChangeGate("docker-smoke");
+});
+
 test("CI runs desktop and mobile target artifact transfer smoke", () => {
     assert.match(ciWorkflow, /Install desktop native shell dependencies/);
     assert.match(ciWorkflow, /libgtk-4-dev libwebkitgtk-6\.0-dev/);
     assert.match(ciWorkflow, /target-artifacts:/);
     assert.match(ciWorkflow, /name: Target artifact transfer smoke/);
-    assert.match(ciWorkflow, /needs: unit/);
+    assertRuntimeChangeGate("target-artifacts");
     assert.match(ciWorkflow, /npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /npm run test:target-artifacts/);
 });
@@ -17,7 +50,7 @@ test("CI runs desktop and mobile target artifact transfer smoke", () => {
 test("CI proves Desktop Chromium shell transfers through package script", () => {
     assert.match(ciWorkflow, /desktop-chromium-shell:/);
     assert.match(ciWorkflow, /name: Desktop Chromium shell transfer smoke/);
-    assert.match(ciWorkflow, /needs: unit/);
+    assertRuntimeChangeGate("desktop-chromium-shell");
     assert.match(ciWorkflow, /npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /npm run test:desktop-chromium/);
     assert.match(ciWorkflow, /npm run test:desktop-chromium-bundled/);
@@ -26,7 +59,7 @@ test("CI proves Desktop Chromium shell transfers through package script", () => 
 test("CI builds mobile native-source artifacts through package scripts", () => {
     assert.match(ciWorkflow, /mobile-native-source-artifacts:/);
     assert.match(ciWorkflow, /name: Mobile native source artifact smoke/);
-    assert.match(ciWorkflow, /needs: unit/);
+    assertRuntimeChangeGate("mobile-native-source-artifacts");
     assert.match(ciWorkflow, /npm run build:ios:native-source -- --version 0\.0\.0-ci --out-dir "\$\{out_dir\}"/);
     assert.match(ciWorkflow, /npm run build:android:native-source -- --version 0\.0\.0-ci --out-dir "\$\{out_dir\}"/);
     assert.match(ciWorkflow, /meshdrop-ios-native-source-0\.0\.0-ci\.tar\.gz/);
@@ -41,14 +74,14 @@ test("CI builds mobile native-source artifacts through package scripts", () => {
 test("CI builds Android APK artifact through package script", () => {
     assert.match(ciWorkflow, /android-apk-artifact:/);
     assert.match(ciWorkflow, /name: Android APK artifact smoke/);
-    assert.match(ciWorkflow, /needs: unit/);
+    assertRuntimeChangeGate("android-apk-artifact");
     assert.match(ciWorkflow, /npm run test:android-apk/);
 });
 
 test("CI proves Android picker UI through an emulator", () => {
     assert.match(ciWorkflow, /android-picker-ui-emulator:/);
     assert.match(ciWorkflow, /name: Android picker UI emulator smoke/);
-    assert.match(ciWorkflow, /needs: unit/);
+    assertRuntimeChangeGate("android-picker-ui-emulator");
     assert.match(ciWorkflow, /sdkmanager="\$\{ANDROID_HOME\}\/cmdline-tools\/latest\/bin\/sdkmanager"/);
     assert.match(ciWorkflow, /ANDROID_AVD_HOME="\$\{RUNNER_TEMP\}\/android-avd"/);
     assert.match(ciWorkflow, /echo "ANDROID_AVD_HOME=\$\{ANDROID_AVD_HOME\}" >> "\$\{GITHUB_ENV\}"/);
@@ -64,6 +97,6 @@ test("CI proves Android picker UI through an emulator", () => {
 test("CI builds Android release APK artifact through package script", () => {
     assert.match(ciWorkflow, /android-release-apk-artifact:/);
     assert.match(ciWorkflow, /name: Android release APK artifact smoke/);
-    assert.match(ciWorkflow, /needs: unit/);
+    assertRuntimeChangeGate("android-release-apk-artifact");
     assert.match(ciWorkflow, /npm run test:android-release-apk/);
 });
