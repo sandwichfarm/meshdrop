@@ -7,10 +7,6 @@ const playwrightModulePath = process.env.PLAYWRIGHT_MODULE_PATH ?? "/usr/lib/nod
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const adminSecretKey = secretKeyFromHex(process.env.MESHDROP_DOCKER_ADMIN_SECRET_KEY || "");
 const adminFipsPeerNpub = process.env.MESHDROP_DOCKER_ADMIN_FIPS_PEER_NPUB || "npub1peer";
-const proofIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#1b806a"/>
-  <path d="M18 34 28 44 47 21" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
 
 async function main() {
     if (!baseUrl) throw new Error("MESHDROP_DOCKER_TRANSFER_BASE_URL or base URL argument is required");
@@ -118,12 +114,13 @@ async function runProofTransfer(browser, options) {
 
         const peerId = await waitForConnectedPeer(pageA, options.roomType);
         await waitForConnectedPeer(pageB, options.roomType);
-        await sendProofIcon(pageA, peerId, options.transportId);
+        const proofFile = createProofFile(options);
+        await sendProofFile(pageA, peerId, options.transportId, proofFile);
 
         const received = await waitForReceivedFiles(pageB, options.name);
-        assertReceived(received);
+        assertReceived(received, proofFile);
         assert(!logs.pageErrors.length, `${options.name}: page errors: ${logs.pageErrors.join("\n")}`);
-        console.log(`Proof ${options.name}: ${options.transportId} delivered meshdrop-proof-icon.svg`);
+        console.log(`Proof ${options.name}: ${options.transportId} delivered ${proofFile.name}`);
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close()]);
@@ -221,14 +218,26 @@ async function waitForConnectedPeer(page, roomType) {
     return peerId.jsonValue();
 }
 
-async function sendProofIcon(page, peerId, transportId) {
-    await page.evaluate(({to, icon, transport}) => {
-        const file = new File([icon], "meshdrop-proof-icon.svg", {type: "image/svg+xml"});
+function createProofFile(options) {
+    return {
+        name: `meshdrop-${options.name}-proof.txt`,
+        text: [
+            "MeshDrop Docker browser transfer proof",
+            `scenario=${options.name}`,
+            `transport=${options.transportId}`,
+            `roomType=${options.roomType}`
+        ].join("\n")
+    };
+}
+
+async function sendProofFile(page, peerId, transportId, proofFile) {
+    await page.evaluate(({to, proof, transport}) => {
+        const file = new File([proof.text], proof.name, {type: "text/plain"});
         window.dispatchEvent(new CustomEvent("select-files-transport", {detail: {to, files: [file]}}));
         const button = document.querySelector(`[data-transport-id="${transport}"]`);
         if (!button) throw new Error(`Missing transport option ${transport}`);
         button.click();
-    }, {to: peerId, icon: proofIcon, transport: transportId});
+    }, {to: peerId, proof: proofFile, transport: transportId});
 }
 
 async function waitForReceivedFiles(page, name) {
@@ -263,10 +272,10 @@ async function debugPageState(page) {
     }));
 }
 
-function assertReceived(received) {
+function assertReceived(received, proofFile) {
     const file = received[0];
-    assert(file.name.startsWith("meshdrop-proof-icon"), `received unexpected file ${file.name}`);
-    assert(file.text === proofIcon, "received proof file contents did not match");
+    assert(file.name === proofFile.name, `received unexpected file ${file.name}`);
+    assert(file.text === proofFile.text, "received proof file contents did not match");
 }
 
 async function loadPlaywright() {

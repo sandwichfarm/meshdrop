@@ -21,6 +21,9 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerTransfer, /select-files-transport/);
     assert.match(dockerTransfer, /docker-local-webrtc/);
     assert.match(dockerTransfer, /docker-pollen-webrtc/);
+    assert.match(dockerTransfer, /meshdrop-\$\{options\.name\}-proof\.txt/);
+    assert.match(dockerTransfer, /scenario=\$\{options\.name\}/);
+    assert.match(dockerTransfer, /transport=\$\{options\.transportId\}/);
     assert.match(dockerTransfer, /meshdropPollenTransfer\.enable/);
     assert.match(dockerTransfer, /undefined, \{timeout: 45000\}/);
     assert.match(dockerSmoke, /MESHDROP_DOCKER_ADMIN_SECRET_KEY/);
@@ -37,7 +40,10 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerTwoHostRelay, /file-transfer-accepted/);
     assert.match(dockerTwoHostRelay, /files-sent/);
     assert.match(dockerTwoHostRelay, /waitForOpenRtcPeer/);
-    assert.match(dockerTwoHostRelay, /meshdrop-proof-icon\.svg between two Docker instances/);
+    assert.match(dockerTwoHostRelay, /meshdrop-\$\{proofName\}-proof\.txt/);
+    assert.match(dockerTwoHostRelay, /scenario=\$\{proofName\}/);
+    assert.match(dockerTwoHostRelay, /relayCount=\$\{relayUrls\.length\}/);
+    assert.match(dockerTwoHostRelay, /between two Docker instances/);
     assert.match(packageJson, /"test:docker:two-host": "node scripts\/docker-two-host-relay-smoke\.mjs"/);
     assert.match(e2eSmoke, /retryScenario\(\s*"federated-fips-webrtc"/);
     assert.match(e2eSmoke, /waitForDirectRoute\(pageA, peerId, "fips"\)/);
