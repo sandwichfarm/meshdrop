@@ -13,6 +13,8 @@ class PairDrop {
             "scripts/browser-tabs-connector.js",
             "scripts/util.js",
             "scripts/nostr-relays.js",
+            "scripts/nostr-pubkey.js",
+            "scripts/nostr-android-signer.js",
             "scripts/nostr-identity.js",
             "scripts/local-discovery.js",
             "scripts/nostr-mesh.js",
@@ -22,6 +24,7 @@ class PairDrop {
             "scripts/fips-discovery.js",
             "scripts/network.js",
             "scripts/ui.js",
+            "scripts/nostr-login-dialog.js",
             "scripts/libs/heic2any.min.js",
             "scripts/libs/no-sleep.min.js",
             "scripts/libs/qr-code.min.js",
@@ -196,6 +199,7 @@ class PairDrop {
         this.shareTextDialog = new globalThis.ShareTextDialog();
         this.protocolSettingsDialog = new globalThis.ProtocolSettingsDialog();
         this.transferChoiceDialog = new globalThis.TransferChoiceDialog();
+        this.nostrLoginDialog = new globalThis.NostrLoginDialog();
         this.toast = new globalThis.Toast();
         this.notifications = new globalThis.Notifications();
         this.networkStatusUI = new globalThis.NetworkStatusUI();

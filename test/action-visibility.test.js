@@ -83,6 +83,8 @@ globalThis.Events = {
 
 await import("../public/scripts/nostr-relays.js");
 await import("../public/scripts/runtime-capabilities.js");
+await import("../public/scripts/nostr-pubkey.js");
+await import("../public/scripts/nostr-android-signer.js");
 await import("../public/scripts/nostr-identity.js");
 await import("../public/scripts/local-discovery.js");
 await import("../public/scripts/nostr-mesh.js");
@@ -196,11 +198,73 @@ test("Nostr and storage actions stay hidden without a NIP-07 signer", () => {
     new globalThis.HashtreeTransferController();
     new globalThis.PollenTransferController();
 
-    assert.equal(buttons.get("nostr-identity").hasAttribute("hidden"), true);
+    assert.equal(buttons.get("nostr-identity").hasAttribute("hidden"), false);
     assert.equal(buttons.get("nostr-mesh").hasAttribute("hidden"), true);
     assert.equal(buttons.get("blossom-transfer").hasAttribute("hidden"), true);
     assert.equal(buttons.get("hashtree-transfer").hasAttribute("hidden"), true);
     assert.equal(buttons.get("pollen-transfer").hasAttribute("hidden"), true);
+});
+
+test("Nostr login uses Remote Signer directly when no browser signer exists", async () => {
+    resetUi();
+    const notifications = [];
+    globalThis.Events.on("notify-user", event => notifications.push(event.detail));
+
+    const identity = new globalThis.NostrIdentityController();
+    await identity.connect();
+
+    assert.equal(buttons.get("nostr-identity").hasAttribute("hidden"), false);
+    assert.equal(identity.getIdentity(), null);
+    assert(notifications.includes("notifications.nostr-remote-signer-unavailable"));
+});
+
+test("Nostr login dialog is used when browser extension and remote signer are both possible", async () => {
+    resetUi();
+    installSigner();
+    const choices = [];
+    globalThis.meshdropNostrLoginDialog = {
+        choose(methods) {
+            choices.push(methods.map(method => method.id));
+            return Promise.resolve("browser-extension");
+        }
+    };
+
+    try {
+        const identity = new globalThis.NostrIdentityController();
+        await identity.connect();
+
+        assert.deepEqual(choices, [["browser-extension", "remote-signer"]]);
+        assert.equal(identity.getIdentity().pubkey, "1".repeat(64));
+    }
+    finally {
+        delete globalThis.meshdropNostrLoginDialog;
+    }
+});
+
+test("Nostr login dialog offers Amber when Android signer bridge is available", async () => {
+    resetUi();
+    const choices = [];
+    globalThis.meshdropAndroidBridge = {
+        isNostrSignerInstalled: () => true,
+        requestNostrSigner: () => false
+    };
+    globalThis.meshdropNostrLoginDialog = {
+        choose(methods) {
+            choices.push(methods.map(method => method.id));
+            return Promise.resolve("remote-signer");
+        }
+    };
+
+    try {
+        const identity = new globalThis.NostrIdentityController();
+        await identity.connect();
+
+        assert.deepEqual(choices, [["remote-signer", "android-signer"]]);
+    }
+    finally {
+        delete globalThis.meshdropAndroidBridge;
+        delete globalThis.meshdropNostrLoginDialog;
+    }
 });
 
 test("Local discovery is enabled by default and toggles the IP room", () => {
@@ -490,6 +554,44 @@ test("Nostr-dependent controls follow negotiated runtime capabilities", async ()
     assert.equal(hashtree.isActive(), false);
 });
 
+test("FIPS and Pollen controls remain visible when configured but temporarily unavailable", async () => {
+    resetUi();
+    globalThis.fetch = async url => {
+        if (url === "fips/status") {
+            return {
+                ok: true,
+                json: async () => ({enabled: true, available: false})
+            };
+        }
+        if (url === "pollen/status") {
+            return {
+                ok: true,
+                json: async () => ({enabled: true, available: false})
+            };
+        }
+        throw new Error(`unexpected fetch ${url}`);
+    };
+
+    try {
+        const fips = new globalThis.FipsDiscoveryController();
+        const pollen = new globalThis.PollenTransferController();
+        await fips._onConfig({
+            fips: {enabled: true, room: "npub-network:test"},
+            capabilities: {transports: {fips: {supported: true}}}
+        });
+        await pollen._onConfig({
+            pollen: {enabled: true, room: "npub-network:test"},
+            capabilities: {transports: {pollen: {supported: true}}}
+        });
+
+        assert.equal(buttons.get("fips-discovery").hasAttribute("hidden"), false);
+        assert.equal(buttons.get("pollen-transfer").hasAttribute("hidden"), false);
+    }
+    finally {
+        delete globalThis.fetch;
+    }
+});
+
 test("Nostr storage actions appear after sign-in even before Blossom servers are known", async () => {
     resetUi();
     installSigner();
@@ -616,12 +718,13 @@ test("Nostr server auth display name does not overwrite hydrated kind 0 profile 
     }
 });
 
-test("FIPS action stays hidden until status confirms the daemon is reachable", async () => {
+test("FIPS action remains visible but unavailable until status confirms the daemon is reachable", async () => {
     resetUi();
     const controller = new globalThis.FipsDiscoveryController();
 
     await controller._onConfig({fips: {enabled: true, room: "npub-network:test"}});
-    assert.equal(buttons.get("fips-discovery").hasAttribute("hidden"), true);
+    assert.equal(buttons.get("fips-discovery").hasAttribute("hidden"), false);
+    assert.equal(buttons.get("fips-discovery").classList.contains("unavailable"), true);
 
     globalThis.fetch = async () => ({
         ok: true,
@@ -635,6 +738,7 @@ test("FIPS action stays hidden until status confirms the daemon is reachable", a
 
     await controller._onConfig({fips: {enabled: true, room: "npub-network:test"}});
     assert.equal(buttons.get("fips-discovery").hasAttribute("hidden"), false);
+    assert.equal(buttons.get("fips-discovery").classList.contains("unavailable"), false);
 });
 
 test("FIPS action shows icon connecting state until room join is confirmed", async () => {

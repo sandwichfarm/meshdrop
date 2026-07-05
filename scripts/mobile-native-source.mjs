@@ -636,6 +636,16 @@ function androidManifestXml() {
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
         "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">",
         "  <uses-permission android:name=\"android.permission.INTERNET\" />",
+        "  <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />",
+        "  <uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\" />",
+        "  <uses-permission android:name=\"android.permission.CHANGE_WIFI_MULTICAST_STATE\" />",
+        "  <queries>",
+        "    <intent>",
+        "      <action android:name=\"android.intent.action.VIEW\" />",
+        "      <category android:name=\"android.intent.category.BROWSABLE\" />",
+        "      <data android:scheme=\"nostrsigner\" />",
+        "    </intent>",
+        "  </queries>",
         "  <application android:theme=\"@style/AppTheme\" android:label=\"MeshDrop\" android:usesCleartextTraffic=\"false\" android:networkSecurityConfig=\"@xml/network_security_config\">",
         "    <activity android:name=\".MainActivity\" android:exported=\"true\" android:launchMode=\"singleTop\">",
         "      <intent-filter>",
@@ -714,6 +724,7 @@ const androidActivityHeaderPrefix = [
     "import android.provider.OpenableColumns;",
     "import android.database.Cursor;",
     "import android.util.Base64;",
+    "import android.webkit.JavascriptInterface;",
     "import android.webkit.ValueCallback;",
     "import android.webkit.WebChromeClient;",
     "import android.webkit.WebSettings;",
@@ -725,9 +736,11 @@ const androidActivityHeaderPrefix = [
     "import java.io.InputStream;",
     "import java.util.ArrayList;",
     "import java.util.List;",
+    "import org.json.JSONObject;",
     "",
     "public final class MainActivity extends Activity {",
-    "    private static final int FILE_CHOOSER_REQUEST = 2407;"
+    "    private static final int FILE_CHOOSER_REQUEST = 2407;",
+    "    private static final int NOSTR_SIGNER_REQUEST = 2408;"
 ];
 
 const androidActivityHeaderSuffix = [
@@ -760,6 +773,7 @@ function androidActivityLifecycle() {
         "        settings.setDomStorageEnabled(true);",
         "        settings.setAllowFileAccess(true);",
         "        settings.setAllowFileAccessFromFileURLs(true);",
+        "        webView.addJavascriptInterface(new MeshDropAndroidBridge(), \"meshdropAndroidBridge\");",
         "        webView.setWebChromeClient(new WebChromeClient() {",
         "            @Override",
         "            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {",
@@ -801,6 +815,10 @@ function androidActivityLifecycle() {
         "    @Override",
         "    protected void onActivityResult(int requestCode, int resultCode, Intent data) {",
         "        super.onActivityResult(requestCode, resultCode, data);",
+        "        if (requestCode == NOSTR_SIGNER_REQUEST) {",
+        "            dispatchNostrSignerResult(resultCode, data);",
+        "            return;",
+        "        }",
         "        if (requestCode != FILE_CHOOSER_REQUEST || filePathCallback == null) return;",
         "        Uri[] results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);",
         "        filePathCallback.onReceiveValue(results);",
@@ -899,6 +917,79 @@ function androidActivityFileHelpers() {
 
 function androidActivityBridge() {
     return [
+        ...androidNostrSignerBridge(),
+        ...androidNativeShareBridge(),
+        ...androidBridgeHelpers()
+    ];
+}
+
+function androidNostrSignerBridge() {
+    return [
+        "    public final class MeshDropAndroidBridge {",
+        "        @JavascriptInterface",
+        "        public boolean isNostrSignerInstalled() {",
+        "            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(\"nostrsigner:\"));",
+        "            return !getPackageManager().queryIntentActivities(intent, 0).isEmpty();",
+        "        }",
+        "",
+        "        @JavascriptInterface",
+        "        public boolean requestNostrSigner(String requestJson) {",
+        "            try {",
+        "                JSONObject request = new JSONObject(requestJson);",
+        "                String payload = request.optString(\"payload\", \"\");",
+        "                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(\"nostrsigner:\" + Uri.encode(payload)));",
+        "                intent.addCategory(Intent.CATEGORY_BROWSABLE);",
+        "                intent.putExtra(\"type\", request.optString(\"type\", \"get_public_key\"));",
+        "                intent.putExtra(\"id\", request.optString(\"id\", \"\"));",
+        "                if (request.has(\"current_user\")) intent.putExtra(\"current_user\", request.optString(\"current_user\", \"\"));",
+        "                if (request.has(\"pubkey\")) intent.putExtra(\"pubkey\", request.optString(\"pubkey\", \"\"));",
+        "                if (request.has(\"returnType\")) intent.putExtra(\"returnType\", request.optString(\"returnType\", \"\"));",
+        "                String packageName = request.optString(\"package\", \"\");",
+        "                if (!packageName.isEmpty()) intent.setPackage(packageName);",
+        "                runOnUiThread(() -> startActivityForResult(intent, NOSTR_SIGNER_REQUEST));",
+        "                return true;",
+        "            } catch (Exception error) {",
+        "                dispatchNostrSignerError(\"\", error.getMessage());",
+        "                return false;",
+        "            }",
+        "        }",
+        "    }",
+        "",
+        "    private void dispatchNostrSignerResult(int resultCode, Intent data) {",
+        "        String id = data == null ? \"\" : data.getStringExtra(\"id\");",
+        "        if (resultCode != Activity.RESULT_OK) {",
+        "            dispatchNostrSignerError(id, \"Android signer failed\");",
+        "            return;",
+        "        }",
+        "        boolean rejected = data != null && data.getBooleanExtra(\"rejected\", false);",
+        "        String result = data == null ? \"\" : data.getStringExtra(\"result\");",
+        "        String event = data == null ? \"\" : data.getStringExtra(\"event\");",
+        "        String packageName = data == null ? \"\" : data.getStringExtra(\"package\");",
+        "        dispatchNostrSignerScript(id, result, event, packageName, rejected, \"\");",
+        "    }",
+        "",
+        "    private void dispatchNostrSignerError(String id, String message) {",
+        "        dispatchNostrSignerScript(id, \"\", \"\", \"\", false, message == null ? \"Android signer failed\" : message);",
+        "    }",
+        "",
+        "    private void dispatchNostrSignerScript(String id, String result, String event, String packageName, boolean rejected, String error) {",
+        "        if (webView == null) return;",
+        "        String script = \"window.dispatchEvent(new CustomEvent('android-nostr-signer-result', {detail: {\"",
+        "            + \"id:\" + quote(id) + \",\"",
+        "            + \"result:\" + quote(result) + \",\"",
+        "            + \"event:\" + quote(event) + \",\"",
+        "            + \"package:\" + quote(packageName) + \",\"",
+        "            + \"rejected:\" + rejected + \",\"",
+        "            + \"error:\" + quote(error)",
+        "            + \"}}));\";",
+        "        runOnUiThread(() -> webView.evaluateJavascript(script, null));",
+        "    }",
+        ""
+    ];
+}
+
+function androidNativeShareBridge() {
+    return [
         "    private String nativeShareBridgeScript() {",
         "        return \"(() => {\"",
         "            + \"if (globalThis.meshdropAndroidNativeShare) return;\"",
@@ -919,7 +1010,12 @@ function androidActivityBridge() {
         "            + \"};\"",
         "            + \"})();\";",
         "    }",
-        "",
+        ""
+    ];
+}
+
+function androidBridgeHelpers() {
+    return [
         "    private String quote(String value) {",
         "        String safe = value == null ? \"\" : value;",
         "        return \"\\\"\" + safe",

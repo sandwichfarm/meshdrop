@@ -198,8 +198,8 @@ class FipsDiscoveryController {
     _render() {
         if (!this.$button) return;
 
-        const canUseFips = FipsDiscoveryProtocol.enabledFromConfig(this._config) && this._available;
-        this.$button.toggleAttribute("hidden", !canUseFips);
+        const supported = FipsDiscoveryProtocol.enabledFromConfig(this._config);
+        this.$button.toggleAttribute("hidden", !supported);
 
         const translationKey = this._active
             ? "header.fips-discovery-disable"
@@ -210,7 +210,9 @@ class FipsDiscoveryController {
             : Localization.getTranslation(`${translationKey}_title`);
         this.$button.classList.toggle("selected", this._active);
         this.$button.classList.toggle("connecting", this._connecting);
+        this.$button.classList.toggle("unavailable", supported && !this._available);
         this.$button.setAttribute("aria-busy", String(this._connecting));
+        this.$button.setAttribute("aria-disabled", String(supported && !this._available));
         const userCount = globalThis.meshdropPeerAvailabilityCounts?.fips;
         if (this._active && !this._connecting) {
             this.$button.setAttribute("data-badge", String(typeof userCount === "number" ? userCount : 0));

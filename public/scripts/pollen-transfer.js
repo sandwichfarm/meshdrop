@@ -230,8 +230,8 @@ class PollenTransferController {
     _render() {
         if (!this.$button) return;
 
-        const canUsePollen = PollenTransferProtocol.enabledFromConfig(this._config) && this._available;
-        this.$button.toggleAttribute("hidden", !canUsePollen);
+        const supported = PollenTransferProtocol.enabledFromConfig(this._config);
+        this.$button.toggleAttribute("hidden", !supported);
 
         const translationKey = this._active
             ? "header.pollen-transfer-disable"
@@ -242,7 +242,9 @@ class PollenTransferController {
             : Localization.getTranslation(`${translationKey}_title`);
         this.$button.classList.toggle("selected", this._active);
         this.$button.classList.toggle("connecting", this._connecting);
+        this.$button.classList.toggle("unavailable", supported && !this._available);
         this.$button.setAttribute("aria-busy", String(this._connecting));
+        this.$button.setAttribute("aria-disabled", String(supported && !this._available));
     }
 }
 

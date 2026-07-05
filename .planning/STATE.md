@@ -82,6 +82,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-tps-transfer-proof-specific-payloads` | complete | Docker local, Pollen, and two-host WebRTC smokes now send/assert scenario-specific proof files; `npm test` 206/206; Docker runtime proof; diff/check; changed-code slop clean |
 | 2026-07-05 | `260705-apd-android-physical-device-uat-harness` | complete | Physical Android UAT harness rejects no-device/emulator/ambiguous states and runs existing Android smokes by serial; hardware pass remains open |
 | 2026-07-05 | `260705-dtu-deployed-target-uat-harness` | complete | Start9/Umbrel deployed UAT harnesses require installed service URLs, validate `/config`, and run local/Pollen WebRTC transfer proof; real device/node pass remains open |
+| 2026-07-05 | `260705-asa-android-safe-area-and-signer-options` | complete | Focused 28/28; e2e transfer smoke passed after CI expectation fix; `npm test` 220/220; physical Android WebView WebRTC/WebSocket proof on `28031FDH300BS5`; live CDP shows safe-area, Nostr button visible, Amber signer options |
 
 ## Active Quick Task
 
