@@ -171,6 +171,7 @@ function stageName(target, nativeSource, androidApk, androidReleaseApk) {
 function createTargetManifest(target, version, nativeSource, androidApk, androidReleaseApk) {
     const androidPackage = androidApk || androidReleaseApk;
     const nativeRuntimeTransfersProven = !nativeSource || androidPackage;
+    const androidPackagedRuntime = target === "android" && androidPackage;
     const manifest = {
         schemaVersion: 1,
         name: manifestName(target, nativeSource, androidApk, androidReleaseApk),
@@ -193,8 +194,8 @@ function createTargetManifest(target, version, nativeSource, androidApk, android
             nostr: nativeRuntimeTransfersProven,
             blossom: true,
             hashtree: true,
-            pollen: false,
-            fips: false,
+            pollen: androidPackagedRuntime,
+            fips: androidPackagedRuntime,
             bluetooth: false
         },
         capabilities: capabilitiesFor(target, nativeSource),

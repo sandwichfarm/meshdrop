@@ -43,6 +43,10 @@ try {
         assert.equal(state.claimsNativeWebRtc, true);
         assert.equal(state.rtcPeerConnection, "function");
         assert.equal(state.webSocket, "function");
+        assert.equal(state.fipsSupported, true);
+        assert.equal(state.pollenSupported, true);
+        assert.equal(state.fipsHidden, false);
+        assert.equal(state.pollenHidden, false);
         assert.equal(state.dataChannelLabel, "meshdrop-probe");
         assert.equal(state.dataChannelError, "");
         assert.equal(state.runtimeBluetooth.supported, false);
@@ -59,6 +63,7 @@ try {
             `RTCPeerConnection=${state.rtcPeerConnection}, WebSocket=${state.webSocket}, ` +
             `RTCDataChannel label=${state.dataChannelLabel}, manifest target=${state.manifestTarget}, ` +
             `native transfer claim=${state.claimsNativeWebRtc}, ` +
+            `FIPS visible=${!state.fipsHidden}, Pollen visible=${!state.pollenHidden}, ` +
             `Bluetooth API=${state.webBluetoothApi}, Bluetooth transfer=${state.runtimeBluetooth.transferSupported} ` +
             `on ${device.serial}`
         );
@@ -181,7 +186,11 @@ async function waitForRuntimeState(cdp) {
         if (
             state.readyState !== "loading" &&
             state.manifestTarget === "android" &&
-            state.runtimeCapabilities === "object"
+            state.runtimeCapabilities === "object" &&
+            state.fipsSupported === true &&
+            state.pollenSupported === true &&
+            state.fipsHidden === false &&
+            state.pollenHidden === false
         ) {
             return state;
         }
@@ -197,6 +206,9 @@ async function evaluateRuntimeState(cdp) {
             const runtimeCapabilities = typeof globalThis.RuntimeCapabilities;
             const runtimeBluetooth = globalThis.RuntimeCapabilities
                 ? globalThis.RuntimeCapabilities.bluetoothCapabilities(manifest)
+                : null;
+            const staticConfig = globalThis.RuntimeCapabilities
+                ? globalThis.RuntimeCapabilities.staticConfig(manifest)
                 : null;
             let dataChannelLabel = "";
             let dataChannelError = "";
@@ -219,6 +231,10 @@ async function evaluateRuntimeState(cdp) {
                 runtimeCapabilities,
                 rtcPeerConnection: typeof RTCPeerConnection,
                 webSocket: typeof WebSocket,
+                fipsSupported: staticConfig?.capabilities?.transports?.fips?.supported,
+                pollenSupported: staticConfig?.capabilities?.transports?.pollen?.supported,
+                fipsHidden: document.getElementById("fips-discovery")?.hasAttribute("hidden"),
+                pollenHidden: document.getElementById("pollen-transfer")?.hasAttribute("hidden"),
                 webBluetoothApi: typeof navigator.bluetooth,
                 bluetoothApiAvailable: !!navigator.bluetooth,
                 runtimeBluetooth,

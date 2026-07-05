@@ -36,6 +36,8 @@ try {
     assert.equal(manifest.nativePackage.releaseSigned, false);
     assert.equal(manifest.transports.webrtc, true);
     assert.equal(manifest.transports.nostr, true);
+    assert.equal(manifest.transports.pollen, true);
+    assert.equal(manifest.transports.fips, true);
     assert.equal(manifest.transports.bluetooth, false);
     assert.deepEqual(manifest.remainingProof, [
         "physical Android device install UAT",
