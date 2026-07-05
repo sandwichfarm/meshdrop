@@ -130,6 +130,58 @@ test("Desktop Chromium shell package creates WebRTC-capable desktop shell artifa
     }
 });
 
+test("Desktop Chromium shell can bundle a Chromium engine", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-desktop-chromium-bundle-test-"));
+
+    try {
+        const fakeEngineDir = path.join(tempDir, "fake-chromium");
+        const fakeEngine = path.join(fakeEngineDir, "chrome");
+        await fs.mkdir(fakeEngineDir, {recursive: true});
+        await fs.writeFile(fakeEngine, "#!/bin/sh\nexit 0\n");
+        await fs.chmod(fakeEngine, 0o755);
+
+        const result = await buildDesktopChromiumPackage({
+            version: "0.0.0 bundled",
+            outDir: tempDir,
+            chromiumBundlePath: fakeEngine,
+            env: {
+                MESH_DROP_BUILD_ID: "unit-chromium-bundled"
+            }
+        });
+        const entries = await listTarEntries(result.artifactPath);
+        const prefix = "meshdrop-desktop-chromium-bundled-0.0.0-bundled";
+        const extractDir = path.join(tempDir, "extract");
+
+        assert.equal(result.chromiumEngineBundled, true);
+        assert(entries.includes(`${prefix}/bin/chromium/chrome`));
+
+        const manifest = JSON.parse(await readTarEntry(result.artifactPath, `${prefix}/meshdrop-target.json`));
+        assert.equal(manifest.name, "meshdrop-desktop-chromium-bundled");
+        assert.equal(manifest.chromiumEngineBundled, true);
+        assert.equal(manifest.nativeShell.chromiumExecutable, "bin/chromium/chrome");
+        assert.deepEqual(manifest.remainingProof, [
+            "desktop installer or signed binary"
+        ]);
+
+        await fs.mkdir(extractDir);
+        await execFileAsync("tar", ["-xzf", result.artifactPath, "-C", extractDir]);
+        const launcher = path.join(extractDir, prefix, "bin", "meshdrop-desktop-chromium.mjs");
+        const appDir = path.join(extractDir, prefix, "app");
+        const {stdout} = await execFileAsync(process.execPath, [
+            launcher,
+            "--meshdrop-print-config",
+            "--app-dir",
+            appDir
+        ]);
+        const smoke = JSON.parse(stdout);
+
+        assert.equal(smoke.chromium, path.join(extractDir, prefix, "bin", "chromium", "chrome"));
+    }
+    finally {
+        await fs.rm(tempDir, {recursive: true, force: true});
+    }
+});
+
 test("Desktop native package builder compiles a Linux shell artifact", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-desktop-native-test-"));
 

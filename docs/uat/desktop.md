@@ -1,23 +1,27 @@
 # Desktop Native UAT Runbook
 
 Use this runbook for the dependency-free Desktop Native source artifact built by `npm run build:desktop`, the Linux
-GTK/WebKit native shell artifact built by `npm run build:desktop:native`, and the Chromium shell artifact built by
-`npm run build:desktop:chromium`.
+GTK/WebKit native shell artifact built by `npm run build:desktop:native`, the Chromium shell artifact built by
+`npm run build:desktop:chromium`, and the bundled Chromium shell artifact built by
+`npm run build:desktop:chromium-bundled`.
 
 ## Build
 
 1. Run `npm run build:desktop -- --version <version>`.
 2. Run `npm run build:desktop:native -- --version <version>`.
 3. Run `npm run build:desktop:chromium -- --version <version>`.
-4. Confirm `dist/meshdrop-desktop-<version>.tar.gz` exists.
-5. Confirm `dist/meshdrop-desktop-linux-<version>.tar.gz` exists.
-6. Confirm `dist/meshdrop-desktop-chromium-<version>.tar.gz` exists.
-7. Confirm the source archive contains `app/index.html`, `meshdrop-target.json`, `README-DESKTOP.md`, and
+4. Run `npm run build:desktop:chromium-bundled -- --version <version>` when validating a bundled Chromium engine.
+5. Confirm `dist/meshdrop-desktop-<version>.tar.gz` exists.
+6. Confirm `dist/meshdrop-desktop-linux-<version>.tar.gz` exists.
+7. Confirm `dist/meshdrop-desktop-chromium-<version>.tar.gz` exists.
+8. Confirm `dist/meshdrop-desktop-chromium-bundled-<version>.tar.gz` exists.
+9. Confirm the source archive contains `app/index.html`, `meshdrop-target.json`, `README-DESKTOP.md`, and
    `UAT-DESKTOP.md`.
-8. Confirm the GTK/WebKit native archive contains `app/index.html`, `bin/meshdrop-desktop`, `src/meshdrop-desktop.c`,
+10. Confirm the GTK/WebKit native archive contains `app/index.html`, `bin/meshdrop-desktop`, `src/meshdrop-desktop.c`,
    `meshdrop-target.json`, `README-DESKTOP.md`, and `UAT-DESKTOP.md`.
-9. Confirm the Chromium shell archive contains `app/index.html`, `bin/meshdrop-desktop-chromium.mjs`,
+11. Confirm the Chromium shell archive contains `app/index.html`, `bin/meshdrop-desktop-chromium.mjs`,
    `src/meshdrop-desktop-chromium.mjs`, `meshdrop-target.json`, `README-DESKTOP.md`, and `UAT-DESKTOP.md`.
+12. For the bundled Chromium shell archive, confirm `bin/chromium/chrome` exists.
 
 ## Artifact Acceptance
 
@@ -37,6 +41,9 @@ GTK/WebKit native shell artifact built by `npm run build:desktop:native`, and th
     `nativeShell.executable` is `bin/meshdrop-desktop-chromium.mjs`, and `nativeShell.toolkit` is `chromium`.
 11. For the Chromium shell archive, confirm `webrtc` and `nostr` are `true` only after
     `npm run test:desktop-chromium` passes.
+12. For the bundled Chromium shell archive, confirm `chromiumEngineBundled` is `true`,
+    `nativeShell.chromiumExecutable` is `bin/chromium/chrome`, and remaining proof lists only
+    `desktop installer or signed binary`.
 
 ## Native Shell Acceptance
 
@@ -55,7 +62,9 @@ GTK/WebKit native shell artifact built by `npm run build:desktop:native`, and th
 3. Confirm the app reads `meshdrop-target.json` and exposes `capabilities.runtime.target` as `desktop`.
 4. Confirm the runtime exposes `RTCPeerConnection`.
 5. Confirm `npm run test:desktop-chromium` transfers `meshdrop-desktop-chromium-proof.txt` over Nostr WebRTC.
-6. Do not claim signed installer or bundled Chromium proof until an installer/bundled-engine artifact exists.
+6. Confirm `npm run test:desktop-chromium-bundled` transfers `meshdrop-desktop-chromium-proof.txt` using the packaged
+   `bin/chromium/chrome` executable.
+7. Do not claim signed installer proof until an installer artifact exists.
 
 ## Automated Smoke
 
@@ -65,18 +74,20 @@ Run:
 npm run build:desktop -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-desktop-smoke
 npm run build:desktop:native -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-desktop-smoke
 npm run build:desktop:chromium -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-desktop-smoke
+npm run build:desktop:chromium-bundled -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-desktop-smoke
 node --test test/desktop-package.test.js
 npm run test:desktop-native
 npm run test:desktop-chromium
+npm run test:desktop-chromium-bundled
 npm run test:target-artifacts
 ```
 
 This smoke proves source artifact shape, target metadata, native Linux shell compilation, native shell config readback,
-native runtime capability metadata, GTK/WebKit WebRTC gating, Chromium shell WebRTC transfer, and a real Nostr WebRTC
-transfer between two browser peers served from the generated desktop source artifact.
+native runtime capability metadata, GTK/WebKit WebRTC gating, Chromium shell WebRTC transfer, bundled Chromium WebRTC
+transfer, and a real Nostr WebRTC transfer between two browser peers served from the generated desktop source artifact.
 
 ## Not Proven
 
 - The GTK/WebKit native shell does not expose `RTCPeerConnection` in current UAT, so native desktop WebRTC transfer UAT
   remains open.
-- The Chromium shell does not prove a signed installer or bundled Chromium engine.
+- The Chromium shell does not prove a signed installer.

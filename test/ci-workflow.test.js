@@ -20,6 +20,7 @@ test("CI proves Desktop Chromium shell transfers through package script", () => 
     assert.match(ciWorkflow, /needs: unit/);
     assert.match(ciWorkflow, /npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /npm run test:desktop-chromium/);
+    assert.match(ciWorkflow, /npm run test:desktop-chromium-bundled/);
 });
 
 test("CI builds mobile native-source artifacts through package scripts", () => {

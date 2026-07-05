@@ -167,6 +167,9 @@ jobs:
       - name: Run Desktop Chromium shell transfer smoke
         run: npm run test:desktop-chromium
 
+      - name: Run bundled Desktop Chromium transfer smoke
+        run: npm run test:desktop-chromium-bundled
+
   mobile-native-source-artifacts:
     name: Mobile native source artifact smoke
     runs-on: ubuntu-latest

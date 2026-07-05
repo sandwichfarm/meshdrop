@@ -70,6 +70,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(desktop, /npm run build:desktop/);
     assert.match(desktop, /npm run build:desktop:native/);
     assert.match(desktop, /npm run build:desktop:chromium/);
+    assert.match(desktop, /npm run build:desktop:chromium-bundled/);
+    assert.match(desktop, /meshdrop-desktop-chromium-bundled-<version>\.tar\.gz/);
     assert.match(desktop, /target` as `desktop`/);
     assert.match(desktop, /runtime\.platform` as `desktop`/);
     assert.match(desktop, /nativeShellBuilt` as `false`/);
@@ -77,14 +79,16 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(desktop, /chromiumShellBuilt` are `true`/);
     assert.match(desktop, /bin\/meshdrop-desktop/);
     assert.match(desktop, /bin\/meshdrop-desktop-chromium\.mjs/);
+    assert.match(desktop, /bin\/chromium\/chrome/);
     assert.match(desktop, /backend-only transports are not claimed/);
     assert.match(desktop, /bluetooth` is `false`/);
     assert.match(desktop, /Nostr WebRTC/);
     assert.match(desktop, /npm run test:target-artifacts/);
     assert.match(desktop, /npm run test:desktop-chromium/);
+    assert.match(desktop, /npm run test:desktop-chromium-bundled/);
     assert.match(desktop, /meshdrop-desktop-chromium-proof\.txt/);
     assert.match(desktop, /native desktop WebRTC transfer UAT/);
-    assert.match(desktop, /signed installer or bundled Chromium proof/);
+    assert.match(desktop, /bundled Chromium WebRTC/);
     assert.match(desktop, /Not Proven/);
 
     const mobile = readDoc("docs/uat/mobile.md");
@@ -201,13 +205,16 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         targetStatus,
         new RegExp([
             "\\| Desktop Native \\| Source artifact transfer smoke, GTK/WebKit runtime proof,",
-            " and Chromium shell transfer proof exist; installer proof open \\|"
+            " Chromium shell transfer proof, and bundled Chromium engine proof exist; installer proof open \\|"
         ].join(""))
     );
     assert.match(targetStatus, /`npm run build:desktop:native`; `npm run build:desktop:chromium`/);
+    assert.match(targetStatus, /`npm run build:desktop:chromium-bundled`/);
+    assert.match(targetStatus, /meshdrop-desktop-chromium-bundled-<version>\.tar\.gz/);
     assert.match(targetStatus, /`npm run test:desktop-native` proves the packaged GTK\/WebKit shell/);
     assert.match(targetStatus, /`npm run test:desktop-chromium` proves the packaged Chromium shell/);
-    assert.match(targetStatus, /Signed installer or bundled Chromium engine proof/);
+    assert.match(targetStatus, /`npm run test:desktop-chromium-bundled` proves the packaged shell uses bundled `bin\/chromium\/chrome`/);
+    assert.match(targetStatus, /Signed installer or binary proof/);
     assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke exists; real Umbrel node UAT open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);
