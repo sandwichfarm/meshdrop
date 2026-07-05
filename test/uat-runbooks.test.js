@@ -205,16 +205,18 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         targetStatus,
         new RegExp([
             "\\| Desktop Native \\| Source artifact transfer smoke, GTK/WebKit runtime proof,",
-            " Chromium shell transfer proof, and bundled Chromium engine proof exist; installer proof open \\|"
+            " Chromium shell transfer proof, bundled Chromium engine proof, and Linux binary launcher proof exist;",
+            " signed installer proof open \\|"
         ].join(""))
     );
     assert.match(targetStatus, /`npm run build:desktop:native`; `npm run build:desktop:chromium`/);
     assert.match(targetStatus, /`npm run build:desktop:chromium-bundled`/);
+    assert.match(targetStatus, /`bin\/meshdrop-desktop-chromium` binary launcher packaging/);
     assert.match(targetStatus, /meshdrop-desktop-chromium-bundled-<version>\.tar\.gz/);
     assert.match(targetStatus, /`npm run test:desktop-native` proves the packaged GTK\/WebKit shell/);
     assert.match(targetStatus, /`npm run test:desktop-chromium` proves the packaged Chromium shell/);
-    assert.match(targetStatus, /`npm run test:desktop-chromium-bundled` proves the packaged shell uses bundled `bin\/chromium\/chrome`/);
-    assert.match(targetStatus, /Signed installer or binary proof/);
+    assert.match(targetStatus, /`npm run test:desktop-chromium-bundled` proves the packaged binary launcher uses bundled `bin\/chromium\/chrome`/);
+    assert.match(targetStatus, /Signed installer proof/);
     assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke exists; real Umbrel node UAT open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);

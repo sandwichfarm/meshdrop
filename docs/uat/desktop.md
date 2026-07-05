@@ -19,7 +19,8 @@ GTK/WebKit native shell artifact built by `npm run build:desktop:native`, the Ch
    `UAT-DESKTOP.md`.
 10. Confirm the GTK/WebKit native archive contains `app/index.html`, `bin/meshdrop-desktop`, `src/meshdrop-desktop.c`,
    `meshdrop-target.json`, `README-DESKTOP.md`, and `UAT-DESKTOP.md`.
-11. Confirm the Chromium shell archive contains `app/index.html`, `bin/meshdrop-desktop-chromium.mjs`,
+11. Confirm the Chromium shell archive contains `app/index.html`, `bin/meshdrop-desktop-chromium`,
+   `bin/meshdrop-desktop-chromium.mjs`, `src/meshdrop-desktop-chromium.c`,
    `src/meshdrop-desktop-chromium.mjs`, `meshdrop-target.json`, `README-DESKTOP.md`, and `UAT-DESKTOP.md`.
 12. For the bundled Chromium shell archive, confirm `bin/chromium/chrome` exists.
 
@@ -38,12 +39,15 @@ GTK/WebKit native shell artifact built by `npm run build:desktop:native`, the Ch
 9. For the GTK/WebKit native Linux archive, confirm `webrtc` and `nostr` are `false` until a native engine exposes
    `RTCPeerConnection` and a real native transfer UAT passes.
 10. For the Chromium shell archive, confirm `nativeShellBuilt` and `chromiumShellBuilt` are `true`,
-    `nativeShell.executable` is `bin/meshdrop-desktop-chromium.mjs`, and `nativeShell.toolkit` is `chromium`.
+    `nativeShell.executable` is `bin/meshdrop-desktop-chromium`, `nativeShell.binaryBuilt` is `true`, and
+    `nativeShell.toolkit` is `chromium`.
 11. For the Chromium shell archive, confirm `webrtc` and `nostr` are `true` only after
     `npm run test:desktop-chromium` passes.
-12. For the bundled Chromium shell archive, confirm `chromiumEngineBundled` is `true`,
+12. For the non-bundled Chromium shell archive, confirm remaining proof lists `bundled Chromium engine` and
+    `signed desktop installer`.
+13. For the bundled Chromium shell archive, confirm `chromiumEngineBundled` is `true`,
     `nativeShell.chromiumExecutable` is `bin/chromium/chrome`, and remaining proof lists only
-    `desktop installer or signed binary`.
+    `signed desktop installer`.
 
 ## Native Shell Acceptance
 
@@ -58,7 +62,7 @@ GTK/WebKit native shell artifact built by `npm run build:desktop:native`, the Ch
 ## Chromium Shell Acceptance
 
 1. Extract `meshdrop-desktop-chromium-<version>.tar.gz`.
-2. Launch MeshDrop from `node bin/meshdrop-desktop-chromium.mjs --app-dir app`.
+2. Launch MeshDrop from `bin/meshdrop-desktop-chromium --app-dir app`.
 3. Confirm the app reads `meshdrop-target.json` and exposes `capabilities.runtime.target` as `desktop`.
 4. Confirm the runtime exposes `RTCPeerConnection`.
 5. Confirm `npm run test:desktop-chromium` transfers `meshdrop-desktop-chromium-proof.txt` over Nostr WebRTC.

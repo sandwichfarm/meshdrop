@@ -165,11 +165,11 @@ async function writeTargetManifest(stageDir, version, mode, {chromiumEngineBundl
             : chromium
                 ? chromiumEngineBundled
                     ? [
-                        "desktop installer or signed binary"
+                        "signed desktop installer"
                     ]
                     : [
-                        "bundled Chromium engine or installer",
-                        "desktop installer or signed binary"
+                        "bundled Chromium engine",
+                        "signed desktop installer"
                     ]
             : [
                 "native shell build",
@@ -189,8 +189,11 @@ async function writeTargetManifest(stageDir, version, mode, {chromiumEngineBundl
         manifest.nativeShell = {
             platform: "linux",
             toolkit: "chromium",
-            executable: "bin/meshdrop-desktop-chromium.mjs",
-            source: "src/meshdrop-desktop-chromium.mjs"
+            executable: "bin/meshdrop-desktop-chromium",
+            script: "bin/meshdrop-desktop-chromium.mjs",
+            source: "src/meshdrop-desktop-chromium.c",
+            scriptSource: "src/meshdrop-desktop-chromium.mjs",
+            binaryBuilt: true
         };
         if (chromiumEngineBundled) manifest.nativeShell.chromiumExecutable = "bin/chromium/chrome";
     }
@@ -247,7 +250,7 @@ function desktopNote(mode) {
     }
     if (mode === "chromium") {
         return [
-            "Launch command: `node bin/meshdrop-desktop-chromium.mjs --app-dir app`.",
+            "Launch command: `bin/meshdrop-desktop-chromium --app-dir app`.",
             "The launcher prefers a bundled `bin/chromium/chrome` engine and falls back to an installed Chromium-compatible browser."
         ].join(" ");
     }
@@ -278,17 +281,30 @@ async function compileNativeShell(stageDir) {
 }
 
 async function writeChromiumShell(stageDir) {
-    const sourcePath = path.join(repoRoot, "packaging", "desktop", "meshdrop-desktop-chromium.mjs");
+    const scriptSourcePath = path.join(repoRoot, "packaging", "desktop", "meshdrop-desktop-chromium.mjs");
+    const binarySourcePath = path.join(repoRoot, "packaging", "desktop", "meshdrop-desktop-chromium.c");
     const sourceDir = path.join(stageDir, "src");
     const binDir = path.join(stageDir, "bin");
-    const stagedSourcePath = path.join(sourceDir, "meshdrop-desktop-chromium.mjs");
-    const launcherPath = path.join(binDir, "meshdrop-desktop-chromium.mjs");
+    const stagedScriptPath = path.join(sourceDir, "meshdrop-desktop-chromium.mjs");
+    const stagedBinarySourcePath = path.join(sourceDir, "meshdrop-desktop-chromium.c");
+    const scriptLauncherPath = path.join(binDir, "meshdrop-desktop-chromium.mjs");
+    const binaryLauncherPath = path.join(binDir, "meshdrop-desktop-chromium");
 
     await fs.mkdir(sourceDir, {recursive: true});
     await fs.mkdir(binDir, {recursive: true});
-    await fs.copyFile(sourcePath, stagedSourcePath);
-    await fs.copyFile(sourcePath, launcherPath);
-    await fs.chmod(launcherPath, 0o755);
+    await fs.copyFile(scriptSourcePath, stagedScriptPath);
+    await fs.copyFile(scriptSourcePath, scriptLauncherPath);
+    await fs.copyFile(binarySourcePath, stagedBinarySourcePath);
+    await run("cc", [
+        stagedBinarySourcePath,
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-o",
+        binaryLauncherPath
+    ]);
+    await fs.chmod(scriptLauncherPath, 0o755);
+    await fs.chmod(binaryLauncherPath, 0o755);
 }
 
 async function resolveChromiumBundlePath(options = {}) {
