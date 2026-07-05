@@ -37,6 +37,9 @@ jobs:
       - name: Install desktop native shell dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
 
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Prepare release metadata
         id: release
         run: |
@@ -78,6 +81,7 @@ jobs:
           npm run build:desktop -- --version "${version}" --out-dir dist
           npm run build:desktop:native -- --version "${version}" --out-dir dist
           npm run build:desktop:chromium -- --version "${version}" --out-dir dist
+          npm run build:desktop:chromium-bundled -- --version "${version}" --out-dir dist
           npm run build:ios -- --version "${version}" --out-dir dist
           npm run build:ios:native-source -- --version "${version}" --out-dir dist
           npm run build:android -- --version "${version}" --out-dir dist

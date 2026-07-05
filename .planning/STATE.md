@@ -70,6 +70,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-btn-bluetooth-transport-negotiation` | complete | Runtime/static config negotiates Bluetooth API/bridge availability while keeping transfer unsupported; focused 13/13; `npm test`; diff/check; changed-code slop clean |
 | 2026-07-05 | `260705-rgc-runtime-gui-capability-gates` | complete | Nostr/Blossom/Hashtree controls follow negotiated runtime capabilities; focused 19/19; `npm test`; diff/check; changed-code slop clean |
 | 2026-07-05 | `260705-dcb-desktop-chromium-bundled-engine` | complete | Desktop Chromium artifact can bundle `bin/chromium/chrome` and transfer over Nostr WebRTC using it; focused 11/11; `npm test`; diff/check; changed-code slop clean |
+| 2026-07-05 | `260705-rbd-release-bundled-desktop-chromium` | complete | Release workflow builds and release-readback expects `meshdrop-desktop-chromium-bundled-<version>.tar.gz`; focused release workflow test green |
 
 ## Active Quick Task
 
