@@ -13,6 +13,7 @@ import {
 
 const FEDERATION_KIND = 25051;
 const SERVICE_PREFIX = "meshdrop-fed";
+const writeStderr = (...parts) => process.stderr.write(`${parts.join(" ")}\n`);
 
 export function createFederationConfig(env = process.env) {
     const enabled = env.MESHDROP_FEDERATION !== "false";
@@ -202,7 +203,7 @@ export default class MeshFederation {
             }
 
             this._discoverFipsPeer(event.peer).catch(error => {
-                console.warn("FIPS federation discovery event failed", error.message);
+                writeStderr("FIPS federation discovery event failed", error.message);
             });
         });
     }
@@ -230,10 +231,10 @@ export default class MeshFederation {
     }
 
     async _poll() {
-        await this.discoverFipsPeers().catch(error => console.warn("FIPS federation discovery failed", error.message));
+        await this.discoverFipsPeers().catch(error => writeStderr("FIPS federation discovery failed", error.message));
         if (this.config.pollen.enabled) {
-            await this._ensurePollenService().catch(error => console.warn("Pollen federation service failed", error.message));
-            await this._announcePollenNostr().catch(error => console.warn("Pollen Nostr announcement failed", error.message));
+            await this._ensurePollenService().catch(error => writeStderr("Pollen federation service failed", error.message));
+            await this._announcePollenNostr().catch(error => writeStderr("Pollen Nostr announcement failed", error.message));
         }
     }
 
@@ -333,7 +334,7 @@ export default class MeshFederation {
             }),
             signal: AbortSignal.timeout(this.config.timeoutMs)
         }).catch(error => {
-            console.warn("MeshDrop federation relay failed", server.baseUrl, error.message);
+            writeStderr("MeshDrop federation relay failed", server.baseUrl, error.message);
         });
     }
 
@@ -393,7 +394,7 @@ export default class MeshFederation {
                 this._announcePollenNostr(socket).catch(() => {});
             };
             socket.onmessage = event => this._onNostrRelayMessage(event.data);
-            socket.onerror = error => console.warn("Pollen Nostr relay error", relay, error.message);
+            socket.onerror = error => writeStderr("Pollen Nostr relay error", relay, error.message);
             socket.onclose = () => this.relaySockets.delete(relay);
             this.relaySockets.set(relay, socket);
         }
@@ -449,7 +450,7 @@ export default class MeshFederation {
         if (!serverId || serverId === this.config.serverId || !serviceName) return;
 
         await this._connectPollenService(serverId, serviceName).catch(error => {
-            console.warn("Pollen federation connect failed", serviceName, error.message);
+            writeStderr("Pollen federation connect failed", serviceName, error.message);
         });
     }
 
