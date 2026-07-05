@@ -2152,3 +2152,8 @@ class FileDigester {
         }));
     }
 }
+
+Object.assign(globalThis, {
+    PeersManager,
+    ServerConnection
+});

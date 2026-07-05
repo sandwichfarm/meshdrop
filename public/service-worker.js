@@ -79,22 +79,18 @@ const relativePathsNotToCache = [
 ]
 
 self.addEventListener('install', function(event) {
-    // Perform install steps
-    console.log("Cache files for sw:", cacheVersion);
     event.waitUntil(
         caches.open(cacheTitle)
             .then(function(cache) {
                 return cache
                     .addAll(relativePathsToCache)
                     .then(_ => {
-                        console.log('All files cached for sw:', cacheVersion);
                         self.skipWaiting();
                     });
             })
     );
 });
 
-// fetch the resource from the network
 const fromNetwork = (request, timeout) =>
     new Promise((resolve, reject) => {
         const timeoutId = setTimeout(reject, timeout);
@@ -107,21 +103,17 @@ const fromNetwork = (request, timeout) =>
                 clearTimeout(timeoutId);
                 resolve(response);
 
-                // Prevent requests that are in relativePathsNotToCache from being cached
                 if (doNotCacheRequest(request)) return;
 
                 updateCache(request)
-                    .then(() => console.log("Cache successfully updated for", request.url))
-                    .catch(err => console.log("Cache could not be updated for", request.url, err));
+                    .catch(err => console.error("Cache could not be updated for", request.url, err));
             })
             .catch(error => {
-                // Handle any errors that occurred during the fetch
                 console.error(`Could not fetch ${request.url}.`);
                 reject(error);
             });
     });
 
-// fetch the resource from the browser cache
 const fromCache = request =>
     caches
         .open(cacheTitle)
@@ -137,7 +129,6 @@ const doNotCacheRequest = request => {
     return relativePathsNotToCache.indexOf(requestRelativePath) !== -1
 };
 
-// cache the current page to make it available for offline
 const updateCache = request => new Promise((resolve, reject) => {
     caches
         .open(cacheTitle)
@@ -156,10 +147,6 @@ const updateCache = request => new Promise((resolve, reject) => {
         );
 });
 
-// general strategy when making a request:
-// 1. Try to retrieve file from cache
-// 2. If cache is not available: Fetch from network and update cache.
-// This way, cached files are only updated if the cacheVersion is changed
 self.addEventListener('fetch', function(event) {
     const swOrigin = new URL(self.location.href).origin;
     const requestOrigin = new URL(event.request.url).origin;
@@ -198,11 +185,8 @@ self.addEventListener('fetch', function(event) {
     }
 });
 
-
-// on activation, we clean up the previously registered service workers
 self.addEventListener('activate', evt => {
-    console.log("Activate sw:", cacheVersion);
-    evt.waitUntil(clients.claim());
+    evt.waitUntil(globalThis.clients.claim());
     return evt.waitUntil(
         caches
             .keys()
@@ -210,7 +194,6 @@ self.addEventListener('activate', evt => {
                 return Promise.all(
                     cacheNames.map(cacheName => {
                         if (cacheName !== cacheTitle) {
-                            console.log("Delete cache:", cacheName);
                             return caches.delete(cacheName);
                         }
                     })
@@ -219,25 +202,25 @@ self.addEventListener('activate', evt => {
     )
 });
 
-const evaluateRequestData = function (request) {
-    return new Promise(async (resolve) => {
-        const formData = await request.formData();
-        const title = formData.get("title");
-        const text = formData.get("text");
-        const url = formData.get("url");
-        const files = formData.getAll("allfiles");
+const evaluateRequestData = async function (request) {
+    const formData = await request.formData();
+    const title = formData.get("title");
+    const text = formData.get("text");
+    const url = formData.get("url");
+    const files = formData.getAll("allfiles");
 
-        const pairDropUrl = request.url;
+    const pairDropUrl = request.url;
 
-        if (files && files.length > 0) {
-            let fileObjects = [];
-            for (let i=0; i<files.length; i++) {
-                fileObjects.push({
-                    name: files[i].name,
-                    buffer: await files[i].arrayBuffer()
-                });
-            }
+    if (files && files.length > 0) {
+        let fileObjects = [];
+        for (let i=0; i<files.length; i++) {
+            fileObjects.push({
+                name: files[i].name,
+                buffer: await files[i].arrayBuffer()
+            });
+        }
 
+        return new Promise(resolve => {
             const DBOpenRequest = indexedDB.open('pairdrop_store');
             DBOpenRequest.onsuccess = e => {
                 const db = e.target.result;
@@ -254,15 +237,14 @@ const evaluateRequestData = function (request) {
             DBOpenRequest.onerror = _ => {
                 resolve(pairDropUrl);
             }
-        }
-        else {
-            let urlArgument = '?share_target=text';
+        });
+    }
 
-            if (title) urlArgument += `&title=${title}`;
-            if (text) urlArgument += `&text=${text}`;
-            if (url) urlArgument += `&url=${url}`;
+    let urlArgument = '?share_target=text';
 
-            resolve(pairDropUrl + urlArgument);
-        }
-    });
+    if (title) urlArgument += `&title=${title}`;
+    if (text) urlArgument += `&text=${text}`;
+    if (url) urlArgument += `&url=${url}`;
+
+    return pairDropUrl + urlArgument;
 }
