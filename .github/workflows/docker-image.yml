@@ -36,6 +36,57 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ci-change-scope:
+    name: CI change scope
+    runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.classify.outputs.runtime }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed paths
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime=false
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            runtime=true
+          else
+            case "${{ github.event_name }}" in
+              pull_request)
+                base="${{ github.event.pull_request.base.sha }}"
+                head="${{ github.event.pull_request.head.sha }}"
+                ;;
+              push)
+                base="${{ github.event.before }}"
+                head="${{ github.sha }}"
+                if [[ "${base}" =~ ^0+$ ]]; then
+                  base="${head}^"
+                fi
+                ;;
+              *)
+                base="${{ github.sha }}^"
+                head="${{ github.sha }}"
+                ;;
+            esac
+
+            while IFS= read -r path; do
+              case "${path}" in
+                public/**|server/**|scripts/**|packaging/**|native/**|test/e2e*|test/*package*|test/*smoke*|Dockerfile|docker-compose.yml|package.json|package-lock.json)
+                  runtime=true
+                  ;;
+              esac
+            done < <(git diff --name-only "${base}" "${head}")
+          fi
+
+          echo "runtime=${runtime}" >> "${GITHUB_OUTPUT}"
+
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -63,7 +114,8 @@ jobs:
   browser-transfer:
     name: Browser transfer smoke
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 20
 
     steps:
@@ -88,7 +140,8 @@ jobs:
   spa-browser-matrix:
     name: SPA browser matrix (${{ matrix.browser }})
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 20
 
     strategy:
@@ -120,7 +173,8 @@ jobs:
   target-artifacts:
     name: Target artifact transfer smoke
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 20
 
     steps:
@@ -145,7 +199,8 @@ jobs:
   desktop-chromium-shell:
     name: Desktop Chromium shell transfer smoke
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 20
 
     steps:
@@ -173,7 +228,8 @@ jobs:
   mobile-native-source-artifacts:
     name: Mobile native source artifact smoke
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 10
 
     steps:
@@ -206,7 +262,8 @@ jobs:
   android-apk-artifact:
     name: Android APK artifact smoke
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 20
 
     steps:
@@ -228,7 +285,8 @@ jobs:
   android-picker-ui-emulator:
     name: Android picker UI emulator smoke
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 35
 
     steps:
@@ -276,7 +334,8 @@ jobs:
   android-release-apk-artifact:
     name: Android release APK artifact smoke
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 20
 
     steps:
@@ -361,7 +420,8 @@ jobs:
   docker-smoke:
     name: Docker smoke
     runs-on: ubuntu-latest
-    needs: unit
+    needs: [ci-change-scope, unit]
+    if: needs.ci-change-scope.outputs.runtime == 'true'
     timeout-minutes: 20
 
     steps:
