@@ -92,13 +92,18 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /npm run build:android/);
     assert.match(mobile, /npm run build:ios:native-source/);
     assert.match(mobile, /npm run build:android:native-source/);
+    assert.match(mobile, /npm run build:android:apk/);
     assert.match(mobile, /target` as `ios` or `android`/);
     assert.match(mobile, /runtime\.platform` as `mobile`/);
     assert.match(mobile, /nativeShellBuilt` as `false`/);
+    assert.match(mobile, /nativeShellBuilt` is `true`/);
     assert.match(mobile, /nativeShellSourceBuilt` is `true`/);
-    assert.match(mobile, /native-source artifacts do not claim unproven native transfer paths/);
+    assert.match(mobile, /native-source and Android APK artifacts do not claim unproven native transfer paths/);
+    assert.match(mobile, /meshdrop-android-debug\.apk/);
+    assert.match(mobile, /gradleTask` set to `assembleDebug`/);
     assert.match(mobile, /globalThis\.__meshdropTargetManifest/);
     assert.match(mobile, /bluetooth` is `false`/);
+    assert.match(mobile, /npm run test:android-apk/);
     assert.match(mobile, /npm run test:target-artifacts/);
     assert.match(mobile, /native mobile WebRTC transfer UAT/);
     assert.match(mobile, /Not Proven/);
@@ -112,6 +117,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /docker buildx imagetools inspect/);
     assert.match(releaseTargets, /release-verify\.yml/);
     assert.match(releaseTargets, /authenticated readback runs with GitHub Actions package/);
+    assert.match(releaseTargets, /Android debug APK tarball/);
     assert.match(releaseTargets, /permissions and anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /npm run verify:ghcr-anonymous -- v0\.x\.y/);
@@ -175,11 +181,15 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);
     assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke and native-source wrapper artifact exist; app package\/device UAT open \|/);
-    assert.match(targetStatus, /\| Android \| Source artifact transfer smoke and native-source wrapper artifact exist; app package\/device UAT open \|/);
+    assert.match(
+        targetStatus,
+        /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, and debug APK build proof exist; device UAT open \|/
+    );
     assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `node --test test\/mobile-package\.test\.js`/);
-    assert.match(targetStatus, /`npm run build:android`; `npm run build:android:native-source`; `node --test test\/mobile-package\.test\.js`/);
+    assert.match(targetStatus, /`npm run build:android`; `npm run build:android:native-source`; `npm run build:android:apk`/);
     assert.match(targetStatus, /`npm run build:ios:native-source`/);
     assert.match(targetStatus, /`npm run build:android:native-source`/);
     assert.match(targetStatus, /Native iOS app package/);
-    assert.match(targetStatus, /Native Android app package/);
+    assert.match(targetStatus, /Gradle-built debug APK artifact/);
+    assert.match(targetStatus, /signed Android release APK or AAB package/);
 });

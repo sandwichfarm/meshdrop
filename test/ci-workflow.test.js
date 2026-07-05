@@ -36,3 +36,10 @@ test("CI builds mobile native-source artifacts through package scripts", () => {
     assert.match(ciWorkflow, /MainActivity\.java/);
     assert.match(ciWorkflow, /assets\/meshdrop\/index\.html/);
 });
+
+test("CI builds Android APK artifact through package script", () => {
+    assert.match(ciWorkflow, /android-apk-artifact:/);
+    assert.match(ciWorkflow, /name: Android APK artifact smoke/);
+    assert.match(ciWorkflow, /needs: unit/);
+    assert.match(ciWorkflow, /npm run test:android-apk/);
+});
