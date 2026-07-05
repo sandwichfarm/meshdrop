@@ -10,22 +10,30 @@ export async function writeNativeSource(stageDir, target, manifest) {
 }
 
 async function writeIosNativeSource(stageDir, manifest) {
+    const iosRoot = path.join(stageDir, "native", "ios");
     const nativeDir = path.join(stageDir, "native", "ios", "MeshDrop");
     const shareExtensionDir = path.join(stageDir, "native", "ios", "MeshDropShareExtension");
+    const xcodeProjectDir = path.join(iosRoot, "MeshDrop.xcodeproj");
+    const xcodeSchemeDir = path.join(xcodeProjectDir, "xcshareddata", "xcschemes");
     const resourceDir = path.join(nativeDir, "Resources", "meshdrop");
     const manifestJson = JSON.stringify(manifest, null, 2);
 
     await fs.mkdir(nativeDir, {recursive: true});
     await fs.mkdir(shareExtensionDir, {recursive: true});
+    await fs.mkdir(xcodeSchemeDir, {recursive: true});
     await fs.cp(path.join(stageDir, "app"), resourceDir, {recursive: true});
     await fs.writeFile(path.join(stageDir, "native", "ios", "README.md"), iosReadme());
+    await fs.writeFile(path.join(xcodeProjectDir, "project.pbxproj"), iosXcodeProjectPbxproj(manifest.version));
+    await fs.writeFile(path.join(xcodeSchemeDir, "MeshDrop.xcscheme"), iosXcodeScheme());
     await fs.writeFile(path.join(nativeDir, "MeshDropApp.swift"), iosAppSource());
     await fs.writeFile(path.join(nativeDir, "MeshDropView.swift"), iosViewSource());
     await fs.writeFile(path.join(nativeDir, "MeshDropViewController.swift"), iosViewControllerSource(manifestJson));
     await fs.writeFile(path.join(nativeDir, "MeshDropShareInbox.swift"), iosShareInboxSource());
     await fs.writeFile(path.join(nativeDir, "Info.plist"), iosInfoPlist());
+    await fs.writeFile(path.join(nativeDir, "MeshDrop.entitlements"), iosAppEntitlements());
     await fs.writeFile(path.join(shareExtensionDir, "ShareViewController.swift"), iosShareExtensionSource());
     await fs.writeFile(path.join(shareExtensionDir, "Info.plist"), iosShareExtensionInfoPlist());
+    await fs.writeFile(path.join(shareExtensionDir, "MeshDropShareExtension.entitlements"), iosShareExtensionEntitlements());
 }
 
 async function writeAndroidNativeSource(stageDir, manifest) {
@@ -57,6 +65,7 @@ function iosReadme() {
         "This source wraps the packaged `app/` directory in `WKWebView` and injects `meshdrop-target.json` at document start.",
         "WKWebView file inputs are wired to the native document picker through `WKUIDelegate`.",
         "Share extension source is included under `MeshDropShareExtension/` and stages shared files through an App Group container.",
+        "The generated `MeshDrop.xcodeproj` has app and share-extension targets plus matching App Group entitlements.",
         "Enable the same App Group entitlement for the app and extension before building the share-sheet path.",
         "Build and signing require Xcode on macOS. This artifact is source only and does not prove device transfer UAT.",
         ""
@@ -310,6 +319,10 @@ function iosInfoPlist() {
     ].join("\n");
 }
 
+function iosAppEntitlements() {
+    return iosAppGroupEntitlementsXml();
+}
+
 function iosShareExtensionInfoPlist() {
     return [
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
@@ -338,6 +351,177 @@ function iosShareExtensionInfoPlist() {
         "  </dict>",
         "</dict>",
         "</plist>",
+        ""
+    ].join("\n");
+}
+
+function iosShareExtensionEntitlements() {
+    return iosAppGroupEntitlementsXml();
+}
+
+function iosAppGroupEntitlementsXml() {
+    return [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\"",
+        "  \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",
+        "<plist version=\"1.0\">",
+        "<dict>",
+        "  <key>com.apple.security.application-groups</key>",
+        "  <array>",
+        "    <string>group.farm.sandwich.meshdrop</string>",
+        "  </array>",
+        "</dict>",
+        "</plist>",
+        ""
+    ].join("\n");
+}
+
+function iosXcodeProjectPbxproj(version) {
+    return [
+        "// !$*UTF8*$!",
+        "{",
+        "\tarchiveVersion = 1;",
+        "\tclasses = {};",
+        "\tobjectVersion = 56;",
+        "\tobjects = {",
+        ...iosXcodeFileReferences(),
+        ...iosXcodeBuildFiles(),
+        ...iosXcodeGroups(),
+        ...iosXcodeBuildPhases(),
+        ...iosXcodeTargets(),
+        ...iosXcodeProjectObject(),
+        ...iosXcodeBuildConfigurations(version),
+        "\t};",
+        "\trootObject = A00000000000000000000001;",
+        "}",
+        ""
+    ].join("\n");
+}
+
+function iosXcodeFileReferences() {
+    return [
+        "\t\tA00000000000000000000010 /* MeshDrop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = MeshDrop.app; sourceTree = BUILT_PRODUCTS_DIR;};",
+        "\t\tA00000000000000000000011 /* MeshDropShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = \"wrapper.app-extension\"; path = MeshDropShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR;};",
+        "\t\tA00000000000000000000020 /* MeshDropApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshDropApp.swift; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000021 /* MeshDropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshDropView.swift; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000022 /* MeshDropViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshDropViewController.swift; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000023 /* MeshDropShareInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshDropShareInbox.swift; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000025 /* MeshDrop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MeshDrop.entitlements; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000026 /* Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000030 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000031 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000032 /* MeshDropShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MeshDropShareExtension.entitlements; sourceTree = \"<group>\";};"
+    ];
+}
+
+function iosXcodeBuildFiles() {
+    return [
+        "\t\tA00000000000000000000120 /* MeshDropApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000020 /* MeshDropApp.swift */;};",
+        "\t\tA00000000000000000000121 /* MeshDropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000021 /* MeshDropView.swift */;};",
+        "\t\tA00000000000000000000122 /* MeshDropViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000022 /* MeshDropViewController.swift */;};",
+        "\t\tA00000000000000000000123 /* MeshDropShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000023 /* MeshDropShareInbox.swift */;};",
+        "\t\tA00000000000000000000124 /* Resources in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000026 /* Resources */;};",
+        "\t\tA00000000000000000000130 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000030 /* ShareViewController.swift */;};",
+        "\t\tA00000000000000000000131 /* MeshDropShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A00000000000000000000011 /* MeshDropShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, );};};"
+    ];
+}
+
+function iosXcodeGroups() {
+    return [
+        "\t\tA00000000000000000000002 = {isa = PBXGroup; children = (A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, ); sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000003 /* MeshDrop */ = {isa = PBXGroup; children = (A00000000000000000000020, A00000000000000000000021, A00000000000000000000022, A00000000000000000000023, A00000000000000000000024, A00000000000000000000025, A00000000000000000000026, ); path = MeshDrop; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000004 /* MeshDropShareExtension */ = {isa = PBXGroup; children = (A00000000000000000000030, A00000000000000000000031, A00000000000000000000032, ); path = MeshDropShareExtension; sourceTree = \"<group>\";};",
+        "\t\tA00000000000000000000005 /* Products */ = {isa = PBXGroup; children = (A00000000000000000000010, A00000000000000000000011, ); name = Products; sourceTree = \"<group>\";};"
+    ];
+}
+
+function iosXcodeBuildPhases() {
+    return [
+        "\t\tA00000000000000000000040 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000120, A00000000000000000000121, A00000000000000000000122, A00000000000000000000123, ); runOnlyForDeploymentPostprocessing = 0;};",
+        "\t\tA00000000000000000000041 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000124, ); runOnlyForDeploymentPostprocessing = 0;};",
+        "\t\tA00000000000000000000042 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};",
+        "\t\tA00000000000000000000043 /* Embed App Extensions */ = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = \"\"; dstSubfolderSpec = 13; files = (A00000000000000000000131, ); name = \"Embed App Extensions\"; runOnlyForDeploymentPostprocessing = 0;};",
+        "\t\tA00000000000000000000050 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000130, ); runOnlyForDeploymentPostprocessing = 0;};",
+        "\t\tA00000000000000000000051 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};",
+        "\t\tA00000000000000000000052 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};"
+    ];
+}
+
+function iosXcodeTargets() {
+    return [
+        "\t\tA00000000000000000000060 /* MeshDrop */ = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000080 /* Build configuration list for PBXNativeTarget \\\"MeshDrop\\\" */; buildPhases = (A00000000000000000000040, A00000000000000000000041, A00000000000000000000042, A00000000000000000000043, ); dependencies = (A00000000000000000000070, ); name = MeshDrop; productName = MeshDrop; productReference = A00000000000000000000010 /* MeshDrop.app */; productType = \"com.apple.product-type.application\";};",
+        "\t\tA00000000000000000000061 /* MeshDropShareExtension */ = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000090 /* Build configuration list for PBXNativeTarget \\\"MeshDropShareExtension\\\" */; buildPhases = (A00000000000000000000050, A00000000000000000000051, A00000000000000000000052, ); dependencies = (); name = MeshDropShareExtension; productName = MeshDropShareExtension; productReference = A00000000000000000000011 /* MeshDropShareExtension.appex */; productType = \"com.apple.product-type.app-extension\";};",
+        "\t\tA00000000000000000000070 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A00000000000000000000061 /* MeshDropShareExtension */; targetProxy = A00000000000000000000071 /* PBXContainerItemProxy */;};",
+        "\t\tA00000000000000000000071 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = A00000000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = A00000000000000000000061; remoteInfo = MeshDropShareExtension;};"
+    ];
+}
+
+function iosXcodeProjectObject() {
+    return [
+        "\t\tA00000000000000000000001 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1640; LastUpgradeCheck = 1640; TargetAttributes = {A00000000000000000000060 = {CreatedOnToolsVersion = 16.4;}; A00000000000000000000061 = {CreatedOnToolsVersion = 16.4;};};}; buildConfigurationList = A00000000000000000000081 /* Build configuration list for PBXProject \\\"MeshDrop\\\" */; compatibilityVersion = \"Xcode 14.0\"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, ); mainGroup = A00000000000000000000002; productRefGroup = A00000000000000000000005 /* Products */; projectDirPath = \"\"; projectRoot = \"\"; targets = (A00000000000000000000060, A00000000000000000000061, );};"
+    ];
+}
+
+function iosXcodeBuildConfigurations(version) {
+    return [
+        ...iosXcodeProjectConfigurations(),
+        ...iosXcodeAppConfigurations(version),
+        ...iosXcodeShareExtensionConfigurations(version),
+        "\t\tA00000000000000000000081 /* Build configuration list for PBXProject \\\"MeshDrop\\\" */ = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000082, A00000000000000000000083, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};",
+        "\t\tA00000000000000000000080 /* Build configuration list for PBXNativeTarget \\\"MeshDrop\\\" */ = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000084, A00000000000000000000085, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};",
+        "\t\tA00000000000000000000090 /* Build configuration list for PBXNativeTarget \\\"MeshDropShareExtension\\\" */ = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000091, A00000000000000000000092, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};"
+    ];
+}
+
+function iosXcodeProjectConfigurations() {
+    return [
+        "\t\tA00000000000000000000082 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES; ENABLE_STRICT_OBJC_MSGSEND = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0;}; name = Debug;};",
+        "\t\tA00000000000000000000083 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES; ENABLE_STRICT_OBJC_MSGSEND = YES; GCC_C_LANGUAGE_STANDARD = gnu17; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0;}; name = Release;};"
+    ];
+}
+
+function iosXcodeAppConfigurations(version) {
+    return [
+        `\t\tA00000000000000000000084 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = MeshDrop/MeshDrop.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MeshDrop/Info.plist; MARKETING_VERSION = ${version}; PRODUCT_BUNDLE_IDENTIFIER = farm.sandwich.meshdrop; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug;};`,
+        `\t\tA00000000000000000000085 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = MeshDrop/MeshDrop.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MeshDrop/Info.plist; MARKETING_VERSION = ${version}; PRODUCT_BUNDLE_IDENTIFIER = farm.sandwich.meshdrop; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Release;};`
+    ];
+}
+
+function iosXcodeShareExtensionConfigurations(version) {
+    return [
+        `\t\tA00000000000000000000091 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = MeshDropShareExtension/MeshDropShareExtension.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MeshDropShareExtension/Info.plist; MARKETING_VERSION = ${version}; PRODUCT_BUNDLE_IDENTIFIER = farm.sandwich.meshdrop.share; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug;};`,
+        `\t\tA00000000000000000000092 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = MeshDropShareExtension/MeshDropShareExtension.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MeshDropShareExtension/Info.plist; MARKETING_VERSION = ${version}; PRODUCT_BUNDLE_IDENTIFIER = farm.sandwich.meshdrop.share; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Release;};`
+    ];
+}
+
+function iosXcodeScheme() {
+    return [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "<Scheme LastUpgradeVersion=\"1640\" version=\"1.7\">",
+        "  <BuildAction parallelizeBuildables=\"YES\" buildImplicitDependencies=\"YES\">",
+        "    <BuildActionEntries>",
+        "      <BuildActionEntry buildForTesting=\"YES\" buildForRunning=\"YES\" buildForProfiling=\"YES\" buildForArchiving=\"YES\" buildForAnalyzing=\"YES\">",
+        "        <BuildableReference BuildableIdentifier=\"primary\" BlueprintIdentifier=\"A00000000000000000000060\" BuildableName=\"MeshDrop.app\" BlueprintName=\"MeshDrop\" ReferencedContainer=\"container:MeshDrop.xcodeproj\" />",
+        "      </BuildActionEntry>",
+        "      <BuildActionEntry buildForTesting=\"YES\" buildForRunning=\"YES\" buildForProfiling=\"YES\" buildForArchiving=\"YES\" buildForAnalyzing=\"YES\">",
+        "        <BuildableReference BuildableIdentifier=\"primary\" BlueprintIdentifier=\"A00000000000000000000061\" BuildableName=\"MeshDropShareExtension.appex\" BlueprintName=\"MeshDropShareExtension\" ReferencedContainer=\"container:MeshDrop.xcodeproj\" />",
+        "      </BuildActionEntry>",
+        "    </BuildActionEntries>",
+        "  </BuildAction>",
+        "  <LaunchAction buildConfiguration=\"Debug\" selectedDebuggerIdentifier=\"Xcode.DebuggerFoundation.Debugger.LLDB\" selectedLauncherIdentifier=\"Xcode.DebuggerFoundation.Launcher.LLDB\" launchStyle=\"0\" useCustomWorkingDirectory=\"NO\" ignoresPersistentStateOnLaunch=\"NO\" debugDocumentVersioning=\"YES\" debugServiceExtension=\"internal\" allowLocationSimulation=\"YES\">",
+        "    <BuildableProductRunnable runnableDebuggingMode=\"0\">",
+        "      <BuildableReference BuildableIdentifier=\"primary\" BlueprintIdentifier=\"A00000000000000000000060\" BuildableName=\"MeshDrop.app\" BlueprintName=\"MeshDrop\" ReferencedContainer=\"container:MeshDrop.xcodeproj\" />",
+        "    </BuildableProductRunnable>",
+        "  </LaunchAction>",
+        "  <ProfileAction buildConfiguration=\"Release\" shouldUseLaunchSchemeArgsEnv=\"YES\" savedToolIdentifier=\"\" useCustomWorkingDirectory=\"NO\" debugDocumentVersioning=\"YES\">",
+        "    <BuildableProductRunnable runnableDebuggingMode=\"0\">",
+        "      <BuildableReference BuildableIdentifier=\"primary\" BlueprintIdentifier=\"A00000000000000000000060\" BuildableName=\"MeshDrop.app\" BlueprintName=\"MeshDrop\" ReferencedContainer=\"container:MeshDrop.xcodeproj\" />",
+        "    </BuildableProductRunnable>",
+        "  </ProfileAction>",
+        "  <AnalyzeAction buildConfiguration=\"Debug\" />",
+        "  <ArchiveAction buildConfiguration=\"Release\" revealArchiveInOrganizer=\"YES\" />",
+        "</Scheme>",
         ""
     ].join("\n");
 }
