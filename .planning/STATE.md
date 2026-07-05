@@ -76,6 +76,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-abw-android-webview-bluetooth-negotiation` | complete | Installed Android WebView smoke proves Bluetooth capability negotiation with `Bluetooth transfer=false`; Android APK metadata no longer lists Bluetooth negotiation as remaining proof; changed-code slop clean |
 | 2026-07-05 | `260705-dsi-desktop-signed-installer-proof` | complete | Signed Desktop Chromium `.run` installer verifies SHA256/GPG signature, installs, and launches packaged config; bundled Chromium transfer still passes |
 | 2026-07-05 | `260705-r4n-ios-simulator-app-package` | complete | Unsigned iOS Simulator `.app` package builds from generated Xcode source; signed/device iOS UAT remains open |
+| 2026-07-05 | `260705-rt0-release-ios-simulator-app-artifact` | complete | Release workflow builds the iOS Simulator app on macOS, publishes it with alpha release assets, and readback expects it; focused tests, YAML parse, `npm test`, diff/slop gates |
 
 ## Active Quick Task
 

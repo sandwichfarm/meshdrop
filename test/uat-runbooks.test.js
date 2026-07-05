@@ -171,6 +171,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /authenticated readback runs with GitHub Actions package/);
     assert.match(releaseTargets, /Android debug APK tarball/);
     assert.match(releaseTargets, /Android\s+release APK tarball/);
+    assert.match(releaseTargets, /iOS Simulator app tarball/);
     assert.doesNotMatch(releaseTargets, /physical-device install UAT and Bluetooth proof/);
     assert.match(releaseTargets, /signed Desktop Chromium\s+installer `\.run`/);
     assert.match(releaseTargets, /installer `\.asc`/);
@@ -188,6 +189,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /meshdrop-ios-0\.1\.4\.tar\.gz/);
     assert.match(releaseTargets, /meshdrop-android-0\.1\.4\.tar\.gz/);
     assert.match(releaseTargets, /meshdrop-ios-native-source-0\.1\.4\.tar\.gz/);
+    assert.doesNotMatch(releaseTargets, /meshdrop-ios-simulator-app-0\.1\.4\.tar\.gz/);
     assert.match(releaseTargets, /meshdrop-android-native-source-0\.1\.4\.tar\.gz/);
     assert.match(releaseTargets, /meshdrop-android-apk-0\.1\.4\.tar\.gz/);
     assert.match(releaseTargets, /v0\.1\.4-standalone/);
