@@ -75,6 +75,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-dbp-desktop-chromium-binary-proof` | complete | Desktop Chromium artifacts include a compiled Linux launcher binary; bundled Chromium transfer smoke passes through the binary launcher |
 | 2026-07-05 | `260705-abw-android-webview-bluetooth-negotiation` | complete | Installed Android WebView smoke proves Bluetooth capability negotiation with `Bluetooth transfer=false`; Android APK metadata no longer lists Bluetooth negotiation as remaining proof; changed-code slop clean |
 | 2026-07-05 | `260705-dsi-desktop-signed-installer-proof` | complete | Signed Desktop Chromium `.run` installer verifies SHA256/GPG signature, installs, and launches packaged config; bundled Chromium transfer still passes |
+| 2026-07-05 | `260705-r4n-ios-simulator-app-package` | complete | Unsigned iOS Simulator `.app` package builds from generated Xcode source; signed/device iOS UAT remains open |
 
 ## Active Quick Task
 
