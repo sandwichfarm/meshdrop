@@ -4,7 +4,8 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 `npm run build:android`, plus the native wrapper source artifacts built by `npm run build:ios:native-source` and
 `npm run build:android:native-source`, the Android debug APK artifact built by `npm run build:android:apk`, and the
 UAT-signed Android release APK artifact built by `npm run build:android:release-apk`, and the unsigned iOS Simulator
-app artifact built by `npm run build:ios:simulator-app`.
+app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS device app artifact built by
+`npm run build:ios:device-app`.
 
 ## Build
 
@@ -15,13 +16,15 @@ app artifact built by `npm run build:ios:simulator-app`.
 5. Run `npm run build:android:apk -- --version <version>`.
 6. Run `npm run build:android:release-apk -- --version <version>`.
 7. On macOS with Xcode installed, run `npm run build:ios:simulator-app -- --version <version>`.
-8. Confirm `dist/meshdrop-ios-<version>.tar.gz` and `dist/meshdrop-android-<version>.tar.gz` exist.
-9. Confirm `dist/meshdrop-ios-native-source-<version>.tar.gz` and
+8. On macOS with Xcode installed, run `npm run build:ios:device-app -- --version <version>`.
+9. Confirm `dist/meshdrop-ios-<version>.tar.gz` and `dist/meshdrop-android-<version>.tar.gz` exist.
+10. Confirm `dist/meshdrop-ios-native-source-<version>.tar.gz` and
    `dist/meshdrop-android-native-source-<version>.tar.gz` exist.
-10. Confirm `dist/meshdrop-ios-simulator-app-<version>.tar.gz` exists.
-11. Confirm `dist/meshdrop-android-apk-<version>.tar.gz` exists.
-12. Confirm `dist/meshdrop-android-release-apk-<version>.tar.gz` exists.
-13. Confirm each source archive contains `app/index.html`, `meshdrop-target.json`, a target README, and `UAT-MOBILE.md`.
+11. Confirm `dist/meshdrop-ios-simulator-app-<version>.tar.gz` exists.
+12. Confirm `dist/meshdrop-ios-device-app-<version>.tar.gz` exists.
+13. Confirm `dist/meshdrop-android-apk-<version>.tar.gz` exists.
+14. Confirm `dist/meshdrop-android-release-apk-<version>.tar.gz` exists.
+15. Confirm each source archive contains `app/index.html`, `meshdrop-target.json`, a target README, and `UAT-MOBILE.md`.
 
 ## Artifact Acceptance
 
@@ -85,6 +88,17 @@ app artifact built by `npm run build:ios:simulator-app`.
 4. Confirm `build-proof.json` reports `sdk` as `iphonesimulator` and `codeSigningAllowed` as `false`.
 5. Do not treat this artifact as App Store, TestFlight, signed-device, App Group provisioning, picker UAT, or native
    transfer proof.
+
+## iOS Device App Acceptance
+
+1. Confirm the iOS device app artifact contains `MeshDrop.app/Info.plist`.
+2. Confirm the artifact contains `build-proof.json`.
+3. Confirm `build-proof.json` reports `packageType` as `unsigned-device-app`.
+4. Confirm `build-proof.json` reports `sdk` as `iphoneos`, `destination` as `generic/platform=iOS`, and
+   `codeSigningAllowed` as `false`.
+5. Confirm `build-proof.json` reports `deviceInstallable` and `appStoreReady` as `false`.
+6. Do not treat this artifact as a signed IPA, App Store/TestFlight package, App Group provisioning proof, picker UAT,
+   share-sheet UAT, or native transfer proof.
 
 ## Android Release APK Acceptance
 
@@ -176,11 +190,13 @@ npm run build:ios -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:ios:native-source -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:ios:simulator-app -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
+npm run build:ios:device-app -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android:native-source -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android:apk -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android:release-apk -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 node --test test/mobile-package.test.js
 npm run test:ios-simulator-app
+npm run test:ios-device-app
 npm run test:android-apk
 npm run test:android-release-apk
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-apk-install
@@ -192,7 +208,8 @@ npm run test:target-artifacts
 ```
 
 This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
-an unsigned iOS Simulator app package build, an Android debug APK build, a UAT-signed Android release APK build with `apksigner` proof, Android emulator
+an unsigned iOS Simulator app package build, an unsigned `iphoneos` iOS device app build, an Android debug APK build,
+a UAT-signed Android release APK build with `apksigner` proof, Android emulator
 install/launch proof, native Android picker UI file selection, Android WebView runtime capability evidence including
 Bluetooth API negotiation with transfer disabled, Android WebView-to-Chromium Nostr WebRTC transfer through a local fake
 relay, Android `ACTION_SEND` file share delivery through the same WebRTC send path, and real Nostr WebRTC transfers
@@ -207,8 +224,9 @@ records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API
   emulator install proof.
 - Android WebView transfer proof does not prove physical Android device install UAT.
 - These artifacts do not prove physical Android device install UAT.
-- The iOS Simulator app artifact proves an unsigned Simulator `.app` package only; it does not prove a signed
-  device-installable iOS package, App Store/TestFlight packaging, or App Group provisioning.
+- The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.
+- The iOS device app artifact proves an unsigned generic `iphoneos` `.app` build product only; it does not prove a
+  signed device-installable IPA, App Store/TestFlight packaging, App Group provisioning, or physical-device install.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
 - The iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18.4+ open-panel hook,
   and the iOS native-source artifact includes Xcode project, entitlement, and share extension source scaffolds, but

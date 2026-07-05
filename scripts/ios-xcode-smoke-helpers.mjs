@@ -32,12 +32,34 @@ export async function prepareIosNativeSource({version, smokeName, buildId, env =
 }
 
 export async function runIosSimulatorBuild({projectPath, derivedDataPath, env = process.env}) {
+    await runUnsignedIosBuild({
+        projectPath,
+        configuration: "Debug",
+        sdk: "iphonesimulator",
+        destination: "generic/platform=iOS Simulator",
+        derivedDataPath,
+        env
+    });
+}
+
+export async function runIosDeviceAppBuild({projectPath, derivedDataPath, env = process.env}) {
+    await runUnsignedIosBuild({
+        projectPath,
+        configuration: "Release",
+        sdk: "iphoneos",
+        destination: "generic/platform=iOS",
+        derivedDataPath,
+        env
+    });
+}
+
+function runUnsignedIosBuild({projectPath, configuration, sdk, destination, derivedDataPath, env}) {
     const args = [
         "-project", projectPath,
         "-scheme", "MeshDrop",
-        "-configuration", "Debug",
-        "-sdk", "iphonesimulator",
-        "-destination", "generic/platform=iOS Simulator"
+        "-configuration", configuration,
+        "-sdk", sdk,
+        "-destination", destination
     ];
     if (derivedDataPath) {
         args.push("-derivedDataPath", derivedDataPath);
@@ -49,11 +71,15 @@ export async function runIosSimulatorBuild({projectPath, derivedDataPath, env = 
         "build"
     );
 
-    await run("xcodebuild", args, {env});
+    return run("xcodebuild", args, {env});
 }
 
 export function iosSimulatorAppPath(derivedDataPath) {
     return path.join(derivedDataPath, "Build", "Products", "Debug-iphonesimulator", "MeshDrop.app");
+}
+
+export function iosDeviceAppPath(derivedDataPath) {
+    return path.join(derivedDataPath, "Build", "Products", "Release-iphoneos", "MeshDrop.app");
 }
 
 export function run(command, args, options = {}) {
