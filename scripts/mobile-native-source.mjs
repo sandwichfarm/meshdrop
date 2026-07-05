@@ -111,7 +111,9 @@ function iosViewControllerSource(manifestJson) {
         "import WebKit",
         "",
         "final class MeshDropViewController: UIViewController, WKUIDelegate, UIDocumentPickerDelegate {",
-        `    private let targetManifest = #"""${manifestJson}"""#`,
+        "    private let targetManifest = #\"\"\"",
+        ...manifestJson.split("\n").map(line => `    ${line}`),
+        "    \"\"\"#",
         "    private var webView: WKWebView!",
         "    private var fileSelectionCompletion: (([URL]?) -> Void)?",
         "",
@@ -669,36 +671,61 @@ async function writeAndroidActivity(appSrc, manifest) {
 
 function androidActivitySource(escapedManifest) {
     return [
-        "package farm.sandwich.meshdrop;",
-        "",
-        "import android.app.Activity;",
-        "import android.content.Intent;",
-        "import android.content.pm.ApplicationInfo;",
-        "import android.net.Uri;",
-        "import android.os.Bundle;",
-        "import android.provider.OpenableColumns;",
-        "import android.database.Cursor;",
-        "import android.util.Base64;",
-        "import android.webkit.ValueCallback;",
-        "import android.webkit.WebChromeClient;",
-        "import android.webkit.WebSettings;",
-        "import android.webkit.WebView;",
-        "import android.webkit.WebViewClient;",
-        "import java.io.ByteArrayOutputStream;",
-        "import java.io.File;",
-        "import java.io.FileInputStream;",
-        "import java.io.InputStream;",
-        "import java.util.ArrayList;",
-        "import java.util.List;",
-        "",
-        "public final class MainActivity extends Activity {",
-        "    private static final int FILE_CHOOSER_REQUEST = 2407;",
+        ...androidActivityHeader(escapedManifest),
+        ...androidActivityLifecycle(),
+        ...androidActivityShareHandling(),
+        ...androidActivityFileHelpers(),
+        ...androidActivityBridge(),
+        "}",
+        ""
+    ].join("\n");
+}
+
+const androidActivityHeaderPrefix = [
+    "package farm.sandwich.meshdrop;",
+    "",
+    "import android.app.Activity;",
+    "import android.content.Intent;",
+    "import android.content.pm.ApplicationInfo;",
+    "import android.net.Uri;",
+    "import android.os.Bundle;",
+    "import android.provider.OpenableColumns;",
+    "import android.database.Cursor;",
+    "import android.util.Base64;",
+    "import android.webkit.ValueCallback;",
+    "import android.webkit.WebChromeClient;",
+    "import android.webkit.WebSettings;",
+    "import android.webkit.WebView;",
+    "import android.webkit.WebViewClient;",
+    "import java.io.ByteArrayOutputStream;",
+    "import java.io.File;",
+    "import java.io.FileInputStream;",
+    "import java.io.InputStream;",
+    "import java.util.ArrayList;",
+    "import java.util.List;",
+    "",
+    "public final class MainActivity extends Activity {",
+    "    private static final int FILE_CHOOSER_REQUEST = 2407;"
+];
+
+const androidActivityHeaderSuffix = [
+    "    private WebView webView;",
+    "    private ValueCallback<Uri[]> filePathCallback;",
+    "    private String pendingShareScript;",
+    "    private boolean pageLoaded;",
+    ""
+];
+
+function androidActivityHeader(escapedManifest) {
+    return [
+        ...androidActivityHeaderPrefix,
         `    private static final String TARGET_MANIFEST = ${escapedManifest};`,
-        "    private WebView webView;",
-        "    private ValueCallback<Uri[]> filePathCallback;",
-        "    private String pendingShareScript;",
-        "    private boolean pageLoaded;",
-        "",
+        ...androidActivityHeaderSuffix
+    ];
+}
+
+function androidActivityLifecycle() {
+    return [
         "    @Override",
         "    protected void onCreate(Bundle savedInstanceState) {",
         "        super.onCreate(savedInstanceState);",
@@ -757,7 +784,12 @@ function androidActivitySource(escapedManifest) {
         "        filePathCallback.onReceiveValue(results);",
         "        filePathCallback = null;",
         "    }",
-        "",
+        ""
+    ];
+}
+
+function androidActivityShareHandling() {
+    return [
         "    private void handleShareIntent(Intent intent) {",
         "        if (intent == null) return;",
         "        String action = intent.getAction();",
@@ -798,7 +830,12 @@ function androidActivitySource(escapedManifest) {
         "        pendingShareScript = null;",
         "        webView.evaluateJavascript(script, null);",
         "    }",
-        "",
+        ""
+    ];
+}
+
+function androidActivityFileHelpers() {
+    return [
         "    private String sharedFileJson(Uri uri) throws Exception {",
         "        byte[] bytes = readAllBytes(uri);",
         "        return \"{\"",
@@ -834,7 +871,12 @@ function androidActivitySource(escapedManifest) {
         "        if (path == null || path.isEmpty()) return \"meshdrop-shared-file\";",
         "        return new File(path).getName();",
         "    }",
-        "",
+        ""
+    ];
+}
+
+function androidActivityBridge() {
+    return [
         "    private String nativeShareBridgeScript() {",
         "        return \"(() => {\"",
         "            + \"if (globalThis.meshdropAndroidNativeShare) return;\"",
@@ -864,8 +906,6 @@ function androidActivitySource(escapedManifest) {
         "            .replace(\"\\n\", \"\\\\n\")",
         "            .replace(\"\\r\", \"\\\\r\")",
         "            + \"\\\"\";",
-        "    }",
-        "}",
-        ""
-    ].join("\n");
+        "    }"
+    ];
 }
