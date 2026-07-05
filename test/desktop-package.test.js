@@ -13,6 +13,7 @@ import {
     listTarEntries,
     readTarEntry
 } from "../scripts/build-desktop-package.mjs";
+import {buildDesktopInstaller} from "../scripts/build-desktop-installer.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -181,6 +182,69 @@ test("Desktop Chromium shell can bundle a Chromium engine", async () => {
         const smoke = JSON.parse(stdout);
 
         assert.equal(smoke.chromium, path.join(extractDir, prefix, "bin", "chromium", "chrome"));
+    }
+    finally {
+        await fs.rm(tempDir, {recursive: true, force: true});
+    }
+});
+
+test("Desktop installer wraps bundled Chromium shell with signature proof", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-desktop-installer-test-"));
+    const installDir = path.join(tempDir, "install");
+    const binDir = path.join(tempDir, "bin");
+    const verifyHome = path.join(tempDir, "verify-gnupg");
+
+    try {
+        const fakeEngineDir = path.join(tempDir, "fake-chromium");
+        const fakeEngine = path.join(fakeEngineDir, "chrome");
+        await fs.mkdir(fakeEngineDir, {recursive: true});
+        await fs.writeFile(fakeEngine, "#!/bin/sh\nexit 0\n");
+        await fs.chmod(fakeEngine, 0o755);
+
+        const result = await buildDesktopInstaller({
+            version: "0.0.0 installer",
+            outDir: tempDir,
+            chromiumBundlePath: fakeEngine,
+            env: {
+                MESH_DROP_BUILD_ID: "unit-installer"
+            }
+        });
+
+        const installerName = "meshdrop-desktop-chromium-bundled-installer-0.0.0-installer.run";
+        assert.equal(path.basename(result.installerPath), installerName);
+        assert.equal(path.basename(result.signaturePath), `${installerName}.asc`);
+        assert.equal(path.basename(result.sha256Path), `${installerName}.sha256`);
+        assert.equal(path.basename(result.publicKeyPath), `${installerName}.pubkey.asc`);
+        assert.deepEqual(result.metadata.remainingProof, []);
+
+        await execFileAsync("sha256sum", ["-c", path.basename(result.sha256Path)], {cwd: tempDir});
+        await fs.mkdir(verifyHome, {recursive: true, mode: 0o700});
+        await fs.chmod(verifyHome, 0o700);
+        await execFileAsync("gpg", ["--batch", "--import", result.publicKeyPath], {
+            env: {...process.env, GNUPGHOME: verifyHome}
+        });
+        await execFileAsync("gpg", ["--batch", "--verify", result.signaturePath, result.installerPath], {
+            env: {...process.env, GNUPGHOME: verifyHome}
+        });
+
+        const {stdout: metadataJson} = await execFileAsync(result.installerPath, ["--print-metadata"]);
+        const metadata = JSON.parse(metadataJson);
+        assert.equal(metadata.target, "desktop");
+        assert.equal(metadata.signature, "gpg-detached-armor");
+        assert.equal(metadata.payloadPrefix, result.prefix);
+
+        await execFileAsync(result.installerPath, [installDir], {
+            env: {...process.env, MESHDROP_INSTALL_BIN_DIR: binDir}
+        });
+        const launcher = path.join(binDir, "meshdrop-desktop");
+        const appDir = path.join(installDir, result.prefix, "app");
+        const {stdout} = await execFileAsync(launcher, ["--meshdrop-print-config", "--app-dir", appDir]);
+        const smoke = JSON.parse(stdout);
+
+        assert.equal(smoke.target, "desktop");
+        assert.equal(smoke.shell, "chromium");
+        assert.equal(smoke.chromium, path.join(installDir, result.prefix, "bin", "chromium", "chrome"));
+        assert.equal(smoke.appIndexExists, true);
     }
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});

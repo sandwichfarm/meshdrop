@@ -39,6 +39,8 @@ test("release workflow publishes GHCR images for alpha target packages", () => {
     assert.match(releaseWorkflow, /npm run build:desktop:chromium -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npx playwright install --with-deps chromium/);
     assert.match(releaseWorkflow, /npm run build:desktop:chromium-bundled -- --version "\$\{version\}" --out-dir dist/);
+    assert.match(releaseWorkflow, /npm run build:desktop:installer -- --version "\$\{version\}" --out-dir dist/);
+    assert.match(releaseWorkflow, /sha256sum dist\/meshdrop-\* > dist\/SHA256SUMS/);
     assert.match(releaseWorkflow, /npm run build:ios -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npm run build:ios:native-source -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npm run build:android -- --version "\$\{version\}" --out-dir dist/);
@@ -77,6 +79,10 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /meshdrop-desktop-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-desktop-chromium-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-desktop-chromium-bundled-\$\{version\}\.tar\.gz/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-desktop-chromium-bundled-installer-\$\{version\}\.run/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-desktop-chromium-bundled-installer-\$\{version\}\.run\.asc/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-desktop-chromium-bundled-installer-\$\{version\}\.run\.pubkey\.asc/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-desktop-chromium-bundled-installer-\$\{version\}\.run\.sha256/);
     assert.match(releaseVerifyWorkflow, /meshdrop-desktop-linux-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-ios-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-ios-native-source-\$\{version\}\.tar\.gz/);

@@ -71,7 +71,11 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(desktop, /npm run build:desktop:native/);
     assert.match(desktop, /npm run build:desktop:chromium/);
     assert.match(desktop, /npm run build:desktop:chromium-bundled/);
+    assert.match(desktop, /npm run build:desktop:installer/);
     assert.match(desktop, /meshdrop-desktop-chromium-bundled-<version>\.tar\.gz/);
+    assert.match(desktop, /meshdrop-desktop-chromium-bundled-installer-<version>\.run/);
+    assert.match(desktop, /gpg-detached-armor/);
+    assert.match(desktop, /sha256sum -c meshdrop-desktop-chromium-bundled-installer-<version>\.run\.sha256/);
     assert.match(desktop, /target` as `desktop`/);
     assert.match(desktop, /runtime\.platform` as `desktop`/);
     assert.match(desktop, /nativeShellBuilt` as `false`/);
@@ -86,9 +90,11 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(desktop, /npm run test:target-artifacts/);
     assert.match(desktop, /npm run test:desktop-chromium/);
     assert.match(desktop, /npm run test:desktop-chromium-bundled/);
+    assert.match(desktop, /npm run test:desktop-installer/);
     assert.match(desktop, /meshdrop-desktop-chromium-proof\.txt/);
     assert.match(desktop, /native desktop WebRTC transfer UAT/);
     assert.match(desktop, /bundled Chromium WebRTC/);
+    assert.match(desktop, /signed installer verification\/install\/launch/);
     assert.match(desktop, /Not Proven/);
 
     const mobile = readDoc("docs/uat/mobile.md");
@@ -152,7 +158,12 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /release-verify\.yml/);
     assert.match(releaseTargets, /authenticated readback runs with GitHub Actions package/);
     assert.match(releaseTargets, /Android debug APK tarball/);
-    assert.match(releaseTargets, /Android release APK tarball/);
+    assert.match(releaseTargets, /Android\s+release APK tarball/);
+    assert.doesNotMatch(releaseTargets, /physical-device install UAT and Bluetooth proof/);
+    assert.match(releaseTargets, /signed Desktop Chromium\s+installer `\.run`/);
+    assert.match(releaseTargets, /installer `\.asc`/);
+    assert.match(releaseTargets, /installer `\.sha256`/);
+    assert.match(releaseTargets, /installer `\.pubkey\.asc`/);
     assert.match(releaseTargets, /permissions and anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /npm run verify:ghcr-anonymous -- v0\.x\.y/);
@@ -206,18 +217,21 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         targetStatus,
         new RegExp([
             "\\| Desktop Native \\| Source artifact transfer smoke, GTK/WebKit runtime proof,",
-            " Chromium shell transfer proof, bundled Chromium engine proof, and Linux binary launcher proof exist;",
-            " signed installer proof open \\|"
+            " Chromium shell transfer proof, bundled Chromium engine proof, Linux binary launcher proof,",
+            " and signed Linux installer proof exist; GTK/WebKit native WebRTC remains gated off \\|"
         ].join(""))
     );
     assert.match(targetStatus, /`npm run build:desktop:native`; `npm run build:desktop:chromium`/);
     assert.match(targetStatus, /`npm run build:desktop:chromium-bundled`/);
+    assert.match(targetStatus, /`npm run build:desktop:installer`/);
     assert.match(targetStatus, /`bin\/meshdrop-desktop-chromium` binary launcher packaging/);
     assert.match(targetStatus, /meshdrop-desktop-chromium-bundled-<version>\.tar\.gz/);
+    assert.match(targetStatus, /signed installer metadata\/signature\/install proof/);
     assert.match(targetStatus, /`npm run test:desktop-native` proves the packaged GTK\/WebKit shell/);
     assert.match(targetStatus, /`npm run test:desktop-chromium` proves the packaged Chromium shell/);
     assert.match(targetStatus, /`npm run test:desktop-chromium-bundled` proves the packaged binary launcher uses bundled `bin\/chromium\/chrome`/);
-    assert.match(targetStatus, /Signed installer proof/);
+    assert.match(targetStatus, /`npm run test:desktop-installer` proves the generated `\.run` installer SHA256/);
+    assert.match(targetStatus, /None recorded for the signed Desktop Chromium installer path/);
     assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke exists; real Umbrel node UAT open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);

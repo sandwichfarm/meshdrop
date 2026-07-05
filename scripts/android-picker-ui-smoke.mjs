@@ -82,8 +82,10 @@ function progress(step) {
 async function seedDownloadFile(device) {
     const localFile = path.join(tempDir, proofFileName);
     await fs.writeFile(localFile, proofText);
-    await run(device.adb, ["-s", device.serial, "shell", "mkdir", "-p", "/sdcard/Download"]);
-    await run(device.adb, ["-s", device.serial, "push", localFile, `/sdcard/Download/${proofFileName}`]);
+    for (const directory of ["/sdcard", "/sdcard/Download", "/sdcard/Documents"]) {
+        await run(device.adb, ["-s", device.serial, "shell", "mkdir", "-p", directory]);
+        await run(device.adb, ["-s", device.serial, "push", localFile, `${directory}/${proofFileName}`]);
+    }
 }
 
 async function bringMeshDropToForeground(adb, serial) {

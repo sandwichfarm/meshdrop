@@ -35,9 +35,10 @@ Repeat with `target=start9` and `target=umbrel`.
 1. Push an alpha tag that matches `v0.*.*`.
 2. Wait for the `Release` workflow to finish.
 3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Desktop Native source tarball, Desktop Native
-   Linux shell tarball, Desktop Chromium shell tarball, iOS source tarball, iOS native-source tarball, Android source
-   tarball, Android native-source tarball, Android debug APK tarball, Android release APK tarball, Start9 source
-   tarball, Umbrel package tarball, and `SHA256SUMS` artifacts.
+   Linux shell tarball, Desktop Chromium shell tarball, Desktop Chromium bundled shell tarball, signed Desktop Chromium
+   installer `.run`, installer `.asc`, installer `.sha256`, installer `.pubkey.asc`, iOS source tarball,
+   iOS native-source tarball, Android source tarball, Android native-source tarball, Android debug APK tarball, Android
+   release APK tarball, Start9 source tarball, Umbrel package tarball, and `SHA256SUMS` artifacts.
 4. Confirm GHCR has both tag-preserving and version-only tags for each target:
    - `v0.x.y-standalone` and `0.x.y-standalone`.
    - `v0.x.y-start9` and `0.x.y-start9`.
@@ -90,9 +91,10 @@ Repeat with `target=start9` and `target=umbrel`.
   REST API. Making `ghcr.io/sandwichfarm/meshdrop` public is still required before anonymous manifest readback can pass.
 - The iOS source and native-source artifacts are not complete native targets until installable packages and transfer UAT
   pass.
-- Android APK artifacts are not complete until physical-device install UAT and Bluetooth proof pass. The release APK
-  artifact uses generated UAT signing and is not Play Store upload signing or AAB proof.
-- The Desktop Native Linux shell artifact is not complete until native transfer UAT and installer/signing proof pass.
+- Android APK artifacts are not complete until physical-device install UAT passes. The release APK artifact uses
+  generated UAT signing and is not Play Store upload signing or AAB proof.
+- The Desktop GTK/WebKit shell artifact still gates off native WebRTC until a native transfer UAT passes. The signed
+  installer proof covers the Desktop Chromium shell path.
 - The Start9 package is not complete until device install and transfer UAT pass on StartOS.
 - The Umbrel package artifact is not complete until device install and transfer UAT pass on Umbrel.
 
