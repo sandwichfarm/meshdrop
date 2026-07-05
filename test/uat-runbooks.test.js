@@ -104,8 +104,12 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /globalThis\.__meshdropTargetManifest/);
     assert.match(mobile, /bluetooth` is `false`/);
     assert.match(mobile, /npm run test:android-apk/);
+    assert.match(mobile, /npm run test:android-apk-install/);
+    assert.match(mobile, /Proof android-apk-emulator-install/);
+    assert.match(mobile, /farm\.sandwich\.meshdrop\/\.MainActivity/);
     assert.match(mobile, /npm run test:target-artifacts/);
     assert.match(mobile, /native mobile WebRTC transfer UAT/);
+    assert.match(mobile, /physical Android device install UAT/);
     assert.match(mobile, /Not Proven/);
 
     const releaseTargets = readDoc("docs/uat/release-target-images.md");
@@ -184,13 +188,16 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke and native-source wrapper artifact exist; app package\/device UAT open \|/);
     assert.match(
         targetStatus,
-        /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, and debug APK build proof exist; device UAT open \|/
+        /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, and emulator install proof exist; physical-device UAT open \|/
     );
     assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `node --test test\/mobile-package\.test\.js`/);
     assert.match(targetStatus, /`npm run build:android`; `npm run build:android:native-source`; `npm run build:android:apk`/);
+    assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-apk-install`/);
     assert.match(targetStatus, /`npm run build:ios:native-source`/);
     assert.match(targetStatus, /`npm run build:android:native-source`/);
     assert.match(targetStatus, /Native iOS app package/);
     assert.match(targetStatus, /Gradle-built debug APK artifact/);
+    assert.match(targetStatus, /Android emulator install\/launch of `farm\.sandwich\.meshdrop\/\.MainActivity`/);
+    assert.match(targetStatus, /Physical Android device install UAT/);
     assert.match(targetStatus, /signed Android release APK or AAB package/);
 });
