@@ -4,7 +4,7 @@ class BrowserTabsConnector {
 
         this.bc = new BroadcastChannel('pairdrop');
         this.bc.addEventListener('message', e => this._onMessage(e));
-        Events.on('broadcast-send', e => this._broadcastSend(e.detail));
+        globalThis.Events.on('broadcast-send', e => this._broadcastSend(e.detail));
     }
 
     _broadcastSend(message) {
@@ -15,7 +15,7 @@ class BrowserTabsConnector {
         console.log('Broadcast:', e.data)
         switch (e.data.type) {
             case 'self-display-name-changed':
-                Events.fire('self-display-name-changed', e.data.detail);
+                globalThis.Events.fire('self-display-name-changed', e.data.detail);
                 break;
         }
     }
@@ -36,7 +36,7 @@ class BrowserTabsConnector {
 
         if (peerIdsBrowserOld) peerIdsBrowser.push(...peerIdsBrowserOld);
         peerIdsBrowser.push(peerId);
-        peerIdsBrowser = peerIdsBrowser.filter(onlyUnique);
+        peerIdsBrowser = peerIdsBrowser.filter((peer, index, peers) => peers.indexOf(peer) === index);
         localStorage.setItem('peer_ids_browser', JSON.stringify(peerIdsBrowser));
 
         return peerIdsBrowser;
@@ -64,3 +64,5 @@ class BrowserTabsConnector {
         return peerIdsBrowser;
     }
 }
+
+globalThis.BrowserTabsConnector = BrowserTabsConnector;

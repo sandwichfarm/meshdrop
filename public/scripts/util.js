@@ -22,11 +22,10 @@ if (!navigator.clipboard) {
             range.selectNode(span);
             selection.addRange(range);
 
-            let success = false;
             try {
-                success = win.document.execCommand('copy');
+                win.document.execCommand('copy');
             } catch (err) {
-                return Promise.error();
+                return Promise.reject(err);
             }
 
             selection.removeAllRanges();
@@ -67,10 +66,10 @@ const zipper = (() => {
     let zipWriter;
     return {
         createNewZipWriter() {
-            zipWriter = new zip.ZipWriter(new zip.BlobWriter("application/zip"), { bufferedWrite: true, level: 0 });
+            zipWriter = new globalThis.zip.ZipWriter(new globalThis.zip.BlobWriter("application/zip"), { bufferedWrite: true, level: 0 });
         },
         addFile(file, options) {
-            return zipWriter.add(file.name, new zip.BlobReader(file), options);
+            return zipWriter.add(file.name, new globalThis.zip.BlobReader(file), options);
         },
         async getBlobURL() {
             if (zipWriter) {
@@ -93,10 +92,10 @@ const zipper = (() => {
             }
         },
         async getEntries(file, options) {
-            return await (new zip.ZipReader(new zip.BlobReader(file))).getEntries(options);
+            return await (new globalThis.zip.ZipReader(new globalThis.zip.BlobReader(file))).getEntries(options);
         },
         async getData(entry, options) {
-            return await entry.getData(new zip.BlobWriter(), options);
+            return await entry.getData(new globalThis.zip.BlobWriter(), options);
         },
     };
 
@@ -474,61 +473,50 @@ async function fileToBlob (file) {
     return new Blob([new Uint8Array(await file.arrayBuffer())], {type: file.type});
 }
 
-function getThumbnailAsDataUrl(file, width = undefined, height = undefined, quality = 0.7) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            if (file.type === "image/heif" || file.type === "image/heic") {
-                // hotfix: Converting heic images taken on iOS 18 crashes page. Waiting for PR #350
-                reject(new Error(`Hotfix: Converting of HEIC/HEIF images currently disabled.`));
-                return;
-                // // browsers can't show heic files --> convert to jpeg before creating thumbnail
-                // let blob = await fileToBlob(file);
-                // file = await heic2any({
-                //     blob,
-                //     toType: "image/jpeg",
-                //     quality: quality
-                // });
-            }
-
-            let imageUrl = URL.createObjectURL(file);
-
-            let image = new Image();
-            image.src = imageUrl;
-
-            await waitUntilImageIsLoaded(imageUrl);
-
-            let imageWidth = image.width;
-            let imageHeight = image.height;
-            let canvas = document.createElement('canvas');
-
-            // resize the canvas and draw the image data into it
-            if (width && height) {
-                canvas.width = width;
-                canvas.height = height;
-            }
-            else if (width) {
-                canvas.width = width;
-                canvas.height = Math.floor(imageHeight * width / imageWidth)
-            }
-            else if (height) {
-                canvas.width = Math.floor(imageWidth * height / imageHeight);
-                canvas.height = height;
-            }
-            else {
-                canvas.width = imageWidth;
-                canvas.height = imageHeight
-            }
-
-            let ctx = canvas.getContext("2d");
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-            let dataUrl = canvas.toDataURL("image/jpeg", quality);
-            resolve(dataUrl);
-        } catch (e) {
-            console.error(e);
-            reject(new Error(`Could not create an image thumbnail from type ${file.type}`));
+async function getThumbnailAsDataUrl(file, width = undefined, height = undefined, quality = 0.7) {
+    try {
+        if (file.type === "image/heif" || file.type === "image/heic") {
+            // hotfix: Converting heic images taken on iOS 18 crashes page. Waiting for PR #350
+            throw new Error(`Hotfix: Converting of HEIC/HEIF images currently disabled.`);
         }
-    })
+
+        let imageUrl = URL.createObjectURL(file);
+
+        let image = new Image();
+        image.src = imageUrl;
+
+        await waitUntilImageIsLoaded(imageUrl);
+
+        let imageWidth = image.width;
+        let imageHeight = image.height;
+        let canvas = document.createElement('canvas');
+
+        // resize the canvas and draw the image data into it
+        if (width && height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+        else if (width) {
+            canvas.width = width;
+            canvas.height = Math.floor(imageHeight * width / imageWidth)
+        }
+        else if (height) {
+            canvas.width = Math.floor(imageWidth * height / imageHeight);
+            canvas.height = height;
+        }
+        else {
+            canvas.width = imageWidth;
+            canvas.height = imageHeight
+        }
+
+        let ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        return canvas.toDataURL("image/jpeg", quality);
+    } catch (e) {
+        console.error(e);
+        throw new Error(`Could not create an image thumbnail from type ${file.type}`);
+    }
 }
 
 // Resolves returned promise when image is loaded and throws error if image cannot be shown
@@ -594,7 +582,22 @@ function isUrlValid(url) {
         new URL(url);
         return true;
     }
-    catch (e) {
+    catch {
         return false;
     }
 }
+
+Object.assign(globalThis, {
+    changeFavicon,
+    cyrb53,
+    arrayBufferToBase64,
+    base64ToArrayBuffer,
+    decodeBase64Files,
+    decodeBase64Text,
+    fileToBlob,
+    getUrlWithoutArguments,
+    getThumbnailAsDataUrl,
+    isUrlValid,
+    onlyUnique,
+    zipper
+});
