@@ -47,7 +47,7 @@ export default class PairDropWsServer {
         // Try to parse message
         try {
             message = JSON.parse(message);
-        } catch (e) {
+        } catch {
             console.warn("WS: Received JSON is malformed");
             return;
         }
@@ -126,7 +126,7 @@ export default class PairDropWsServer {
                     this._signalAndRelay(sender, message);
                 }
                 else {
-                    console.log("Websocket fallback is not activated on this instance.")
+                    process.stderr.write("Websocket fallback is not activated on this instance.\n")
                 }
         }
     }
@@ -440,7 +440,6 @@ export default class PairDropWsServer {
     _leaveSecretRoom(peer, roomSecret, disconnect = false) {
         this._leaveRoom(peer, 'secret', roomSecret, disconnect)
 
-        //remove secret from peer
         peer.removeRoomSecret(roomSecret);
     }
 
@@ -456,7 +455,6 @@ export default class PairDropWsServer {
         const roomKey = this._roomStorageKey(roomType, roomId);
         if (!this._rooms[roomKey] || !this._rooms[roomKey][peer.id]) return;
 
-        // remove peer from room
         delete this._rooms[roomKey][peer.id];
         if (!peer.isRemoteFederation) {
             this._conf?.federationClient?.localPeerLeft(roomType, roomId, peer.id);
