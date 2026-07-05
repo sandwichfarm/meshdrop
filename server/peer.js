@@ -56,7 +56,6 @@ export default class Peer {
             this.ip = request.socket.remoteAddress ?? '';
         }
 
-        // remove the prefix used for IPv4-translated addresses
         if (this.ip.substring(0,7) === "::ffff:") {
             this.ip = this.ip.substring(7);
         }
@@ -68,18 +67,18 @@ export default class Peer {
         }
 
         if (this.conf.debugMode) {
-            console.debug("\n");
-            console.debug("----DEBUGGING-PEER-IP-START----");
-            console.debug("remoteAddress:", request.connection.remoteAddress);
-            console.debug("x-forwarded-for:", request.headers['x-forwarded-for']);
-            console.debug("cf-connecting-ip:", request.headers['cf-connecting-ip']);
+            this._writeDebug("");
+            this._writeDebug("----DEBUGGING-PEER-IP-START----");
+            this._writeDebug("remoteAddress:", request.connection.remoteAddress);
+            this._writeDebug("x-forwarded-for:", request.headers['x-forwarded-for']);
+            this._writeDebug("cf-connecting-ip:", request.headers['cf-connecting-ip']);
             if (ipv6_was_localized) {
-                console.debug("IPv6 client IP was localized to", this.conf.ipv6Localize, this.conf.ipv6Localize > 1 ? "segments" : "segment");
+                this._writeDebug("IPv6 client IP was localized to", this.conf.ipv6Localize, this.conf.ipv6Localize > 1 ? "segments" : "segment");
             }
-            console.debug("MeshDrop uses:", this.ip);
-            console.debug("IP is private:", this.ipIsPrivate(this.ip));
-            console.debug("if IP is private, '127.0.0.1' is used instead");
-            console.debug("----DEBUGGING-PEER-IP-END----");
+            this._writeDebug("MeshDrop uses:", this.ip);
+            this._writeDebug("IP is private:", this.ipIsPrivate(this.ip));
+            this._writeDebug("if IP is private, '127.0.0.1' is used instead");
+            this._writeDebug("----DEBUGGING-PEER-IP-END----");
         }
 
         // IPv4 and IPv6 use different values to refer to localhost
@@ -87,6 +86,10 @@ export default class Peer {
         if (this.ip === '::1' || this.ipIsPrivate(this.ip)) {
             this.ip = '127.0.0.1';
         }
+    }
+
+    _writeDebug(...parts) {
+        process.stdout.write(`${parts.join(" ")}\n`);
     }
 
     ipIsPrivate(ip) {
@@ -130,7 +133,7 @@ export default class Peer {
     }
 
     _setPeerId(request) {
-        const searchParams = new URL(request.url, "http://server").searchParams;
+        const searchParams = this._requestSearchParams(request);
         let peerId = searchParams.get('peer_id');
         let peerIdHash = searchParams.get('peer_id_hash');
         if (peerId && Peer.isValidUuid(peerId) && this.isPeerIdHashValid(peerId, peerIdHash)) {
@@ -141,8 +144,13 @@ export default class Peer {
     }
 
     _setRtcSupported(request) {
-        const searchParams = new URL(request.url, "http://server").searchParams;
+        const searchParams = this._requestSearchParams(request);
         this.rtcSupported = searchParams.get('webrtc_supported') === "true";
+    }
+
+    _requestSearchParams(request) {
+        const query = (request.url || "").split("?", 2)[1]?.split("#", 1)[0] || "";
+        return new URLSearchParams(query);
     }
 
     _setNostrIdentity(request) {
