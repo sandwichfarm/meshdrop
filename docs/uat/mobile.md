@@ -2,7 +2,8 @@
 
 Use this runbook for the dependency-free mobile source artifacts built by `npm run build:ios` and
 `npm run build:android`, plus the native wrapper source artifacts built by `npm run build:ios:native-source` and
-`npm run build:android:native-source`, plus the Android debug APK artifact built by `npm run build:android:apk`.
+`npm run build:android:native-source`, the Android debug APK artifact built by `npm run build:android:apk`, and the
+UAT-signed Android release APK artifact built by `npm run build:android:release-apk`.
 
 ## Build
 
@@ -11,11 +12,13 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 3. Run `npm run build:ios:native-source -- --version <version>`.
 4. Run `npm run build:android:native-source -- --version <version>`.
 5. Run `npm run build:android:apk -- --version <version>`.
-6. Confirm `dist/meshdrop-ios-<version>.tar.gz` and `dist/meshdrop-android-<version>.tar.gz` exist.
-7. Confirm `dist/meshdrop-ios-native-source-<version>.tar.gz` and
+6. Run `npm run build:android:release-apk -- --version <version>`.
+7. Confirm `dist/meshdrop-ios-<version>.tar.gz` and `dist/meshdrop-android-<version>.tar.gz` exist.
+8. Confirm `dist/meshdrop-ios-native-source-<version>.tar.gz` and
    `dist/meshdrop-android-native-source-<version>.tar.gz` exist.
-8. Confirm `dist/meshdrop-android-apk-<version>.tar.gz` exists.
-9. Confirm each archive contains `app/index.html`, `meshdrop-target.json`, a target README, and `UAT-MOBILE.md`.
+9. Confirm `dist/meshdrop-android-apk-<version>.tar.gz` exists.
+10. Confirm `dist/meshdrop-android-release-apk-<version>.tar.gz` exists.
+11. Confirm each archive contains `app/index.html`, `meshdrop-target.json`, a target README, and `UAT-MOBILE.md`.
 
 ## Artifact Acceptance
 
@@ -25,14 +28,14 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 4. Confirm `meshdrop-target.json` reports `nativeShellBuilt` as `false`.
 5. For source artifacts, confirm `nativeShellSourceBuilt` is `false`.
 6. For native-source artifacts, confirm `nativeShellSourceBuilt` is `true` and `nativeSource.sourceRoot` is present.
-7. For Android APK artifacts, confirm `nativeShellBuilt` is `true`, `nativeShellSourceBuilt` is `true`,
-   and `nativePackage.packageType` is `debug-apk`.
+7. For Android APK artifacts, confirm `nativeShellBuilt` is `true`, `nativeShellSourceBuilt` is `true`, and
+   `nativePackage.packageType` is `debug-apk` or `release-apk`.
 8. Confirm backend-only transports are not claimed: `localDiscovery`, `pollen`, and `fips` are `false`.
 9. Confirm `bluetooth` is `false` until a real mobile Bluetooth transport is implemented and tested.
 10. Confirm browser-backed source artifacts report `webrtc`, `nostr`, `blossom`, and `hashtree` as `true`.
 11. Confirm native-source artifacts do not claim unproven native transfer paths: `webrtc` and `nostr` are `false`.
 12. Confirm Android APK artifacts report `webrtc` and `nostr` as `true` only after `npm run test:android-webview-transfer`
-    passes for the installed debug APK.
+    passes for the installed debug APK path.
 13. Confirm Android APK artifacts do not list Android share-sheet `ACTION_SEND` as remaining proof after
     `npm run test:android-share-file` passes.
 14. Confirm Android APK artifacts still list native file picker UI UAT as remaining proof until picker selection is
@@ -55,6 +58,21 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 3. Confirm the Android APK artifact contains `apk/output-metadata.json`.
 4. Confirm `meshdrop-target.json` reports `nativePackage.path` as `apk/meshdrop-android-debug.apk`.
 5. Confirm the debug APK is not treated as release signing proof: `nativePackage.releaseSigned` is `false`.
+
+## Android Release APK Acceptance
+
+1. Confirm the Android release APK artifact contains `apk/meshdrop-android-release.apk`.
+2. Confirm the Android release APK artifact contains `apk/build-proof.json` with `gradleTask` set to
+   `assembleRelease`.
+3. Confirm `apk/build-proof.json` reports `releaseSigned` as `true`, `productionSigning` as `false`, and
+   `signed` as `uat-release`.
+4. Confirm `apk/build-proof.json` contains a SHA-256 digest for the APK and an `apksigner verify --print-certs`
+   signature proof.
+5. Confirm `meshdrop-target.json` reports `nativePackage.path` as `apk/meshdrop-android-release.apk`.
+6. Confirm the release APK artifact does not list signed Android release APK proof as remaining Android proof.
+7. Confirm the release APK artifact still lists physical Android device install UAT, native file picker UI UAT, and
+   Bluetooth negotiation as remaining proof.
+8. Do not treat the generated UAT keystore as Play Store upload signing or AAB proof.
 
 ## Android Emulator Install Acceptance
 
@@ -120,8 +138,10 @@ npm run build:android -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-sm
 npm run build:ios:native-source -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android:native-source -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android:apk -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
+npm run build:android:release-apk -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 node --test test/mobile-package.test.js
 npm run test:android-apk
+npm run test:android-release-apk
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-apk-install
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-capabilities
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-transfer
@@ -130,14 +150,15 @@ npm run test:target-artifacts
 ```
 
 This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
-an Android debug APK build, Android emulator install/launch proof, Android WebView runtime capability evidence, Android
-WebView-to-Chromium Nostr WebRTC transfer through a local fake relay, Android `ACTION_SEND` file share delivery through
-the same WebRTC send path, and real Nostr WebRTC transfers between two browser peers served from the generated iOS and
-Android source artifacts.
+an Android debug APK build, a UAT-signed Android release APK build with `apksigner` proof, Android emulator
+install/launch proof, Android WebView runtime capability evidence, Android WebView-to-Chromium Nostr WebRTC transfer
+through a local fake relay, Android `ACTION_SEND` file share delivery through the same WebRTC send path, and real Nostr
+WebRTC transfers between two browser peers served from the generated iOS and Android source artifacts.
 
 ## Not Proven
 
-- These artifacts do not prove signed app-store packages, release APKs, AABs, or IPAs.
+- The Android release APK artifact proves a release APK signed with a generated UAT keystore.
+- These artifacts do not prove app-store packages, Play Store upload signing, AABs, or IPAs.
 - The Android debug APK artifact alone does not prove install UAT; `npm run test:android-apk-install` provides the
   emulator install proof.
 - Android WebView transfer proof does not prove physical Android device install UAT.

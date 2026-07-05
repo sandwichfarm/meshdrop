@@ -167,6 +167,10 @@ for (const target of ["ios", "android"]) {
                 assert.match(networkConfig, /cleartextTrafficPermitted="true"/);
                 assert.match(networkConfig, /127\.0\.0\.1/);
                 assert.match(networkConfig, /localhost/);
+                const gradleBuild = await readTarEntry(result.artifactPath, `${nativeRoot}/app/build.gradle`);
+                assert.match(gradleBuild, /MESHDROP_ANDROID_RELEASE_STORE_FILE/);
+                assert.match(gradleBuild, /signingConfigs/);
+                assert.match(gradleBuild, /buildTypes/);
             }
 
             const readme = await readTarEntry(result.artifactPath, `${prefix}/README-${target.toUpperCase()}.md`);
@@ -184,21 +188,32 @@ test("mobile package builder requires an explicit supported target", () => {
         outDir: path.resolve(new URL("..", import.meta.url).pathname, "dist"),
         target: "ios",
         nativeSource: false,
-        androidApk: false
+        androidApk: false,
+        androidReleaseApk: false
     });
     assert.deepEqual(parseArgs(["--target", "android", "--native-source"]), {
         version: packageJson.version,
         outDir: path.resolve(new URL("..", import.meta.url).pathname, "dist"),
         target: "android",
         nativeSource: true,
-        androidApk: false
+        androidApk: false,
+        androidReleaseApk: false
     });
     assert.deepEqual(parseArgs(["--target", "android", "--android-apk"]), {
         version: packageJson.version,
         outDir: path.resolve(new URL("..", import.meta.url).pathname, "dist"),
         target: "android",
         nativeSource: false,
-        androidApk: true
+        androidApk: true,
+        androidReleaseApk: false
+    });
+    assert.deepEqual(parseArgs(["--target", "android", "--android-release-apk"]), {
+        version: packageJson.version,
+        outDir: path.resolve(new URL("..", import.meta.url).pathname, "dist"),
+        target: "android",
+        nativeSource: false,
+        androidApk: false,
+        androidReleaseApk: true
     });
     assert.rejects(() => buildMobilePackage({target: "desktop"}), /ios or android/);
 });

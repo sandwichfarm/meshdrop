@@ -93,6 +93,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /npm run build:ios:native-source/);
     assert.match(mobile, /npm run build:android:native-source/);
     assert.match(mobile, /npm run build:android:apk/);
+    assert.match(mobile, /npm run build:android:release-apk/);
     assert.match(mobile, /target` as `ios` or `android`/);
     assert.match(mobile, /runtime\.platform` as `mobile`/);
     assert.match(mobile, /nativeShellBuilt` as `false`/);
@@ -102,9 +103,15 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /Android APK artifacts report `webrtc` and `nostr` as `true`/);
     assert.match(mobile, /meshdrop-android-debug\.apk/);
     assert.match(mobile, /gradleTask` set to `assembleDebug`/);
+    assert.match(mobile, /meshdrop-android-release\.apk/);
+    assert.match(mobile, /gradleTask` set to\s+`assembleRelease`/);
+    assert.match(mobile, /`apksigner verify --print-certs`/);
+    assert.match(mobile, /generated UAT keystore/);
+    assert.match(mobile, /Play Store upload signing/);
     assert.match(mobile, /globalThis\.__meshdropTargetManifest/);
     assert.match(mobile, /bluetooth` is `false`/);
     assert.match(mobile, /npm run test:android-apk/);
+    assert.match(mobile, /npm run test:android-release-apk/);
     assert.match(mobile, /npm run test:android-apk-install/);
     assert.match(mobile, /Proof android-apk-emulator-install/);
     assert.match(mobile, /farm\.sandwich\.meshdrop\/\.MainActivity/);
@@ -122,6 +129,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /meshdrop-android-share-proof\.txt/);
     assert.match(mobile, /npm run test:target-artifacts/);
     assert.match(mobile, /Android WebView transfer proof does not prove physical Android device install UAT/);
+    assert.match(mobile, /Android release APK artifact proves a release APK signed with a generated UAT keystore/);
     assert.match(mobile, /native mobile WebRTC transfer UAT/);
     assert.match(mobile, /physical Android device install UAT/);
     assert.match(mobile, /native iOS file-picker or share-sheet integration/);
@@ -137,6 +145,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /release-verify\.yml/);
     assert.match(releaseTargets, /authenticated readback runs with GitHub Actions package/);
     assert.match(releaseTargets, /Android debug APK tarball/);
+    assert.match(releaseTargets, /Android release APK tarball/);
     assert.match(releaseTargets, /permissions and anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /npm run verify:ghcr-anonymous -- v0\.x\.y/);
@@ -153,7 +162,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /meshdrop-android-apk-0\.1\.4\.tar\.gz/);
     assert.match(releaseTargets, /v0\.1\.4-standalone/);
     assert.match(releaseTargets, /Docker smoke passed for `ghcr\.io\/sandwichfarm\/meshdrop:v0\.1\.4-standalone`/);
-    assert.match(releaseTargets, /Start9 source tarball/);
+    assert.match(releaseTargets, /Start9 source\s+tarball/);
     assert.match(releaseTargets, /Umbrel package tarball/);
     assert.match(releaseTargets, /`npm run verify:ghcr-anonymous -- v0\.1\.4` step failed with GHCR/);
     assert.match(releaseTargets, /Not proven/);
@@ -203,10 +212,11 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke and native-source wrapper artifact exist; app package\/device UAT open \|/);
     assert.match(
         targetStatus,
-        /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, emulator install proof, WebView capability proof, WebView transfer proof, and share-intent file proof exist; physical-device and picker UI UAT open \|/
+        /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability proof, WebView transfer proof, and share-intent file proof exist; physical-device and picker UI UAT open \|/
     );
     assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `node --test test\/mobile-package\.test\.js`/);
     assert.match(targetStatus, /`npm run build:android`; `npm run build:android:native-source`; `npm run build:android:apk`/);
+    assert.match(targetStatus, /`npm run build:android:release-apk`/);
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-apk-install`/);
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-webview-capabilities`/);
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-webview-transfer`/);
@@ -215,13 +225,14 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /`npm run build:android:native-source`/);
     assert.match(targetStatus, /Native iOS app package/);
     assert.match(targetStatus, /Gradle-built debug APK artifact/);
+    assert.match(targetStatus, /UAT-signed release APK verified by `apksigner`/);
     assert.match(targetStatus, /Android emulator install\/launch of `farm\.sandwich\.meshdrop\/\.MainActivity`/);
     assert.match(targetStatus, /Android WebView `RTCPeerConnection`\/`WebSocket`\/`RTCDataChannel` capability evidence/);
     assert.match(targetStatus, /Android WebView sent `meshdrop-android-webview-proof\.txt`/);
     assert.match(targetStatus, /Android received an `ACTION_SEND` stream for `meshdrop-android-share-proof\.txt`/);
     assert.match(targetStatus, /Physical Android device install UAT/);
     assert.match(targetStatus, /Android native file picker UI UAT/);
+    assert.doesNotMatch(targetStatus, /signed Android release APK or AAB package/);
     assert.doesNotMatch(targetStatus, /native Android WebView file transfer UAT/);
     assert.doesNotMatch(targetStatus, /mobile file-picker\/share-sheet integration, Bluetooth/);
-    assert.match(targetStatus, /signed Android release APK or AAB package/);
 });
