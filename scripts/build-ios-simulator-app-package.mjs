@@ -79,8 +79,7 @@ export async function buildIosSimulatorAppPackage(options = {}) {
                 "App Group entitlement provisioning",
                 "iOS device file-picker UAT",
                 "iOS share-sheet device UAT",
-                "native iOS WebRTC transfer UAT",
-                "Bluetooth transport negotiation"
+                "native iOS WebRTC transfer UAT"
             ]
         }, null, 2)}\n`);
         await fs.copyFile(path.join(repoRoot, "docs", "uat", "mobile.md"), path.join(stageDir, "UAT-MOBILE.md"));

@@ -26,6 +26,11 @@ const expectedNativeSourceRemainingProof = [
     "mobile file picker and share sheet",
     "Bluetooth transport negotiation"
 ];
+const expectedIosNativeSourceRemainingProof = [
+    "native mobile app package build",
+    "native mobile WebRTC transfer UAT",
+    "mobile file picker and share sheet"
+];
 
 for (const target of ["ios", "android"]) {
     test(`${target} package builder creates source artifact with target metadata`, async () => {
@@ -140,7 +145,23 @@ for (const target of ["ios", "android"]) {
             assert.equal(manifest.transports.fips, false);
             assert.equal(manifest.transports.bluetooth, false);
             assert.equal(manifest.nativeSource.sourceRoot, `native/${target}`);
-            assert.deepEqual(manifest.remainingProof, expectedNativeSourceRemainingProof);
+            assert.deepEqual(
+                manifest.remainingProof,
+                target === "ios" ? expectedIosNativeSourceRemainingProof : expectedNativeSourceRemainingProof
+            );
+            if (target === "ios") {
+                assert.equal(manifest.capabilities.transports.bluetooth.supported, false);
+                assert.equal(manifest.capabilities.transports.bluetooth.transferSupported, false);
+                assert.equal(manifest.capabilities.transports.bluetooth.apiAvailable, false);
+                assert.equal(manifest.capabilities.transports.bluetooth.nativeBridgeAvailable, false);
+                assert.equal(
+                    manifest.capabilities.transports.bluetooth.unavailableReason,
+                    "bluetooth-transfer-not-implemented"
+                );
+            }
+            else {
+                assert.equal(manifest.capabilities, undefined);
+            }
 
             const wrapperSource = await readTarEntry(
                 result.artifactPath,
