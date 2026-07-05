@@ -139,7 +139,7 @@ conf.localhostOnly = process.argv.includes('--localhost-only');
 
 if (conf.ipv6Localize) {
     if (!(0 < conf.ipv6Localize && conf.ipv6Localize < 8)) {
-        console.error("ipv6Localize must be an integer between 1 and 7");
+        writeStderr("ipv6Localize must be an integer between 1 and 7");
         process.exit(1);
     }
 
@@ -160,7 +160,7 @@ if (conf.signalingServer) {
     const containsProtocol = conf.signalingServer.includes("://")
     const endsWithSlash = conf.signalingServer.endsWith("/")
     if (!isValidUrl || containsProtocol) {
-        console.error("SIGNALING_SERVER must be a valid url without the protocol prefix.\n" +
+        writeStderr("SIGNALING_SERVER must be a valid url without the protocol prefix.\n" +
             "Examples of valid values: `meshdrop.example`, `meshdrop.example:3000`, `example.com/meshdrop`");
         process.exit(1);
     }
@@ -170,7 +170,7 @@ if (conf.signalingServer) {
     }
 
     if (process.env.RTC_CONFIG || conf.wsFallback || conf.ipv6Localize) {
-        console.error("SIGNALING_SERVER cannot be used alongside WS_FALLBACK, RTC_CONFIG or IPV6_LOCALIZE as these " +
+        writeStderr("SIGNALING_SERVER cannot be used alongside WS_FALLBACK, RTC_CONFIG or IPV6_LOCALIZE as these " +
             "configurations are specified by the signaling server.\n" +
             "To use this instance as the signaling server do not set SIGNALING_SERVER");
         process.exit(1);
