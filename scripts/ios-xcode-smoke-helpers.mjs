@@ -52,6 +52,23 @@ export async function runIosSimulatorBuild({projectPath, derivedDataPath, env = 
     await run("xcodebuild", args, {env});
 }
 
+export async function runIosDeviceArchiveBuild({projectPath, archivePath, env = process.env}) {
+    const args = [
+        "-project", projectPath,
+        "-scheme", "MeshDrop",
+        "-configuration", "Release",
+        "-sdk", "iphoneos",
+        "-destination", "generic/platform=iOS",
+        "-archivePath", archivePath,
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "CODE_SIGN_IDENTITY=",
+        "archive"
+    ];
+
+    await run("xcodebuild", args, {env});
+}
+
 export function iosSimulatorAppPath(derivedDataPath) {
     return path.join(derivedDataPath, "Build", "Products", "Debug-iphonesimulator", "MeshDrop.app");
 }

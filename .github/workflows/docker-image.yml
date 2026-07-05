@@ -263,7 +263,7 @@ jobs:
             | grep -E 'native/android/app/src/main/(AndroidManifest.xml|assets/meshdrop/index.html|java/farm/sandwich/meshdrop/MainActivity.java)$'
 
   ios-xcode-build:
-    name: iOS Xcode native-source and simulator app smoke
+    name: iOS Xcode native-source, simulator app, and device archive smoke
     runs-on: macos-15
     needs: [ci-change-scope, unit]
     if: needs.ci-change-scope.outputs.runtime == 'true'
@@ -287,6 +287,9 @@ jobs:
 
       - name: Build unsigned iOS Simulator app package
         run: npm run test:ios-simulator-app
+
+      - name: Build unsigned iOS device archive package
+        run: npm run test:ios-device-archive
 
   android-apk-artifact:
     name: Android APK artifact smoke
