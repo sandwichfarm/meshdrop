@@ -105,12 +105,16 @@ for (const target of ["ios", "android"]) {
             assert(entries.includes(`${nativeRoot}/README.md`));
 
             if (target === "ios") {
+                assert(entries.includes(`${nativeRoot}/MeshDrop.xcodeproj/project.pbxproj`));
+                assert(entries.includes(`${nativeRoot}/MeshDrop.xcodeproj/xcshareddata/xcschemes/MeshDrop.xcscheme`));
                 assert(entries.includes(`${nativeRoot}/MeshDrop/MeshDropApp.swift`));
                 assert(entries.includes(`${nativeRoot}/MeshDrop/MeshDropViewController.swift`));
                 assert(entries.includes(`${nativeRoot}/MeshDrop/MeshDropShareInbox.swift`));
+                assert(entries.includes(`${nativeRoot}/MeshDrop/MeshDrop.entitlements`));
                 assert(entries.includes(`${nativeRoot}/MeshDrop/Resources/meshdrop/index.html`));
                 assert(entries.includes(`${nativeRoot}/MeshDropShareExtension/ShareViewController.swift`));
                 assert(entries.includes(`${nativeRoot}/MeshDropShareExtension/Info.plist`));
+                assert(entries.includes(`${nativeRoot}/MeshDropShareExtension/MeshDropShareExtension.entitlements`));
             }
             else {
                 assert(entries.includes(`${nativeRoot}/settings.gradle`));
@@ -165,6 +169,22 @@ for (const target of ["ios", "android"]) {
                     result.artifactPath,
                     `${nativeRoot}/MeshDropShareExtension/Info.plist`
                 );
+                const xcodeProject = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/MeshDrop.xcodeproj/project.pbxproj`
+                );
+                const xcodeScheme = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/MeshDrop.xcodeproj/xcshareddata/xcschemes/MeshDrop.xcscheme`
+                );
+                const appEntitlements = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/MeshDrop/MeshDrop.entitlements`
+                );
+                const shareEntitlements = await readTarEntry(
+                    result.artifactPath,
+                    `${nativeRoot}/MeshDropShareExtension/MeshDropShareExtension.entitlements`
+                );
                 assert.match(shareInboxSource, /containerURL\(forSecurityApplicationGroupIdentifier:/);
                 assert.match(shareInboxSource, /share-inbox\.json/);
                 assert.match(shareExtensionSource, /SLComposeServiceViewController/);
@@ -176,6 +196,20 @@ for (const target of ["ios", "android"]) {
                 assert.match(shareExtensionPlist, /com\.apple\.share-services/);
                 assert.match(shareExtensionPlist, /NSExtensionActivationRule/);
                 assert.match(shareExtensionPlist, /NSExtensionActivationSupportsFileWithMaxCount/);
+                assert.match(xcodeProject, /PBXNativeTarget/);
+                assert.match(xcodeProject, /com\.apple\.product-type\.application/);
+                assert.match(xcodeProject, /com\.apple\.product-type\.app-extension/);
+                assert.match(xcodeProject, /CODE_SIGN_ENTITLEMENTS = MeshDrop\/MeshDrop\.entitlements/);
+                assert.match(xcodeProject, /CODE_SIGN_ENTITLEMENTS = MeshDropShareExtension\/MeshDropShareExtension\.entitlements/);
+                assert.match(xcodeProject, /INFOPLIST_FILE = MeshDrop\/Info\.plist/);
+                assert.match(xcodeProject, /INFOPLIST_FILE = MeshDropShareExtension\/Info\.plist/);
+                assert.match(xcodeProject, /MARKETING_VERSION = 0\.0\.0-test/);
+                assert.match(xcodeScheme, /MeshDrop\.app/);
+                assert.match(xcodeScheme, /MeshDropShareExtension\.appex/);
+                assert.match(appEntitlements, /com\.apple\.security\.application-groups/);
+                assert.match(appEntitlements, /group\.farm\.sandwich\.meshdrop/);
+                assert.match(shareEntitlements, /com\.apple\.security\.application-groups/);
+                assert.match(shareEntitlements, /group\.farm\.sandwich\.meshdrop/);
             }
             else {
                 const androidManifest = await readTarEntry(
