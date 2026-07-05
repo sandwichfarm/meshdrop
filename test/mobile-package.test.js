@@ -156,13 +156,22 @@ test("mobile package builder requires an explicit supported target", () => {
         version: packageJson.version,
         outDir: path.resolve(new URL("..", import.meta.url).pathname, "dist"),
         target: "ios",
-        nativeSource: false
+        nativeSource: false,
+        androidApk: false
     });
     assert.deepEqual(parseArgs(["--target", "android", "--native-source"]), {
         version: packageJson.version,
         outDir: path.resolve(new URL("..", import.meta.url).pathname, "dist"),
         target: "android",
-        nativeSource: true
+        nativeSource: true,
+        androidApk: false
+    });
+    assert.deepEqual(parseArgs(["--target", "android", "--android-apk"]), {
+        version: packageJson.version,
+        outDir: path.resolve(new URL("..", import.meta.url).pathname, "dist"),
+        target: "android",
+        nativeSource: false,
+        androidApk: true
     });
     assert.rejects(() => buildMobilePackage({target: "desktop"}), /ios or android/);
 });

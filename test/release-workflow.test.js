@@ -41,6 +41,7 @@ test("release workflow publishes GHCR images for alpha target packages", () => {
     assert.match(releaseWorkflow, /npm run build:ios:native-source -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npm run build:android -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /npm run build:android:native-source -- --version "\$\{version\}" --out-dir dist/);
+    assert.match(releaseWorkflow, /npm run build:android:apk -- --version "\$\{version\}" --out-dir dist/);
     assert.match(releaseWorkflow, /Install desktop native shell dependencies/);
     assert.match(releaseWorkflow, /libgtk-4-dev libwebkitgtk-6\.0-dev/);
 });
@@ -77,6 +78,7 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /meshdrop-ios-native-source-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-android-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-android-native-source-\$\{version\}\.tar\.gz/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-android-apk-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /docker buildx imagetools inspect "\$\{image\}"/);
     assert.match(releaseVerifyWorkflow, /Verify anonymous GHCR manifests/);
     assert.match(releaseVerifyWorkflow, /image_base="ghcr\.io\/\$\{GITHUB_REPOSITORY,,\}"/);
