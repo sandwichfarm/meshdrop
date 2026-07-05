@@ -15,15 +15,18 @@ Files must transfer between peers reliably over every negotiated transport that 
 - ✓ Nostr WebRTC discovery uses followed npub contacts instead of static rooms.
 - ✓ FIPS and Pollen federation discovery derive their network from npub contacts instead of static rooms.
 - ✓ Browser e2e smoke proves local, FIPS, Pollen, Nostr, and federated FIPS transfer paths in the current Docker/local test harness.
+- ✓ Claimed Docker, SPA, Desktop Chromium, Android WebView, and target-artifact WebRTC paths have deterministic transfer proof with path-specific payloads.
+- ✓ Runtime capability negotiation gates GUI controls by target/runtime capability instead of hard-coded transport assumptions.
+- ✓ Docker shared-instance admin controls are gated by configured admin npub and backend-verified signed Nostr events.
+- ✓ Alpha release automation builds/readbacks target artifacts and GHCR images with authenticated GitHub Actions package access.
 
 ### Active
 
-- [ ] Docker shared-instance admin npub is configured in compose/runtime config.
-- [ ] Admin-only GUI controls are visible only for the configured admin identity.
-- [ ] Backend validates admin setting changes with signed Nostr events from the configured admin npub.
-- [ ] FIPS/backend settings can be managed through the signed admin path.
-- [ ] CI/CT/CD workflows exercise the right gates without redundant release reruns.
-- [ ] Multi-platform build/run/UAT paths are documented and verified.
+- [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
+- [ ] Cut and verify a new alpha release from current `master` so latest Android, Desktop Chromium bundled installer, iOS Simulator/device app, and Android release APK artifacts are present in the published release.
+- [ ] Run physical Android hardware UAT with `npm run test:android-physical-device`.
+- [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services.
+- [ ] Obtain signed/device-installable iOS package proof and iOS device file-picker/share-sheet/native transfer UAT.
 
 ### Out of Scope
 
@@ -53,7 +56,7 @@ Files must transfer between peers reliably over every negotiated transport that 
 |----------|-----------|---------|
 | Npub-network discovery replaces FIPS/Pollen room envs | Static rooms do not represent the user’s intended peer network | ✓ Good |
 | Runtime transfer proof is required for WebRTC claims | Prior “fixed” claims failed without transfer proof | ✓ Good |
-| Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | — Pending |
+| Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | ✓ Good |
 
 ---
-*Last updated: 2026-07-04 after initializing GSD project state from the goal objective.*
+*Last updated: 2026-07-06 after auditing merged PRs #1-#105 and current release/GHCR evidence.*
