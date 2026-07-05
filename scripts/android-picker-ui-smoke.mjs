@@ -84,8 +84,20 @@ async function seedDownloadFile(device) {
     await fs.writeFile(localFile, proofText);
     for (const directory of ["/sdcard", "/sdcard/Download", "/sdcard/Documents"]) {
         await run(device.adb, ["-s", device.serial, "shell", "mkdir", "-p", directory]);
-        await run(device.adb, ["-s", device.serial, "push", localFile, `${directory}/${proofFileName}`]);
+        const remoteFile = `${directory}/${proofFileName}`;
+        await run(device.adb, ["-s", device.serial, "push", localFile, remoteFile]);
+        await indexMediaFile(device.adb, device.serial, remoteFile);
     }
+}
+
+async function indexMediaFile(adb, serial, remoteFile) {
+    await run(adb, ["-s", serial, "shell", "cmd", "media", "scan-file", remoteFile], {timeoutMs: 10000})
+        .catch(() => run(adb, [
+            "-s", serial, "shell", "am", "broadcast",
+            "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+            "-d", `file://${remoteFile}`
+        ], {timeoutMs: 10000}))
+        .catch(() => {});
 }
 
 async function bringMeshDropToForeground(adb, serial) {
@@ -159,21 +171,14 @@ async function waitForTopActivity(adb, serial, pattern) {
 }
 
 async function tapPickerFile(adb, serial, fileName) {
-    for (const label of [fileName, "Download", "Downloads"]) {
-        const tapped = await tapUiNode(adb, serial, label);
-        if (!tapped) continue;
-        await sleep(1000);
-        const activity = await topActivityLine(adb, serial);
-        if (activity.includes(androidMainActivity)) return;
+    for (let i = 0; i < 8; i += 1) {
+        if (await tapVisiblePickerFile(adb, serial, fileName)) return;
+        await sleep(750);
     }
 
     await openDownloadsRoot(adb, serial);
-    for (let i = 0; i < 10; i += 1) {
-        if (await tapUiNode(adb, serial, fileName)) {
-            await sleep(1000);
-            const activity = await topActivityLine(adb, serial);
-            if (activity.includes(androidMainActivity)) return;
-        }
+    for (let i = 0; i < 12; i += 1) {
+        if (await tapVisiblePickerFile(adb, serial, fileName)) return;
         await scrollPicker(adb, serial);
         await sleep(500);
     }
@@ -182,13 +187,37 @@ async function tapPickerFile(adb, serial, fileName) {
 }
 
 async function openDownloadsRoot(adb, serial) {
-    for (const label of ["Show roots", "Open navigation drawer", "More options"]) {
-        if (await tapUiNode(adb, serial, label)) {
-            await sleep(1000);
-            break;
+    for (const rootLabel of ["Downloads", "Documents", "sdk_gphone64_x86_64"]) {
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            await openPickerDrawer(adb, serial);
+            if (await tapUiNode(adb, serial, rootLabel)) {
+                await sleep(1500);
+                if (await pickerDrawerClosed(adb, serial)) return;
+            }
+            await sleep(750);
         }
     }
-    await tapUiNode(adb, serial, "Downloads");
+}
+
+async function tapVisiblePickerFile(adb, serial, fileName) {
+    if (!await tapUiNode(adb, serial, fileName)) return false;
+    await sleep(1000);
+    const activity = await topActivityLine(adb, serial);
+    return activity.includes(androidMainActivity);
+}
+
+async function openPickerDrawer(adb, serial) {
+    for (const label of ["Show roots", "Open navigation drawer"]) {
+        if (await tapUiNode(adb, serial, label)) {
+            await sleep(750);
+            return;
+        }
+    }
+}
+
+async function pickerDrawerClosed(adb, serial) {
+    const xml = await dumpUiHierarchy(adb, serial).catch(() => "");
+    return !xml.includes("com.google.android.documentsui:id/drawer_roots");
 }
 
 async function tapUiNode(adb, serial, textOrDescription) {
