@@ -222,8 +222,13 @@ async function dumpUiHierarchy(adb, serial) {
 
 function findNode(xml, needle) {
     const escaped = escapeRegExp(needle);
-    const nodePattern = new RegExp(`<node\\b[^>]*(?:text="[^"]*${escaped}[^"]*"|content-desc="[^"]*${escaped}[^"]*")[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i");
-    const match = xml.match(nodePattern);
+    const patterns = [
+        new RegExp(`<node\\b[^>]*text="${escaped}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i"),
+        new RegExp(`<node\\b[^>]*text="[^"]*${escaped}[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i"),
+        new RegExp(`<node\\b[^>]*content-desc="${escaped}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i"),
+        new RegExp(`<node\\b[^>]*content-desc="[^"]*${escaped}[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i")
+    ];
+    const match = patterns.map(pattern => xml.match(pattern)).find(Boolean);
     if (!match) return null;
     const [, left, top, right, bottom] = match.map(Number);
     return {
