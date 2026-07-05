@@ -263,6 +263,7 @@ for (const target of ["ios", "android"]) {
                 assert.match(wrapperSource, /isNostrSignerInstalled/);
                 assert.match(wrapperSource, /requestNostrSigner/);
                 assert.match(wrapperSource, /android-nostr-signer-result/);
+                assert.match(wrapperSource, /permissions/);
                 assert.match(wrapperSource, /android-native-share-received/);
                 assert.match(wrapperSource, /setAllowFileAccessFromFileURLs\(true\)/);
                 assert.match(wrapperSource, /delete HTMLCanvasElement\.prototype\.transferControlToOffscreen/);

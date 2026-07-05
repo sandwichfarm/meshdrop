@@ -48,6 +48,7 @@ class TestButton {
 }
 
 const listeners = new Map();
+const windowListeners = new Map();
 const buttons = new Map();
 let storedIdentity = null;
 let storedValues = new Map();
@@ -80,6 +81,17 @@ globalThis.Events = {
         for (const callback of listeners.get(type) || []) callback({detail});
     }
 };
+globalThis.addEventListener = (type, callback) => {
+    if (!windowListeners.has(type)) windowListeners.set(type, []);
+    windowListeners.get(type).push(callback);
+};
+globalThis.removeEventListener = (type, callback) => {
+    const callbacks = windowListeners.get(type) || [];
+    windowListeners.set(type, callbacks.filter(existing => existing !== callback));
+};
+globalThis.dispatchEvent = event => {
+    for (const callback of windowListeners.get(event.type) || []) callback(event);
+};
 
 await import("../public/scripts/nostr-relays.js");
 await import("../public/scripts/runtime-capabilities.js");
@@ -95,10 +107,12 @@ await import("../public/scripts/fips-discovery.js");
 
 function resetUi() {
     listeners.clear();
+    windowListeners.clear();
     buttons.clear();
     storedIdentity = null;
     storedValues = new Map();
     delete globalThis.nostr;
+    delete globalThis.meshdropAndroidBridge;
     delete globalThis.WebSocket;
     delete globalThis.meshdropNostrIdentity;
     delete globalThis.meshdropNostrMesh;
@@ -149,6 +163,7 @@ function installStoredIdentity(pubkey = "1".repeat(64)) {
             sig: "3".repeat(128),
             pubkey
         },
+        androidSignerPackage: "com.greenart7c3.nostrsigner",
         verified: true
     });
 }
@@ -266,6 +281,100 @@ test("Nostr login dialog offers Amber when Android signer bridge is available", 
         delete globalThis.meshdropNostrLoginDialog;
     }
 });
+
+test("Android signer-backed identity exposes NIP-04 encryption for Nostr mesh", async () => {
+    resetUi();
+    const pubkey = "5".repeat(64);
+    const requests = [];
+    globalThis.meshdropAndroidBridge = {
+        isNostrSignerInstalled: () => true,
+        requestNostrSigner(requestJson) {
+            const request = JSON.parse(requestJson);
+            requests.push(request);
+            queueMicrotask(() => {
+                const detail = androidSignerResult(request, pubkey);
+                globalThis.dispatchEvent(new CustomEvent("android-nostr-signer-result", {detail}));
+            });
+            return true;
+        }
+    };
+    globalThis.meshdropNostrLoginDialog = {
+        choose() {
+            return Promise.resolve("android-signer");
+        }
+    };
+
+    try {
+        const identity = new globalThis.NostrIdentityController();
+        await identity.connect();
+
+        assert.equal(identity.getIdentity().pubkey, pubkey);
+        assert.equal(identity.getIdentity().androidSignerPackage, "com.greenart7c3.nostrsigner");
+        assert.equal(identity.canEncrypt(), true);
+        assert.equal(await identity.encryptTo("6".repeat(64), "hello"), "nip04_encrypt:hello");
+        assert.equal(await identity.decryptFrom("6".repeat(64), "ciphertext"), "nip04_decrypt:ciphertext");
+        assert.equal(requests.some(request => request.type === "get_public_key" && request.permissions.includes("nip04_encrypt")), true);
+        assert.equal(requests.some(request => request.type === "nip04_encrypt" && request.pubkey === "6".repeat(64)), true);
+        assert.equal(requests.some(request => request.type === "nip04_decrypt" && request.current_user === pubkey), true);
+    }
+    finally {
+        delete globalThis.meshdropAndroidBridge;
+        delete globalThis.meshdropNostrLoginDialog;
+    }
+});
+
+test("Stored Android signer identity reuses Amber package for NIP-04 requests", async () => {
+    resetUi();
+    const pubkey = "9".repeat(64);
+    const requests = [];
+    installStoredIdentity(pubkey);
+    globalThis.meshdropAndroidBridge = {
+        isNostrSignerInstalled: () => true,
+        requestNostrSigner(requestJson) {
+            const request = JSON.parse(requestJson);
+            requests.push(request);
+            queueMicrotask(() => {
+                globalThis.dispatchEvent(new CustomEvent("android-nostr-signer-result", {
+                    detail: {id: request.id, result: `${request.type}:${request.payload}`}
+                }));
+            });
+            return true;
+        }
+    };
+
+    try {
+        const identity = new globalThis.NostrIdentityController();
+
+        assert.equal(identity.canEncrypt(), true);
+        assert.equal(await identity.encryptTo("a".repeat(64), "hello"), "nip04_encrypt:hello");
+        assert.equal(requests[0].package, "com.greenart7c3.nostrsigner");
+        assert.equal(requests[0].current_user, pubkey);
+    }
+    finally {
+        delete globalThis.meshdropAndroidBridge;
+    }
+});
+
+function androidSignerResult(request, pubkey) {
+    if (request.type === "get_public_key") {
+        return {id: request.id, result: pubkey, package: "com.greenart7c3.nostrsigner"};
+    }
+    if (request.type === "sign_event") {
+        return {
+            id: request.id,
+            event: JSON.stringify({
+                ...JSON.parse(request.payload),
+                pubkey,
+                id: "7".repeat(64),
+                sig: "8".repeat(128)
+            })
+        };
+    }
+    if (request.type === "nip04_encrypt" || request.type === "nip04_decrypt") {
+        return {id: request.id, result: `${request.type}:${request.payload}`};
+    }
+    return {id: request.id, error: `unexpected request ${request.type}`};
+}
 
 test("Local discovery is enabled by default and toggles the IP room", () => {
     resetUi();

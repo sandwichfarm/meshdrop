@@ -74,6 +74,7 @@ class NostrIdentityController {
                 followListStatus: "loading",
                 blossomServers: [],
                 blossomServerListStatus: "loading",
+                androidSignerPackage: signer.getPackage?.() || "",
                 event,
                 verified: !!event
             };
@@ -147,31 +148,37 @@ class NostrIdentityController {
     }
 
     canEncrypt() {
-        return !!(window.nostr?.nip04?.encrypt && window.nostr?.nip04?.decrypt);
+        const signer = this._encryptionSigner();
+        return !!(signer?.nip04?.encrypt && signer?.nip04?.decrypt);
     }
 
     canNip44() {
-        return !!(window.nostr?.nip44?.encrypt && window.nostr?.nip44?.decrypt);
+        const signer = this._encryptionSigner();
+        return !!(signer?.nip44?.encrypt && signer?.nip44?.decrypt);
     }
 
     async encryptTo(pubkey, plaintext) {
+        const signer = this._encryptionSigner();
         if (!this.canEncrypt()) throw new Error("NIP-04 encryption is unavailable");
-        return window.nostr.nip04.encrypt(pubkey, plaintext);
+        return signer.nip04.encrypt(pubkey, plaintext);
     }
 
     async decryptFrom(pubkey, ciphertext) {
+        const signer = this._encryptionSigner();
         if (!this.canEncrypt()) throw new Error("NIP-04 decryption is unavailable");
-        return window.nostr.nip04.decrypt(pubkey, ciphertext);
+        return signer.nip04.decrypt(pubkey, ciphertext);
     }
 
     async encryptNip44To(pubkey, plaintext) {
+        const signer = this._encryptionSigner();
         if (!this.canNip44()) throw new Error("NIP-44 encryption is unavailable");
-        return window.nostr.nip44.encrypt(pubkey, plaintext);
+        return signer.nip44.encrypt(pubkey, plaintext);
     }
 
     async decryptNip44From(pubkey, ciphertext) {
+        const signer = this._encryptionSigner();
         if (!this.canNip44()) throw new Error("NIP-44 decryption is unavailable");
-        return window.nostr.nip44.decrypt(pubkey, ciphertext);
+        return signer.nip44.decrypt(pubkey, ciphertext);
     }
 
     _onServerDisplayName(message) {
@@ -299,6 +306,10 @@ class NostrIdentityController {
         return window.nostr;
     }
 
+    _encryptionSigner() {
+        return this._signer || this._defaultSigner();
+    }
+
     _hasAndroidSigner() {
         return globalThis.AndroidNostrSigner?.isAvailable?.() || false;
     }
@@ -306,7 +317,7 @@ class NostrIdentityController {
     _androidSigner() {
         if (!this._hasAndroidSigner()) return null;
 
-        return new globalThis.AndroidNostrSigner(() => this._identity);
+        return new globalThis.AndroidNostrSigner(() => this._identity, this._identity?.androidSignerPackage || "");
     }
 
     _displayNameFromPubkey(pubkey) {
