@@ -24,6 +24,7 @@
     "test:docker:admin": "node scripts/docker-compose-admin-uat.mjs",
     "test:docker:two-host": "node scripts/docker-two-host-relay-smoke.mjs",
     "test:android-apk": "node scripts/android-apk-smoke.mjs",
+    "test:android-apk-install": "node scripts/android-apk-install-smoke.mjs",
     "test:desktop-native": "node scripts/desktop-native-runtime-smoke.mjs",
     "test:desktop-chromium": "node scripts/desktop-chromium-shell-smoke.mjs",
     "test:e2e": "node scripts/e2e-smoke.mjs",

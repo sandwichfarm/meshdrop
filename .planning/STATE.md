@@ -65,6 +65,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-v13-release-v013-readback` | complete | `v0.1.3` release assets, GHCR target images, authenticated readback, and Docker smoke passed; anonymous GHCR still returns `unauthorized` |
 | 2026-07-05 | `260705-303-add-an-android-apk-package-artifact-with` | complete | Android debug APK artifact builds; `npm run test:android-apk`; `npm test`; workflow lint; changed-code slop clean |
 | 2026-07-05 | `260705-3ni-record-v014-release-proof` | complete | `v0.1.4` release assets include Android APK; GHCR target images, authenticated readback, and Docker smoke passed; anonymous GHCR still returns `unauthorized` |
+| 2026-07-05 | `260705-3wu-prove-android-apk-emulator-install` | complete | Android debug APK installs and launches on local AVD `Medium_Phone_API_36.1`; native transfer/signing/device UAT remain open |
 
 ## Active Quick Task
 
