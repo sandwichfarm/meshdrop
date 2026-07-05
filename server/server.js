@@ -6,6 +6,9 @@ import http from "http";
 import {adminPublicConfig, createAdminConfig, verifySignedAdminRequest} from "./admin-auth.js";
 import {createRuntimeCapabilities} from "./runtime-capabilities.js";
 
+const writeStdout = (...parts) => process.stdout.write(`${parts.join(" ")}\n`);
+const writeStderr = error => process.stderr.write(`${error?.stack || error?.message || error}\n`);
+
 export default class PairDropServer {
 
     constructor(conf) {
@@ -29,7 +32,7 @@ export default class PairDropServer {
             app.set('trust proxy', conf.rateLimit);
 
             if (!conf.debugMode) {
-                console.log("Use DEBUG_MODE=true to find correct number for RATE_LIMIT.");
+                writeStdout("Use DEBUG_MODE=true to find correct number for RATE_LIMIT.");
             }
         }
 
@@ -40,13 +43,13 @@ export default class PairDropServer {
         app.use(express.static(publicPathAbs));
 
         if (conf.debugMode && conf.rateLimit) {
-            console.debug("\n");
-            console.debug("----DEBUG RATE_LIMIT----")
-            console.debug(
+            writeStdout("");
+            writeStdout("----DEBUG RATE_LIMIT----");
+            writeStdout(
                 "To find out the correct value for RATE_LIMIT go to '/ip' " +
                 "and ensure the returned IP-address is the IP-address of your client."
-            )
-            console.debug("See https://github.com/express-rate-limit/express-rate-limit#troubleshooting-proxy-issues for more info")
+            );
+            writeStdout("See https://github.com/express-rate-limit/express-rate-limit#troubleshooting-proxy-issues for more info");
             app.get('/ip', (req, res) => {
                 res.send(req.ip);
             })
@@ -154,7 +157,7 @@ export default class PairDropServer {
 
         app.get('/', (req, res) => {
             res.sendFile('index.html');
-            console.log(`Serving client files from:\n${publicPathAbs}`)
+            writeStdout(`Serving client files from:\n${publicPathAbs}`);
         });
 
         const hostname = conf.localhostOnly ? '127.0.0.1' : null;
@@ -164,8 +167,8 @@ export default class PairDropServer {
 
         server.on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
-                console.error(err);
-                console.info("Error EADDRINUSE received, exiting process without restarting process...");
+                writeStderr(err);
+                writeStdout("Error EADDRINUSE received, exiting process without restarting process...");
                 process.exit(1)
             }
         });
