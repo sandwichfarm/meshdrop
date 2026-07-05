@@ -16,7 +16,8 @@ export function parseArgs(argv) {
         outDir: path.join(repoRoot, "dist"),
         mode: "source",
         native: false,
-        chromium: false
+        chromium: false,
+        bundleChromium: false
     };
 
     for (let i = 0; i < argv.length; i += 1) {
@@ -35,6 +36,9 @@ export function parseArgs(argv) {
         else if (argv[i] === "--chromium-shell") {
             args.mode = "chromium";
             args.chromium = true;
+        }
+        else if (argv[i] === "--bundle-chromium") {
+            args.bundleChromium = true;
         }
         else {
             throw new Error(`Unknown argument: ${argv[i]}`);
@@ -71,7 +75,9 @@ async function buildDesktopArtifact(options = {}) {
     const chromium = mode === "chromium";
     const version = sanitizeArtifactPart(options.version || packageJson.version);
     const outDir = path.resolve(options.outDir || path.join(repoRoot, "dist"));
-    const prefix = artifactPrefix(mode, version);
+    const chromiumBundlePath = chromium ? await resolveChromiumBundlePath(options) : "";
+    const chromiumEngineBundled = !!chromiumBundlePath;
+    const prefix = artifactPrefix(mode, version, {chromiumEngineBundled});
     const stageRoot = path.join(outDir, `.${prefix}-stage`);
     const stageDir = path.join(stageRoot, prefix);
     const appDir = path.join(stageDir, "app");
@@ -80,7 +86,7 @@ async function buildDesktopArtifact(options = {}) {
     await fs.rm(stageRoot, {recursive: true, force: true});
     await fs.mkdir(stageDir, {recursive: true});
     await fs.cp(path.join(repoRoot, "public"), appDir, {recursive: true});
-    await writeTargetManifest(stageDir, version, mode);
+    await writeTargetManifest(stageDir, version, mode, {chromiumEngineBundled});
     await writeDesktopReadme(stageDir, version, mode);
     await fs.copyFile(path.join(repoRoot, "docs", "uat", "desktop.md"), path.join(stageDir, "UAT-DESKTOP.md"));
     await stampServiceWorker(appDir, version, options.env || process.env);
@@ -89,12 +95,13 @@ async function buildDesktopArtifact(options = {}) {
     }
     if (chromium) {
         await writeChromiumShell(stageDir);
+        if (chromiumBundlePath) await copyChromiumBundle(stageDir, chromiumBundlePath);
     }
     await fs.rm(artifactPath, {force: true});
     await tarCreate(artifactPath, stageRoot, prefix);
     await fs.rm(stageRoot, {recursive: true, force: true});
 
-    return {artifactPath, prefix, version, nativeShellBuilt: native || chromium, mode};
+    return {artifactPath, prefix, version, nativeShellBuilt: native || chromium, mode, chromiumEngineBundled};
 }
 
 export async function listTarEntries(artifactPath) {
@@ -112,24 +119,26 @@ function normalizeMode(mode) {
     return mode;
 }
 
-function artifactPrefix(mode, version) {
+function artifactPrefix(mode, version, {chromiumEngineBundled = false} = {}) {
     if (mode === "native") return `meshdrop-desktop-linux-${version}`;
+    if (mode === "chromium" && chromiumEngineBundled) return `meshdrop-desktop-chromium-bundled-${version}`;
     if (mode === "chromium") return `meshdrop-desktop-chromium-${version}`;
     return `meshdrop-desktop-${version}`;
 }
 
-async function writeTargetManifest(stageDir, version, mode) {
+async function writeTargetManifest(stageDir, version, mode, {chromiumEngineBundled = false} = {}) {
     const native = mode === "native";
     const chromium = mode === "chromium";
     const manifest = {
         schemaVersion: 1,
-        name: manifestName(mode),
+        name: manifestName(mode, {chromiumEngineBundled}),
         version,
         target: "desktop",
         appRoot: "app",
         entrypoint: "app/index.html",
         nativeShellBuilt: native || chromium,
         chromiumShellBuilt: chromium,
+        chromiumEngineBundled,
         uatRunbook: "UAT-DESKTOP.md",
         runtime: {
             target: "desktop",
@@ -154,10 +163,14 @@ async function writeTargetManifest(stageDir, version, mode) {
                 "desktop installer or signed binary"
             ]
             : chromium
-                ? [
-                    "bundled Chromium engine or installer",
-                    "desktop installer or signed binary"
-                ]
+                ? chromiumEngineBundled
+                    ? [
+                        "desktop installer or signed binary"
+                    ]
+                    : [
+                        "bundled Chromium engine or installer",
+                        "desktop installer or signed binary"
+                    ]
             : [
                 "native shell build",
                 "native desktop WebRTC transfer UAT",
@@ -179,13 +192,15 @@ async function writeTargetManifest(stageDir, version, mode) {
             executable: "bin/meshdrop-desktop-chromium.mjs",
             source: "src/meshdrop-desktop-chromium.mjs"
         };
+        if (chromiumEngineBundled) manifest.nativeShell.chromiumExecutable = "bin/chromium/chrome";
     }
 
     await fs.writeFile(path.join(stageDir, "meshdrop-target.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-function manifestName(mode) {
+function manifestName(mode, {chromiumEngineBundled = false} = {}) {
     if (mode === "native") return "meshdrop-desktop-linux";
+    if (mode === "chromium" && chromiumEngineBundled) return "meshdrop-desktop-chromium-bundled";
     if (mode === "chromium") return "meshdrop-desktop-chromium";
     return "meshdrop-desktop";
 }
@@ -231,7 +246,10 @@ function desktopNote(mode) {
         ].join(" ");
     }
     if (mode === "chromium") {
-        return "Launch command: `node bin/meshdrop-desktop-chromium.mjs --app-dir app`. Requires an installed Chromium-compatible browser.";
+        return [
+            "Launch command: `node bin/meshdrop-desktop-chromium.mjs --app-dir app`.",
+            "The launcher prefers a bundled `bin/chromium/chrome` engine and falls back to an installed Chromium-compatible browser."
+        ].join(" ");
     }
     return "It is not a native installer or executable.";
 }
@@ -271,6 +289,41 @@ async function writeChromiumShell(stageDir) {
     await fs.copyFile(sourcePath, stagedSourcePath);
     await fs.copyFile(sourcePath, launcherPath);
     await fs.chmod(launcherPath, 0o755);
+}
+
+async function resolveChromiumBundlePath(options = {}) {
+    const env = options.env || process.env;
+    if (options.chromiumBundlePath) return validateChromiumExecutable(options.chromiumBundlePath);
+    if (env.MESHDROP_CHROMIUM_BUNDLE_PATH) return validateChromiumExecutable(env.MESHDROP_CHROMIUM_BUNDLE_PATH);
+    if (!options.bundleChromium && env.MESHDROP_BUNDLE_CHROMIUM !== "1") return "";
+
+    try {
+        const {chromium} = await import("playwright");
+        return validateChromiumExecutable(chromium.executablePath());
+    } catch (error) {
+        throw new Error(`Bundled Chromium build requires Playwright Chromium: ${error.message}`);
+    }
+}
+
+async function validateChromiumExecutable(executablePath) {
+    const resolved = path.resolve(executablePath);
+    const stat = await fs.stat(resolved).catch(error => {
+        throw new Error(`Chromium executable not found for bundle: ${resolved} (${error.message})`);
+    });
+
+    if (!stat.isFile()) throw new Error(`Chromium bundle path is not a file: ${resolved}`);
+    return resolved;
+}
+
+async function copyChromiumBundle(stageDir, executablePath) {
+    const sourceDir = path.dirname(executablePath);
+    const executableName = path.basename(executablePath);
+    const bundleDir = path.join(stageDir, "bin", "chromium");
+    const bundledExecutable = path.join(bundleDir, executableName);
+
+    await fs.cp(sourceDir, bundleDir, {recursive: true});
+    if (executableName !== "chrome") await fs.copyFile(bundledExecutable, path.join(bundleDir, "chrome"));
+    await fs.chmod(path.join(bundleDir, "chrome"), 0o755);
 }
 
 async function pkgConfigFlags(packages) {

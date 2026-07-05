@@ -89,6 +89,7 @@ function parseArgs(argv) {
 
 function findChromium() {
     const candidates = [
+        path.join(rootDir, "bin", "chromium", "chrome"),
         "/usr/bin/chromium",
         "/usr/bin/chromium-browser",
         "/usr/bin/google-chrome",
@@ -106,10 +107,8 @@ function spawnChromium(url, profileDir) {
         "--disable-default-apps"
     ];
 
-    if (existsSync("/usr/bin/chromium")) return spawn("/usr/bin/chromium", args, {stdio: "inherit"});
-    if (existsSync("/usr/bin/chromium-browser")) return spawn("/usr/bin/chromium-browser", args, {stdio: "inherit"});
-    if (existsSync("/usr/bin/google-chrome")) return spawn("/usr/bin/google-chrome", args, {stdio: "inherit"});
-    if (existsSync("/usr/bin/google-chrome-stable")) return spawn("/usr/bin/google-chrome-stable", args, {stdio: "inherit"});
+    const chromium = findChromium();
+    if (chromium) return spawn(chromium, args, {stdio: "inherit"});
     throw new Error("No Chromium-compatible browser found in a supported system path.");
 }
 
