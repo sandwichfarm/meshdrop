@@ -149,11 +149,15 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /iOS native-source artifact contains `native\/ios\/MeshDrop\.xcodeproj\/project\.pbxproj`/);
     assert.match(mobile, /shared `MeshDrop\.xcscheme`/);
     assert.match(mobile, /npm run test:ios-xcode-build/);
+    assert.match(mobile, /npm run build:ios:simulator-app/);
+    assert.match(mobile, /npm run test:ios-simulator-app/);
+    assert.match(mobile, /packageType` as `unsigned-simulator-app`/);
     assert.match(mobile, /matching App Group entitlement files/);
     assert.match(mobile, /iOS native-source artifact includes a share extension source scaffold/);
     assert.match(mobile, /MeshDropShareExtension\/ShareViewController\.swift/);
     assert.match(mobile, /App Group entitlement provisioning, share-sheet device UAT/);
     assert.match(mobile, /iOS device picker\s+UAT, App Group entitlement provisioning, share-sheet device UAT/);
+    assert.match(mobile, /iOS Simulator app artifact proves an unsigned Simulator `\.app` package only/);
     assert.match(mobile, /Not Proven/);
 
     const releaseTargets = readDoc("docs/uat/release-target-images.md");
@@ -243,17 +247,18 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke exists; real Umbrel node UAT open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Real Umbrel node install from UI and device transfer UAT/);
-    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, and share extension source scaffold exist; app package\/device UAT open \|/);
+    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, and share extension source scaffold exist; signed\/device UAT open \|/);
     assert.match(
         targetStatus,
         /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, and native picker UI proof exist; physical-device UAT open \|/
     );
-    assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `npm run test:ios-xcode-build`; `node --test test\/mobile-package\.test\.js`/);
+    assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `npm run build:ios:simulator-app`; `npm run test:ios-xcode-build`; `npm run test:ios-simulator-app`; `node --test test\/mobile-package\.test\.js`/);
     assert.match(targetStatus, /wires iOS 18\.4\+ file inputs to `UIDocumentPickerViewController`/);
     assert.match(targetStatus, /includes `MeshDrop\.xcodeproj` and shared App Group entitlement files/);
     assert.match(targetStatus, /`npm run test:ios-xcode-build` proves the generated `MeshDrop` Xcode scheme builds for iOS Simulator without code signing/);
+    assert.match(targetStatus, /`npm run test:ios-simulator-app` proves an unsigned `MeshDrop\.app` Simulator package can be built and inspected/);
     assert.match(targetStatus, /includes `MeshDropShareExtension\/ShareViewController\.swift`/);
-    assert.match(targetStatus, /native iOS app package, App Group entitlement provisioning/);
+    assert.match(targetStatus, /signed\/device-installable iOS package, App Group entitlement provisioning/);
     assert.match(targetStatus, /`npm run build:android`; `npm run build:android:native-source`; `npm run build:android:apk`/);
     assert.match(targetStatus, /`npm run build:android:release-apk`/);
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-apk-install`/);
@@ -263,7 +268,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-share-file`/);
     assert.match(targetStatus, /`npm run build:ios:native-source`/);
     assert.match(targetStatus, /`npm run build:android:native-source`/);
-    assert.match(targetStatus, /native iOS app package/);
+    assert.match(targetStatus, /signed\/device-installable iOS package/);
     assert.match(targetStatus, /Gradle-built debug APK artifact/);
     assert.match(targetStatus, /UAT-signed release APK verified by `apksigner`/);
     assert.match(targetStatus, /Android emulator install\/launch of `farm\.sandwich\.meshdrop\/\.MainActivity`/);

@@ -74,10 +74,11 @@ test("CI builds mobile native-source artifacts through package scripts", () => {
 
 test("CI proves generated iOS native source builds with Xcode", () => {
     assert.match(ciWorkflow, /ios-xcode-build:/);
-    assert.match(ciWorkflow, /name: iOS Xcode native-source build smoke/);
+    assert.match(ciWorkflow, /name: iOS Xcode native-source and simulator app smoke/);
     assert.match(ciWorkflow, /runs-on: macos-15/);
     assertRuntimeChangeGate("ios-xcode-build");
     assert.match(ciWorkflow, /npm run test:ios-xcode-build/);
+    assert.match(ciWorkflow, /npm run test:ios-simulator-app/);
 });
 
 test("CI builds Android APK artifact through package script", () => {
