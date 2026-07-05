@@ -1,3 +1,18 @@
+const meshdropGetById = globalThis.$;
+const meshdropQuery = globalThis.$$;
+const meshdropBrowserTabsConnector = globalThis.BrowserTabsConnector;
+const meshdropEvents = globalThis.Events;
+const meshdropLocalization = globalThis.Localization;
+const meshdropNostrDiscoveryProtocol = globalThis.NostrDiscoveryProtocol;
+const meshdropPersistentStorage = globalThis.PersistentStorage;
+const meshdropProtocolServerPreferences = globalThis.ProtocolServerPreferences;
+const meshdropRelaySettingsPreferences = globalThis.RelaySettingsPreferences;
+const meshdropChangeFavicon = globalThis.changeFavicon;
+const meshdropDecodeBase64Files = globalThis.decodeBase64Files;
+const meshdropDecodeBase64Text = globalThis.decodeBase64Text;
+const meshdropGetThumbnailAsDataUrl = globalThis.getThumbnailAsDataUrl;
+const meshdropIsUrlValid = globalThis.isUrlValid;
+
 const PeerAvailabilityProtocol = {
     roomTypeOrder: ["ip", "secret", "pollen", "fips", "nostr", "public-id"],
     roomTypeMeta: {
@@ -202,23 +217,88 @@ const PeerAvailabilityProtocol = {
 
 globalThis.PeerAvailabilityProtocol = PeerAvailabilityProtocol;
 
+const MeshDropSafeDom = {
+    setQrSvg($container, svgMarkup) {
+        const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+        const $svg = parsed.documentElement;
+        if (!$svg || $svg.tagName.toLowerCase() !== "svg") {
+            throw new Error("QRCode renderer returned invalid SVG");
+        }
+        $container.replaceChildren(document.importNode($svg, true));
+    },
+
+    renderReceivedText($target, text) {
+        $target.textContent = "";
+        const $fragment = document.createDocumentFragment();
+        let cursor = 0;
+
+        for (const match of this._receivedTextLinkMatches(text)) {
+            const whitespace = match.whitespace || "";
+            const linkText = match.linkText;
+            const href = this._normalizeReceivedTextLink(linkText);
+            if (!meshdropIsUrlValid(href)) continue;
+
+            $fragment.appendChild(document.createTextNode(text.slice(cursor, match.index + whitespace.length)));
+            const $link = document.createElement("a");
+            $link.href = href;
+            $link.target = "_blank";
+            $link.rel = "noreferrer";
+            $link.textContent = linkText;
+            $fragment.appendChild($link);
+            cursor = match.index + match.full.length;
+        }
+
+        $fragment.appendChild(document.createTextNode(text.slice(cursor)));
+        $target.replaceChildren($fragment);
+    },
+
+    _receivedTextLinkMatches(text) {
+        const chrs = `a-zA-Z0-9áàäčçđéèêŋńñóòôöšŧüžæøåëìíîïðùúýþćěłřśţźǎǐǒǔǥǧǩǯəʒâûœÿãõāēīōūăąĉċďĕėęĝğġģĥħĩĭįıĵķĸĺļľņňŏőŕŗŝşťũŭůűųŵŷżאבגדהוזחטיךכלםמןנסעףפץצקרשתװױײ`;
+        const rgxWhitespace = `(?<whitespace>^|\\n|\\s)`;
+        const rgxScheme = `(?<scheme>https?:\\/\\/)`;
+        const rgxSchemeMail = `(mailto:)`;
+        const rgxUserinfo = `(?:(?:[${chrs}.%]*(?::[${chrs}.%]*)?)@)`;
+        const rgxHost = `(?:(?:[${chrs}](?:[${chrs}-]{0,61}[${chrs}])?\\.)+[${chrs}][${chrs}-]{0,61}[${chrs}])`;
+        const rgxPort = `(:\\d*)`;
+        const rgxPath = `(?:(?:\\/[${chrs}\\-\\._~!$&'\\(\\)\\*\\+,;=:@%]*)*)`;
+        const rgxQueryAndFragment = `(\\?[${chrs}\\-_~:\\/#\\[\\]@!$&'\\(\\)*+,;=%.]*)`;
+        const rgxUrl = `${rgxScheme}?${rgxHost}${rgxPort}?${rgxPath}${rgxQueryAndFragment}?`;
+        const rgxMail = `${rgxSchemeMail}${rgxUserinfo}${rgxHost}`;
+        const rgxLink = new RegExp(`${rgxWhitespace}(?<link>${rgxUrl}|${rgxMail})`, "g");
+
+        return [...text.matchAll(rgxLink)].map(match => ({
+            full: match[0],
+            index: match.index,
+            whitespace: match.groups.whitespace,
+            scheme: match.groups.scheme,
+            linkText: match.groups.link
+        }));
+    },
+
+    _normalizeReceivedTextLink(linkText) {
+        return linkText.startsWith("www") ? `http://${linkText}` : linkText;
+    }
+};
+
+globalThis.MeshDropSafeDom = MeshDropSafeDom;
+
 class PeersUI {
 
     constructor() {
-        this.$xPeers = $$('x-peers');
-        this.$xNoPeers = $$('x-no-peers');
-        this.$xInstructions = $$('x-instructions');
-        this.$wsFallbackWarning = $('websocket-fallback');
+        this.$xPeers = meshdropQuery('x-peers');
+        this.$xNoPeers = meshdropQuery('x-no-peers');
+        this.$xInstructions = meshdropQuery('x-instructions');
+        this.$wsFallbackWarning = meshdropGetById('websocket-fallback');
 
-        this.$sharePanel = $$('.shr-panel');
-        this.$shareModeImageThumb = $$('.shr-panel .image-thumb');
-        this.$shareModeTextThumb = $$('.shr-panel .text-thumb');
-        this.$shareModeFileThumb = $$('.shr-panel .file-thumb');
-        this.$shareModeDescriptor = $$('.shr-panel .share-descriptor');
-        this.$shareModeDescriptorItem = $$('.shr-panel .descriptor-item');
-        this.$shareModeDescriptorOther = $$('.shr-panel .descriptor-other');
-        this.$shareModeCancelBtn = $$('.shr-panel .cancel-btn');
-        this.$shareModeEditBtn = $$('.shr-panel .edit-btn');
+        this.$sharePanel = meshdropQuery('.shr-panel');
+        this.$shareModeImageThumb = meshdropQuery('.shr-panel .image-thumb');
+        this.$shareModeTextThumb = meshdropQuery('.shr-panel .text-thumb');
+        this.$shareModeFileThumb = meshdropQuery('.shr-panel .file-thumb');
+        this.$shareModeDescriptor = meshdropQuery('.shr-panel .share-descriptor');
+        this.$shareModeDescriptorItem = meshdropQuery('.shr-panel .descriptor-item');
+        this.$shareModeDescriptorOther = meshdropQuery('.shr-panel .descriptor-other');
+        this.$shareModeCancelBtn = meshdropQuery('.shr-panel .cancel-btn');
+        this.$shareModeEditBtn = meshdropQuery('.shr-panel .edit-btn');
 
         this.peers = {};
         this._peerAliases = {};
@@ -230,34 +310,34 @@ class PeersUI {
             text: ""
         }
 
-        Events.on('peer-joined', e => this._onPeerJoined(e.detail));
-        Events.on('peer-added', _ => this._evaluateOverflowingPeers());
-        Events.on('peer-connected', e => this._onPeerConnected(e.detail.peerId, e.detail.connectionHash));
-        Events.on('peer-disconnected', e => this._onPeerDisconnected(e.detail));
-        Events.on('peers', e => this._onPeers(e.detail));
-        Events.on('set-progress', e => this._onSetProgress(e.detail));
+        meshdropEvents.on('peer-joined', e => this._onPeerJoined(e.detail));
+        meshdropEvents.on('peer-added', _ => this._evaluateOverflowingPeers());
+        meshdropEvents.on('peer-connected', e => this._onPeerConnected(e.detail.peerId, e.detail.connectionHash));
+        meshdropEvents.on('peer-disconnected', e => this._onPeerDisconnected(e.detail));
+        meshdropEvents.on('peers', e => this._onPeers(e.detail));
+        meshdropEvents.on('set-progress', e => this._onSetProgress(e.detail));
 
-        Events.on('drop', e => this._onDrop(e));
-        Events.on('keydown', e => this._onKeyDown(e));
-        Events.on('dragover', e => this._onDragOver(e));
-        Events.on('dragleave', _ => this._onDragEnd());
-        Events.on('dragend', _ => this._onDragEnd());
-        Events.on('resize', _ => this._evaluateOverflowingPeers());
-        Events.on('header-changed', _ => this._evaluateOverflowingPeers());
+        meshdropEvents.on('drop', e => this._onDrop(e));
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('dragover', e => this._onDragOver(e));
+        meshdropEvents.on('dragleave', _ => this._onDragEnd());
+        meshdropEvents.on('dragend', _ => this._onDragEnd());
+        meshdropEvents.on('resize', _ => this._evaluateOverflowingPeers());
+        meshdropEvents.on('header-changed', _ => this._evaluateOverflowingPeers());
 
-        Events.on('paste', e => this._onPaste(e));
-        Events.on('activate-share-mode', e => this._activateShareMode(e.detail.files, e.detail.text));
-        Events.on('translation-loaded', _ => this._reloadShareMode());
-        Events.on('room-type-removed', e => this._onRoomTypeRemoved(e.detail.peerId, e.detail.roomType));
+        meshdropEvents.on('paste', e => this._onPaste(e));
+        meshdropEvents.on('activate-share-mode', e => this._activateShareMode(e.detail.files, e.detail.text));
+        meshdropEvents.on('translation-loaded', _ => this._reloadShareMode());
+        meshdropEvents.on('room-type-removed', e => this._onRoomTypeRemoved(e.detail.peerId, e.detail.roomType));
 
 
         this.$shareModeCancelBtn.addEventListener('click', _ => this._deactivateShareMode());
 
-        Events.on('peer-display-name-changed', e => this._onPeerDisplayNameChanged(e));
-        Events.on('peer-profile-changed', e => this._onPeerProfileChanged(e));
-        Events.on('nostr-identity-changed', e => this._onNostrIdentityChanged(e.detail));
+        meshdropEvents.on('peer-display-name-changed', e => this._onPeerDisplayNameChanged(e));
+        meshdropEvents.on('peer-profile-changed', e => this._onPeerProfileChanged(e));
+        meshdropEvents.on('nostr-identity-changed', e => this._onNostrIdentityChanged(e.detail));
 
-        Events.on('ws-config', e => this._evaluateRtcSupport(e.detail))
+        meshdropEvents.on('ws-config', e => this._evaluateRtcSupport(e.detail))
     }
 
     _evaluateRtcSupport(wsConfig) {
@@ -267,7 +347,7 @@ class PeersUI {
         else {
             this.$wsFallbackWarning.hidden = true;
             if (!window.isRtcSupported) {
-                alert(Localization.getTranslation("instructions.webrtc-requirement"));
+                alert(meshdropLocalization.getTranslation("instructions.webrtc-requirement"));
             }
         }
     }
@@ -277,7 +357,7 @@ class PeersUI {
         if (!this.peers[peerId]) return;
 
         this.peers[peerId].name.displayName = displayName;
-        const peerIdNode = $(peerId);
+        const peerIdNode = meshdropGetById(peerId);
         if (peerIdNode && displayName) peerIdNode.querySelector('.name').textContent = displayName;
         this._redrawPeerRoomTypes(peerId);
     }
@@ -294,11 +374,11 @@ class PeersUI {
 
         if (e.detail.displayName) peer.name.displayName = e.detail.displayName;
         peer.nostrIdentity = {
-            ...(peer.nostrIdentity || {}),
+            ...peer.nostrIdentity,
             picture: e.detail.picture || peer.nostrIdentity?.picture || ""
         };
 
-        const peerNode = $(peerId);
+        const peerNode = meshdropGetById(peerId);
         if (!peerNode) return;
 
         if (e.detail.displayName) peerNode.querySelector('.name').textContent = e.detail.displayName;
@@ -334,7 +414,7 @@ class PeersUI {
             return;
         }
 
-        peer._isSameBrowser = () => BrowserTabsConnector.peerIsSameBrowser(peer.id);
+        peer._isSameBrowser = () => meshdropBrowserTabsConnector.peerIsSameBrowser(peer.id);
         peer._roomIds = {};
         peer._peerIdsByRoomType = {};
 
@@ -371,17 +451,17 @@ class PeersUI {
         const existingPeer = this.peers[existingPeerId];
         existingPeer._roomIds[roomType] = roomId;
         existingPeer._peerIdsByRoomType = {
-            ...(existingPeer._peerIdsByRoomType || {}),
+            ...existingPeer._peerIdsByRoomType,
             [roomType]: peer.id
         };
         existingPeer.nostrIdentity = {
-            ...(existingPeer.nostrIdentity || {}),
-            ...(peer.nostrIdentity || {})
+            ...existingPeer.nostrIdentity,
+            ...peer.nostrIdentity
         };
 
         if (this._isMoreSpecificPeerName(peer.name, existingPeer.name)) {
             existingPeer.name = peer.name;
-            const peerNode = $(existingPeerId);
+            const peerNode = meshdropGetById(existingPeerId);
             if (peerNode) {
                 peerNode.querySelector('.name').textContent = existingPeer.name.displayName;
                 peerNode.querySelector('.device-name').textContent = existingPeer.name.deviceName;
@@ -390,7 +470,7 @@ class PeersUI {
 
         this._rememberPeerAliases(existingPeerId, existingPeer);
         this._rememberPeerAliases(existingPeerId, peer);
-        const peerNode = $(existingPeerId);
+        const peerNode = meshdropGetById(existingPeerId);
         if (peerNode) peerNode.ui._setAvatar(existingPeer.nostrIdentity?.picture);
         this._redrawPeerRoomTypes(existingPeerId);
     }
@@ -424,7 +504,7 @@ class PeersUI {
         peerId = this._visiblePeerId(peerId);
         if (!this.peers[peerId]) return;
 
-        const peerNode = $(peerId);
+        const peerNode = meshdropGetById(peerId);
         if (peerNode) {
             peerNode.ui?.markConnected(connectionHash);
             return;
@@ -441,7 +521,7 @@ class PeersUI {
     _redrawPeerRoomTypes(peerId) {
         peerId = this._visiblePeerId(peerId);
         const peer = this.peers[peerId];
-        const peerNode = $(peerId);
+        const peerNode = meshdropGetById(peerId);
 
         if (!peer || !peerNode) return;
 
@@ -480,15 +560,15 @@ class PeersUI {
         });
         this._renderProtocolPeerCounts();
 
-        const $peer = $(peerId);
+        const $peer = meshdropGetById(peerId);
         if (!$peer) return;
         $peer.remove();
         this._evaluateOverflowingPeers();
         this._renderProtocolPeerCounts();
 
         // If no peer is shown -> start background animation again
-        if ($$('x-peers:empty')) {
-            Events.fire('background-animation', {animate: true});
+        if (meshdropQuery('x-peers:empty')) {
+            meshdropEvents.fire('background-animation', {animate: true});
         }
 
     }
@@ -505,7 +585,7 @@ class PeersUI {
     }
 
     _onSetProgress(progress) {
-        const $peer = $(this._visiblePeerId(progress.peerId));
+        const $peer = meshdropGetById(this._visiblePeerId(progress.peerId));
         if (!$peer) return;
         $peer.ui.setProgress(progress.progress, progress.status, progress.transport)
     }
@@ -526,7 +606,7 @@ class PeersUI {
 
         this._onDragEnd();
 
-        if ($$('x-peer') && $$('x-peer').contains(e.target)) return; // dropped on peer
+        if (meshdropQuery('x-peer') && meshdropQuery('x-peer').contains(e.target)) return; // dropped on peer
 
         let files = e.dataTransfer.files;
         let text = e.dataTransfer.getData("text");
@@ -535,12 +615,12 @@ class PeersUI {
         files = [...files];
 
         if (files.length > 0) {
-            Events.fire('activate-share-mode', {
+            meshdropEvents.fire('activate-share-mode', {
                 files: files
             });
         }
         else if(text.length > 0) {
-            Events.fire('activate-share-mode', {
+            meshdropEvents.fire('activate-share-mode', {
                 text: text
             });
         }
@@ -572,12 +652,12 @@ class PeersUI {
         files = [...files];
 
         if (files.length > 0) {
-            Events.fire('activate-share-mode', {files: files});
+            meshdropEvents.fire('activate-share-mode', {files: files});
         } else if (text.length > 0) {
             if (ShareTextDialog.isApproveShareTextSet()) {
-                Events.fire('share-text-dialog', text);
+                meshdropEvents.fire('share-text-dialog', text);
             } else {
-                Events.fire('activate-share-mode', {text: text});
+                meshdropEvents.fire('activate-share-mode', {text: text});
             }
         }
     }
@@ -588,14 +668,14 @@ class PeersUI {
         this._activateCallback = e => this._sendShareData(e);
         this._editShareTextCallback = _ => {
             this._deactivateShareMode();
-            Events.fire('share-text-dialog', text);
+            meshdropEvents.fire('share-text-dialog', text);
         };
 
-        Events.on('share-mode-pointerdown', this._activateCallback);
+        meshdropEvents.on('share-mode-pointerdown', this._activateCallback);
 
-        const sharedText = Localization.getTranslation("instructions.activate-share-mode-shared-text");
-        const andOtherFilesPlural = Localization.getTranslation("instructions.activate-share-mode-and-other-files-plural", null, {count: files.length-1});
-        const andOtherFiles = Localization.getTranslation("instructions.activate-share-mode-and-other-file");
+        const sharedText = meshdropLocalization.getTranslation("instructions.activate-share-mode-shared-text");
+        const andOtherFilesPlural = meshdropLocalization.getTranslation("instructions.activate-share-mode-and-other-files-plural", null, {count: files.length-1});
+        const andOtherFiles = meshdropLocalization.getTranslation("instructions.activate-share-mode-and-other-file");
 
         let descriptorComplete, descriptorItem, descriptorOther, descriptorInstructions;
 
@@ -625,15 +705,15 @@ class PeersUI {
                 this.$shareModeDescriptorOther.removeAttribute('hidden');
             }
             if (files.length > 1) {
-                descriptorInstructions = Localization.getTranslation("instructions.activate-share-mode-shared-files-plural", null, {count: files.length});
+                descriptorInstructions = meshdropLocalization.getTranslation("instructions.activate-share-mode-shared-files-plural", null, {count: files.length});
             }
             else {
-                descriptorInstructions = Localization.getTranslation("instructions.activate-share-mode-shared-file");
+                descriptorInstructions = meshdropLocalization.getTranslation("instructions.activate-share-mode-shared-file");
             }
 
             if (files[0].type.split('/')[0] === 'image') {
                 try {
-                    let imageUrl = await getThumbnailAsDataUrl(files[0], 80, null, 0.9);
+                    let imageUrl = await meshdropGetThumbnailAsDataUrl(files[0], 80, null, 0.9);
 
                     this.$shareModeImageThumb.style.backgroundImage = `url(${imageUrl})`;
 
@@ -652,11 +732,11 @@ class PeersUI {
             this.$shareModeEditBtn.addEventListener('click', this._editShareTextCallback);
             this.$shareModeEditBtn.removeAttribute('hidden');
 
-            descriptorInstructions = Localization.getTranslation("instructions.activate-share-mode-shared-text");
+            descriptorInstructions = meshdropLocalization.getTranslation("instructions.activate-share-mode-shared-text");
         }
 
-        const desktop = Localization.getTranslation("instructions.x-instructions-share-mode_desktop", null, {descriptor: descriptorInstructions});
-        const mobile = Localization.getTranslation("instructions.x-instructions-share-mode_mobile", null, {descriptor: descriptorInstructions});
+        const desktop = meshdropLocalization.getTranslation("instructions.x-instructions-share-mode_desktop", null, {descriptor: descriptorInstructions});
+        const mobile = meshdropLocalization.getTranslation("instructions.x-instructions-share-mode_mobile", null, {descriptor: descriptorInstructions});
 
         this.$xInstructions.setAttribute('desktop', desktop);
         this.$xInstructions.setAttribute('mobile', mobile);
@@ -673,7 +753,7 @@ class PeersUI {
 
         console.log('Share mode activated.');
 
-        Events.fire('share-mode-changed', {
+        meshdropEvents.fire('share-mode-changed', {
             active: true,
             descriptor: descriptorComplete
         });
@@ -698,10 +778,10 @@ class PeersUI {
         this.shareMode.files = [];
         this.shareMode.text = "";
 
-        Events.off('share-mode-pointerdown', this._activateCallback);
+        meshdropEvents.off('share-mode-pointerdown', this._activateCallback);
 
-        const desktop = Localization.getTranslation("instructions.x-instructions_desktop");
-        const mobile = Localization.getTranslation("instructions.x-instructions_mobile");
+        const desktop = meshdropLocalization.getTranslation("instructions.x-instructions_desktop");
+        const mobile = meshdropLocalization.getTranslation("instructions.x-instructions_mobile");
 
         this.$xInstructions.setAttribute('desktop', desktop);
         this.$xInstructions.setAttribute('mobile', mobile);
@@ -720,7 +800,7 @@ class PeersUI {
         this.$shareModeEditBtn.setAttribute('hidden', true);
 
         console.log('Share mode deactivated.')
-        Events.fire('share-mode-changed', { active: false });
+        meshdropEvents.fire('share-mode-changed', { active: false });
     }
 
     _sendShareData(e) {
@@ -730,13 +810,13 @@ class PeersUI {
         const text = this.shareMode.text;
 
         if (files.length > 0) {
-            Events.fire('select-files-transport', {
+            meshdropEvents.fire('select-files-transport', {
                 files: files,
                 to: peerId
             });
         }
         else if (text.length > 0) {
-            Events.fire('send-text', {
+            meshdropEvents.fire('send-text', {
                 text: text,
                 to: peerId
             });
@@ -747,8 +827,8 @@ class PeersUI {
 class PeerUI {
 
     constructor(peer, connectionHash, shareMode) {
-        this.$xInstructions = $$('x-instructions');
-        this.$xPeers = $$('x-peers');
+        this.$xInstructions = meshdropQuery('x-instructions');
+        this.$xPeers = meshdropQuery('x-peers');
 
         this._peer = peer;
         this._connected = connectionHash !== null && connectionHash !== undefined;
@@ -760,18 +840,18 @@ class PeerUI {
         this._initDom();
 
         this.$xPeers.appendChild(this.$el);
-        Events.fire('peer-added');
+        meshdropEvents.fire('peer-added');
 
         // ShareMode
-        Events.on('share-mode-changed', e => this._onShareModeChanged(e.detail.active, e.detail.descriptor));
+        meshdropEvents.on('share-mode-changed', e => this._onShareModeChanged(e.detail.active, e.detail.descriptor));
     }
 
     html() {
         let title = !this._connected
-            ? Localization.getTranslation("notifications.connecting")
+            ? meshdropLocalization.getTranslation("notifications.connecting")
             : this._shareMode.active
-            ? Localization.getTranslation("peer-ui.click-to-send-share-mode", null, {descriptor: this._shareMode.descriptor})
-            : Localization.getTranslation("peer-ui.click-to-send");
+            ? meshdropLocalization.getTranslation("peer-ui.click-to-send-share-mode", null, {descriptor: this._shareMode.descriptor})
+            : meshdropLocalization.getTranslation("peer-ui.click-to-send");
 
         this.$el.innerHTML = `
             <label class="column center pointer" title="${title}">
@@ -885,18 +965,18 @@ class PeerUI {
     _evaluateShareMode() {
         let title;
         if (!this._connected) {
-            title = Localization.getTranslation("notifications.connecting");
+            title = meshdropLocalization.getTranslation("notifications.connecting");
             this.$input.setAttribute('disabled', true);
             this.$el.setAttribute('status', 'connecting');
             this.$el.querySelector('.status').innerText = title;
             this.currentStatus = 'connecting';
         }
         else if (!this._shareMode.active) {
-            title = Localization.getTranslation("peer-ui.click-to-send");
+            title = meshdropLocalization.getTranslation("peer-ui.click-to-send");
             this.$input.removeAttribute('disabled');
         }
         else {
-            title =  Localization.getTranslation("peer-ui.click-to-send-share-mode", null, {descriptor: this._shareMode.descriptor});
+            title =  meshdropLocalization.getTranslation("peer-ui.click-to-send-share-mode", null, {descriptor: this._shareMode.descriptor});
             this.$input.setAttribute('disabled', true);
         }
         this.$label.setAttribute('title', title);
@@ -918,10 +998,10 @@ class PeerUI {
 
     _bindListeners() {
         if(!this._shareMode.active) {
-            // Remove Events Share mode
+            // Remove meshdropEvents Share mode
             this.$el.removeEventListener('pointerdown', this._callbackPointerDown);
 
-            // Add Events Normal Mode
+            // Add meshdropEvents Normal Mode
             this.$el.querySelector('input').addEventListener('change', this._callbackInput);
             this.$el.addEventListener('click', this._callbackClickSleep);
             this.$el.addEventListener('touchstart', this._callbackTouchStartSleep);
@@ -934,7 +1014,7 @@ class PeerUI {
             this.$el.addEventListener('touchend', this._callbackTouchEnd);
         }
         else {
-            // Remove Events Normal Mode
+            // Remove meshdropEvents Normal Mode
             this.$el.removeEventListener('click', this._callbackClickSleep);
             this.$el.removeEventListener('touchstart', this._callbackTouchStartSleep);
             this.$el.removeEventListener('drop', this._callbackDrop);
@@ -945,7 +1025,7 @@ class PeerUI {
             this.$el.removeEventListener('touchstart', this._callbackTouchStart);
             this.$el.removeEventListener('touchend', this._callbackTouchEnd);
 
-            // Add Events Share mode
+            // Add meshdropEvents Share mode
             this.$el.addEventListener('pointerdown', this._callbackPointerDown);
         }
     }
@@ -956,7 +1036,7 @@ class PeerUI {
         // Prevents triggering of event twice on touch devices
         e.stopPropagation();
         e.preventDefault();
-        Events.fire('share-mode-pointerdown', {
+        meshdropEvents.fire('share-mode-pointerdown', {
             peerId: this._peer.id
         });
     }
@@ -1009,7 +1089,7 @@ class PeerUI {
 
         if (files.length === 0) return;
 
-        Events.fire('select-files-transport', {
+        meshdropEvents.fire('select-files-transport', {
             files: files,
             to: this._peer.id
         });
@@ -1027,10 +1107,10 @@ class PeerUI {
         if (progress < 1) {
             if (status !== this.currentStatus) {
                 let statusName = {
-                    "prepare": Localization.getTranslation("peer-ui.preparing"),
-                    "transfer": Localization.getTranslation("peer-ui.transferring"),
-                    "process": Localization.getTranslation("peer-ui.processing"),
-                    "wait": Localization.getTranslation("peer-ui.waiting")
+                    "prepare": meshdropLocalization.getTranslation("peer-ui.preparing"),
+                    "transfer": meshdropLocalization.getTranslation("peer-ui.transferring"),
+                    "process": meshdropLocalization.getTranslation("peer-ui.processing"),
+                    "wait": meshdropLocalization.getTranslation("peer-ui.waiting")
                 }[status];
                 if (transport?.label) statusName = `${statusName} · ${transport.label}`;
 
@@ -1062,13 +1142,13 @@ class PeerUI {
         const text = e.dataTransfer.getData("text");
 
         if (files.length > 0) {
-            Events.fire('select-files-transport', {
+            meshdropEvents.fire('select-files-transport', {
                 files: files,
                 to: peerId
             });
         }
         else if (text.length > 0) {
-            Events.fire('send-text', {
+            meshdropEvents.fire('send-text', {
                 text: text,
                 to: peerId
             });
@@ -1089,7 +1169,7 @@ class PeerUI {
         if (!this._connected) return;
 
         e.preventDefault();
-        Events.fire('text-recipient', {
+        meshdropEvents.fire('text-recipient', {
             peerId: this._peer.id,
             deviceName: e.target.closest('x-peer').querySelector('.name').innerText
         });
@@ -1108,7 +1188,7 @@ class PeerUI {
         }
         else if (this._touchTimer) { // this was a long tap
             e.preventDefault();
-            Events.fire('text-recipient', {
+            meshdropEvents.fire('text-recipient', {
                 peerId: this._peer.id,
                 deviceName: e.target.closest('x-peer').querySelector('.name').innerText
             });
@@ -1119,7 +1199,7 @@ class PeerUI {
 
 class Dialog {
     constructor(id) {
-        this.$el = $(id);
+        this.$el = meshdropGetById(id);
         this.$autoFocus = this.$el.querySelector('[autofocus]');
         this.$xBackground = this.$el.querySelector('x-background');
         this.$closeBtns = this.$el.querySelectorAll('[close]');
@@ -1128,7 +1208,7 @@ class Dialog {
             el.addEventListener('click', _ => this.hide())
         });
 
-        Events.on('peer-disconnected', e => this._onPeerDisconnected(e.detail));
+        meshdropEvents.on('peer-disconnected', e => this._onPeerDisconnected(e.detail));
     }
 
     static anyDialogShown() {
@@ -1158,14 +1238,14 @@ class Dialog {
             window.blur();
         }
         document.title = 'MeshDrop | Transfer Files Cross-Platform. No Setup, No Signup.';
-        changeFavicon("images/favicon-96x96.png");
+        meshdropChangeFavicon("images/favicon-96x96.png");
         this.correspondingPeerId = undefined;
     }
 
     _onPeerDisconnected(peerId) {
         if (this.isShown() && this.correspondingPeerId === peerId) {
             this.hide();
-            Events.fire('notify-user', Localization.getTranslation("notifications.selected-peer-left"));
+            meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.selected-peer-left"));
         }
     }
 
@@ -1184,14 +1264,14 @@ class LanguageSelectDialog extends Dialog {
     constructor() {
         super('language-select-dialog');
 
-        this.$languageSelectBtn = $('language-selector');
+        this.$languageSelectBtn = meshdropGetById('language-selector');
         this.$languageSelectBtn.addEventListener('click', _ => this.show());
 
         this.$languageButtons = this.$el.querySelectorAll(".language-buttons .btn");
         this.$languageButtons.forEach($btn => {
             $btn.addEventListener("click", e => this.selectLanguage(e));
         })
-        Events.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
     }
 
     _onKeyDown(e) {
@@ -1203,8 +1283,8 @@ class LanguageSelectDialog extends Dialog {
     }
 
     show() {
-        let locale = Localization.getLocale();
-        this.currentLanguageBtn = Localization.isSystemLocale()
+        let locale = meshdropLocalization.getLocale();
+        this.currentLanguageBtn = meshdropLocalization.isSystemLocale()
             ? this.$languageButtons[0]
             : this.$el.querySelector(`.btn[value="${locale}"]`);
 
@@ -1230,7 +1310,7 @@ class LanguageSelectDialog extends Dialog {
             localStorage.removeItem('language_code');
         }
 
-        Localization.setTranslation(languageCode)
+        meshdropLocalization.setTranslation(languageCode)
             .then(_ => this.hide());
     }
 }
@@ -1240,7 +1320,7 @@ class ProtocolSettingsDialog extends Dialog {
     constructor() {
         super('protocol-settings-dialog');
 
-        this.$button = $('protocol-settings');
+        this.$button = meshdropGetById('protocol-settings');
         this.$tabs = [...this.$el.querySelectorAll('[data-settings-tab]')];
         this.$panels = [...this.$el.querySelectorAll('[data-settings-panel]')];
         this.$status = this.$el.querySelector('.protocol-settings-status');
@@ -1259,10 +1339,10 @@ class ProtocolSettingsDialog extends Dialog {
 
         if (this.$button) this.$button.addEventListener('click', _ => this.show());
 
-        Events.on('nostr-identity-changed', _ => this.render());
-        Events.on('nostr-server-list-changed', _ => this.render());
-        Events.on('protocol-server-preferences-changed', _ => this.render());
-        Events.on('relay-settings-changed', _ => this._renderRelays());
+        meshdropEvents.on('nostr-identity-changed', _ => this.render());
+        meshdropEvents.on('nostr-server-list-changed', _ => this.render());
+        meshdropEvents.on('protocol-server-preferences-changed', _ => this.render());
+        meshdropEvents.on('relay-settings-changed', _ => this._renderRelays());
         this.$tabs.forEach(tab => tab.addEventListener('click', _ => this._selectTab(tab.dataset.settingsTab)));
         this.$serverList.addEventListener('change', e => this._onToggle(e));
         this.$fipsAddPeer.addEventListener('click', _ => this._addFipsPeerRow());
@@ -1335,7 +1415,7 @@ class ProtocolSettingsDialog extends Dialog {
         }
 
         const status = identity.blossomServerListStatus || 'loading';
-        const servers = ProtocolServerPreferences.normalizeServers(identity.blossomServers);
+        const servers = meshdropProtocolServerPreferences.normalizeServers(identity.blossomServers);
 
         if (status === 'loading') {
             this.$status.textContent = 'Loading your Blossom server list from Nostr relays.';
@@ -1389,7 +1469,7 @@ class ProtocolSettingsDialog extends Dialog {
         input.type = 'checkbox';
         input.dataset.server = server;
         input.dataset.protocol = protocol;
-        input.checked = ProtocolServerPreferences.protocolEnabled(server, protocol);
+        input.checked = meshdropProtocolServerPreferences.protocolEnabled(server, protocol);
 
         wrapper.append(text, input);
         return wrapper;
@@ -1399,7 +1479,7 @@ class ProtocolSettingsDialog extends Dialog {
         const input = event.target;
         if (!input?.dataset?.server || !input.dataset.protocol) return;
 
-        ProtocolServerPreferences.setProtocolEnabled(
+        meshdropProtocolServerPreferences.setProtocolEnabled(
             input.dataset.server,
             input.dataset.protocol,
             input.checked
@@ -1528,9 +1608,9 @@ class ProtocolSettingsDialog extends Dialog {
     }
 
     _renderRelays() {
-        if (!globalThis.RelaySettingsPreferences) return;
+        if (!globalThis.meshdropRelaySettingsPreferences) return;
 
-        const settings = RelaySettingsPreferences.normalize(RelaySettingsPreferences.read());
+        const settings = meshdropRelaySettingsPreferences.normalize(meshdropRelaySettingsPreferences.read());
         this.$relayBootstrap.value = settings.bootstrapRelays.join('\n');
         this.$relayWebRtc.value = settings.webRtcRelays.join('\n');
         this.$relayInbox.value = settings.inboxRelays.join('\n');
@@ -1539,7 +1619,7 @@ class ProtocolSettingsDialog extends Dialog {
     }
 
     async _saveRelays() {
-        const settings = RelaySettingsPreferences.write({
+        const settings = meshdropRelaySettingsPreferences.write({
             bootstrapRelays: this._textareaLines(this.$relayBootstrap),
             webRtcRelays: this._textareaLines(this.$relayWebRtc),
             inboxRelays: this._textareaLines(this.$relayInbox),
@@ -1555,9 +1635,9 @@ class ProtocolSettingsDialog extends Dialog {
 
         try {
             const event = await identityController.signEvent({
-                kind: NostrDiscoveryProtocol.relayListKind,
+                kind: meshdropNostrDiscoveryProtocol.relayListKind,
                 created_at: Math.floor(Date.now() / 1000),
-                tags: RelaySettingsPreferences.relayListTags(settings.inboxRelays, settings.outboxRelays),
+                tags: meshdropRelaySettingsPreferences.relayListTags(settings.inboxRelays, settings.outboxRelays),
                 content: ''
             });
             const relays = [
@@ -1587,14 +1667,14 @@ class TransferChoiceDialog extends Dialog {
         this.$list = this.$el.querySelector('.transfer-choice-list');
         this.$list.addEventListener('click', e => this._onOptionClick(e));
 
-        Events.on('select-files-transport', e => this._onFilesSelected(e.detail));
+        meshdropEvents.on('select-files-transport', e => this._onFilesSelected(e.detail));
     }
 
     _onFilesSelected(detail) {
-        const peerNode = $(detail.to);
+        const peerNode = meshdropGetById(detail.to);
         const peer = peerNode?.ui?._peer;
         if (!peer) {
-            Events.fire('files-selected', detail);
+            meshdropEvents.fire('files-selected', detail);
             return;
         }
 
@@ -1605,7 +1685,7 @@ class TransferChoiceDialog extends Dialog {
         };
 
         if (!this._detail.options.length) {
-            Events.fire('files-selected', {
+            meshdropEvents.fire('files-selected', {
                 ...detail,
                 transport: {id: 'direct', type: 'direct', label: 'Direct'}
             });
@@ -1673,7 +1753,7 @@ class TransferChoiceDialog extends Dialog {
         const transport = this._detail.options.find(option => option.id === button.dataset.transportId);
         if (!transport) return;
 
-        Events.fire('files-selected', {
+        meshdropEvents.fire('files-selected', {
             files: this._detail.files,
             to: transport.peerId || this._detail.to,
             transport
@@ -1722,13 +1802,13 @@ class ReceiveDialog extends Dialog {
 
         if (files.length === 2) {
             fileOther = imagesOnly
-                ? Localization.getTranslation("dialogs.file-other-description-image")
-                : Localization.getTranslation("dialogs.file-other-description-file");
+                ? meshdropLocalization.getTranslation("dialogs.file-other-description-image")
+                : meshdropLocalization.getTranslation("dialogs.file-other-description-file");
         }
         else if (files.length >= 2) {
             fileOther = imagesOnly
-                ? Localization.getTranslation("dialogs.file-other-description-image-plural", null, {count: files.length - 1})
-                : Localization.getTranslation("dialogs.file-other-description-file-plural", null, {count: files.length - 1});
+                ? meshdropLocalization.getTranslation("dialogs.file-other-description-image-plural", null, {count: files.length - 1})
+                : meshdropLocalization.getTranslation("dialogs.file-other-description-file-plural", null, {count: files.length - 1});
         }
 
         this.$fileOther.innerText = fileOther;
@@ -1756,14 +1836,14 @@ class ReceiveFileDialog extends ReceiveDialog {
         this.$downloadBtn = this.$el.querySelector('#download-btn');
         this.$shareBtn = this.$el.querySelector('#share-btn');
 
-        Events.on('files-received', e => this._onFilesReceived(e.detail.peerId, e.detail.files, e.detail.imagesOnly, e.detail.totalSize));
+        meshdropEvents.on('files-received', e => this._onFilesReceived(e.detail.peerId, e.detail.files, e.detail.imagesOnly, e.detail.totalSize));
         this._filesQueue = [];
     }
 
     async _onFilesReceived(peerId, files, imagesOnly, totalSize) {
-        const displayName = $(peerId).ui._displayName();
-        const connectionHash = $(peerId).ui._connectionHash;
-        const badgeClassName = $(peerId).ui._badgeClassName();
+        const displayName = meshdropGetById(peerId).ui._displayName();
+        const connectionHash = meshdropGetById(peerId).ui._connectionHash;
+        const badgeClassName = meshdropGetById(peerId).ui._badgeClassName();
 
         this._filesQueue.push({
             peerId: peerId,
@@ -1816,7 +1896,7 @@ class ReceiveFileDialog extends ReceiveDialog {
                     };
                     element.src = URL.createObjectURL(file);
                 }
-            } catch (e) {
+            } catch (_e) {
                 reject(`preview could not be loaded from type ${file.type}`);
             }
         });
@@ -1828,15 +1908,15 @@ class ReceiveFileDialog extends ReceiveDialog {
         let descriptor, url, filenameDownload;
         if (files.length === 1) {
             descriptor = imagesOnly
-                ? Localization.getTranslation("dialogs.title-image")
-                : Localization.getTranslation("dialogs.title-file");
+                ? meshdropLocalization.getTranslation("dialogs.title-image")
+                : meshdropLocalization.getTranslation("dialogs.title-file");
         }
         else {
             descriptor = imagesOnly
-                ? Localization.getTranslation("dialogs.title-image-plural")
-                : Localization.getTranslation("dialogs.title-file-plural");
+                ? meshdropLocalization.getTranslation("dialogs.title-image-plural")
+                : meshdropLocalization.getTranslation("dialogs.title-file-plural");
         }
-        this.$receiveTitle.innerText = Localization.getTranslation("dialogs.receive-title", null, {descriptor: descriptor});
+        this.$receiveTitle.innerText = meshdropLocalization.getTranslation("dialogs.receive-title", null, {descriptor: descriptor});
 
         const canShare = (window.iOS || window.android) && !!navigator.share && navigator.canShare({files});
         if (canShare) {
@@ -1854,11 +1934,11 @@ class ReceiveFileDialog extends ReceiveDialog {
             downloadZipped = true;
             try {
                 let bytesCompleted = 0;
-                zipper.createNewZipWriter();
+                globalThis.zipper.createNewZipWriter();
                 for (let i=0; i<files.length; i++) {
-                    await zipper.addFile(files[i], {
+                    await globalThis.zipper.addFile(files[i], {
                         onprogress: (progress) => {
-                            Events.fire('set-progress', {
+                            meshdropEvents.fire('set-progress', {
                                 peerId: peerId,
                                 progress: (bytesCompleted + progress) / totalSize,
                                 status: 'process'
@@ -1867,7 +1947,7 @@ class ReceiveFileDialog extends ReceiveDialog {
                     });
                     bytesCompleted += files[i].size;
                 }
-                url = await zipper.getBlobURL();
+                url = await globalThis.zipper.getBlobURL();
 
                 let now = new Date(Date.now());
                 let year = now.getFullYear().toString();
@@ -1887,7 +1967,7 @@ class ReceiveFileDialog extends ReceiveDialog {
         }
 
         this.$downloadBtn.removeAttribute('disabled');
-        this.$downloadBtn.innerText = Localization.getTranslation("dialogs.download");
+        this.$downloadBtn.innerText = meshdropLocalization.getTranslation("dialogs.download");
         this.$downloadBtn.onclick = _ => {
             if (downloadZipped) {
                 let tmpZipBtn = document.createElement("a");
@@ -1900,9 +1980,9 @@ class ReceiveFileDialog extends ReceiveDialog {
             }
 
             if (!canShare) {
-                this.$downloadBtn.innerText = Localization.getTranslation("dialogs.download-again");
+                this.$downloadBtn.innerText = meshdropLocalization.getTranslation("dialogs.download-again");
             }
-            Events.fire('notify-user', Localization.getTranslation("notifications.download-successful", null, {descriptor: descriptor}));
+            meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.download-successful", null, {descriptor: descriptor}));
 
             // Prevent clicking the button multiple times
             this.$downloadBtn.style.pointerEvents = "none";
@@ -1910,11 +1990,11 @@ class ReceiveFileDialog extends ReceiveDialog {
         };
 
         document.title = files.length === 1
-            ? `${ Localization.getTranslation("document-titles.file-received") } - MeshDrop`
-            : `${ Localization.getTranslation("document-titles.file-received-plural", null, {count: files.length}) } - MeshDrop`;
-        changeFavicon("images/favicon-96x96-notification.png");
+            ? `${ meshdropLocalization.getTranslation("document-titles.file-received") } - MeshDrop`
+            : `${ meshdropLocalization.getTranslation("document-titles.file-received-plural", null, {count: files.length}) } - MeshDrop`;
+        meshdropChangeFavicon("images/favicon-96x96-notification.png");
 
-        Events.fire('set-progress', {peerId: peerId, progress: 1, status: 'process'})
+        meshdropEvents.fire('set-progress', {peerId: peerId, progress: 1, status: 'process'})
         this.show();
 
         setTimeout(() => {
@@ -1970,8 +2050,8 @@ class ReceiveRequestDialog extends ReceiveDialog {
         this.$acceptRequestBtn.addEventListener('click', _ => this._respondToFileTransferRequest(true));
         this.$declineRequestBtn.addEventListener('click', _ => this._respondToFileTransferRequest(false));
 
-        Events.on('files-transfer-request', e => this._onRequestFileTransfer(e.detail.request, e.detail.peerId))
-        Events.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('files-transfer-request', e => this._onRequestFileTransfer(e.detail.request, e.detail.peerId))
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
         this._filesTransferRequestQueue = [];
     }
 
@@ -1998,10 +2078,10 @@ class ReceiveRequestDialog extends ReceiveDialog {
     _showRequestDialog(request, peerId) {
         this.correspondingPeerId = peerId;
 
-        const displayName = $(peerId).ui._displayName();
-        const connectionHash = $(peerId).ui._connectionHash;
+        const displayName = meshdropGetById(peerId).ui._displayName();
+        const connectionHash = meshdropGetById(peerId).ui._connectionHash;
 
-        const badgeClassName = $(peerId).ui._badgeClassName();
+        const badgeClassName = meshdropGetById(peerId).ui._badgeClassName();
 
         this._parseFileData(displayName, connectionHash, request.header, request.imagesOnly, request.totalSize, badgeClassName);
 
@@ -2012,25 +2092,25 @@ class ReceiveRequestDialog extends ReceiveDialog {
         }
 
         const transferRequestTitle= request.imagesOnly
-            ? Localization.getTranslation('document-titles.image-transfer-requested')
-            : Localization.getTranslation('document-titles.file-transfer-requested');
+            ? meshdropLocalization.getTranslation('document-titles.image-transfer-requested')
+            : meshdropLocalization.getTranslation('document-titles.file-transfer-requested');
 
         this.$receiveTitle.innerText = transferRequestTitle;
 
         document.title =  `${transferRequestTitle} - MeshDrop`;
-        changeFavicon("images/favicon-96x96-notification.png");
+        meshdropChangeFavicon("images/favicon-96x96-notification.png");
 
         this.$acceptRequestBtn.removeAttribute('disabled');
         this.show();
     }
 
     _respondToFileTransferRequest(accepted) {
-        Events.fire('respond-to-files-transfer-request', {
+        meshdropEvents.fire('respond-to-files-transfer-request', {
             to: this.correspondingPeerId,
             accepted: accepted
         })
         if (accepted) {
-            Events.fire('set-progress', {peerId: this.correspondingPeerId, progress: 0, status: 'wait'});
+            meshdropEvents.fire('set-progress', {peerId: this.correspondingPeerId, progress: 0, status: 'wait'});
             NoSleepUI.enable();
         }
         this.hide();
@@ -2167,9 +2247,9 @@ class InputKeyContainer {
 class PairDeviceDialog extends Dialog {
     constructor() {
         super('pair-device-dialog');
-        this.$pairDeviceHeaderBtn = $('pair-device');
-        this.$editPairedDevicesHeaderBtn = $('edit-paired-devices');
-        this.$footerInstructionsPairedDevices = $$('.discovery-wrapper .badge-room-secret');
+        this.$pairDeviceHeaderBtn = meshdropGetById('pair-device');
+        this.$editPairedDevicesHeaderBtn = meshdropGetById('edit-paired-devices');
+        this.$footerInstructionsPairedDevices = meshdropQuery('.discovery-wrapper .badge-room-secret');
 
         this.$key = this.$el.querySelector('.key');
         this.$qrCode = this.$el.querySelector('.key-qr-code');
@@ -2189,16 +2269,16 @@ class PairDeviceDialog extends Dialog {
         this.$form.addEventListener('submit', e => this._onSubmit(e));
         this.$closeBtn.addEventListener('click', _ => this._close());
 
-        Events.on('keydown', e => this._onKeyDown(e));
-        Events.on('ws-disconnected', _ => this.hide());
-        Events.on('pair-device-initiated', e => this._onPairDeviceInitiated(e.detail));
-        Events.on('pair-device-joined', e => this._onPairDeviceJoined(e.detail.peerId, e.detail.roomSecret));
-        Events.on('peers', e => this._onPeers(e.detail));
-        Events.on('peer-joined', e => this._onPeerJoined(e.detail));
-        Events.on('pair-device-join-key-invalid', _ => this._onPublicRoomJoinKeyInvalid());
-        Events.on('pair-device-canceled', e => this._onPairDeviceCanceled(e.detail));
-        Events.on('evaluate-number-room-secrets', _ => this._evaluateNumberRoomSecrets())
-        Events.on('secret-room-deleted', e => this._onSecretRoomDeleted(e.detail));
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('ws-disconnected', _ => this.hide());
+        meshdropEvents.on('pair-device-initiated', e => this._onPairDeviceInitiated(e.detail));
+        meshdropEvents.on('pair-device-joined', e => this._onPairDeviceJoined(e.detail.peerId, e.detail.roomSecret));
+        meshdropEvents.on('peers', e => this._onPeers(e.detail));
+        meshdropEvents.on('peer-joined', e => this._onPeerJoined(e.detail));
+        meshdropEvents.on('pair-device-join-key-invalid', _ => this._onPublicRoomJoinKeyInvalid());
+        meshdropEvents.on('pair-device-canceled', e => this._onPairDeviceCanceled(e.detail));
+        meshdropEvents.on('evaluate-number-room-secrets', _ => this._evaluateNumberRoomSecrets())
+        meshdropEvents.on('secret-room-deleted', e => this._onSecretRoomDeleted(e.detail));
         this.$el.addEventListener('paste', e => this._onPaste(e));
         this.$qrCode.addEventListener('click', _ => this._copyPairUrl());
 
@@ -2224,7 +2304,7 @@ class PairDeviceDialog extends Dialog {
     }
 
     _pairDeviceInitiate() {
-        Events.fire('pair-device-initiate');
+        meshdropEvents.fire('pair-device-initiate');
     }
 
     _onPairDeviceInitiated(msg) {
@@ -2239,7 +2319,7 @@ class PairDeviceDialog extends Dialog {
         this.$key.innerText = `${this.pairKey.substring(0,3)} ${this.pairKey.substring(3,6)}`
 
         // Display the QR code for the url
-        const qr = new QRCode({
+        const qr = new globalThis.QRCode({
             content: this._getPairUrl(),
             width: 130,
             height: 130,
@@ -2249,7 +2329,7 @@ class PairDeviceDialog extends Dialog {
             ecl: "L",
             join: true
         });
-        this.$qrCode.innerHTML = qr.svg();
+        MeshDropSafeDom.setQrSvg(this.$qrCode, qr.svg());
     }
 
     _getPairUrl() {
@@ -2261,10 +2341,10 @@ class PairDeviceDialog extends Dialog {
     _copyPairUrl() {
         navigator.clipboard.writeText(this._getPairUrl())
             .then(_ => {
-                Events.fire('notify-user', Localization.getTranslation("notifications.pair-url-copied-to-clipboard"));
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.pair-url-copied-to-clipboard"));
             })
             .catch(_ => {
-                Events.fire('notify-user', Localization.getTranslation("notifications.copied-to-clipboard-error"));
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.copied-to-clipboard-error"));
             })
     }
 
@@ -2280,20 +2360,20 @@ class PairDeviceDialog extends Dialog {
 
     _pairDeviceJoin(pairKey) {
         if (/^\d{6}$/g.test(pairKey)) {
-            Events.fire('pair-device-join', pairKey);
+            meshdropEvents.fire('pair-device-join', pairKey);
             this.inputKeyContainer.focusLastChar();
         }
     }
 
     _onPairDeviceJoined(peerId, roomSecret) {
         // abort if peer is another tab on the same browser and remove room-type from gui
-        if (BrowserTabsConnector.peerIsSameBrowser(peerId)) {
+        if (meshdropBrowserTabsConnector.peerIsSameBrowser(peerId)) {
             this._cleanUp();
             this.hide();
 
-            Events.fire('room-secrets-deleted', [roomSecret]);
+            meshdropEvents.fire('room-secrets-deleted', [roomSecret]);
 
-            Events.fire('notify-user', Localization.getTranslation("notifications.pairing-tabs-error"));
+            meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.pairing-tabs-error"));
             return;
         }
 
@@ -2331,17 +2411,17 @@ class PairDeviceDialog extends Dialog {
 
     _onPairPeerJoined(peerId, roomSecret) {
         // if devices are paired that are already connected we must save the names at this point
-        const $peer = $(peerId);
+        const $peer = meshdropGetById(peerId);
         let displayName, deviceName;
         if ($peer) {
             displayName = $peer.ui._peer.name.displayName;
             deviceName = $peer.ui._peer.name.deviceName;
         }
 
-        PersistentStorage
+        meshdropPersistentStorage
             .addRoomSecret(roomSecret, displayName, deviceName)
             .then(_ => {
-                Events.fire('notify-user', Localization.getTranslation("notifications.pairing-success"));
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.pairing-success"));
                 this._evaluateNumberRoomSecrets();
             })
             .finally(() => {
@@ -2349,13 +2429,13 @@ class PairDeviceDialog extends Dialog {
                 this.hide();
             })
             .catch(_ => {
-                Events.fire('notify-user', Localization.getTranslation("notifications.pairing-not-persistent"));
-                PersistentStorage.logBrowserNotCapable();
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.pairing-not-persistent"));
+                meshdropPersistentStorage.logBrowserNotCapable();
             });
     }
 
     _onPublicRoomJoinKeyInvalid() {
-        Events.fire('notify-user', Localization.getTranslation("notifications.pairing-key-invalid"));
+        meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.pairing-key-invalid"));
     }
 
     _close() {
@@ -2365,11 +2445,11 @@ class PairDeviceDialog extends Dialog {
     _pairDeviceCancel() {
         this.hide();
         this._cleanUp();
-        Events.fire('pair-device-cancel');
+        meshdropEvents.fire('pair-device-cancel');
     }
 
     _onPairDeviceCanceled(pairKey) {
-        Events.fire('notify-user', Localization.getTranslation("notifications.pairing-key-invalidated", null, {key: pairKey}));
+        meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.pairing-key-invalidated", null, {key: pairKey}));
     }
 
     _cleanUp() {
@@ -2380,7 +2460,7 @@ class PairDeviceDialog extends Dialog {
     }
 
     _onSecretRoomDeleted(roomSecret) {
-        PersistentStorage
+        meshdropPersistentStorage
             .deleteRoomSecret(roomSecret)
             .then(_ => {
                 this._evaluateNumberRoomSecrets();
@@ -2388,7 +2468,7 @@ class PairDeviceDialog extends Dialog {
     }
 
     _evaluateNumberRoomSecrets() {
-        PersistentStorage
+        meshdropPersistentStorage
             .getAllRoomSecrets()
             .then(roomSecrets => {
                 if (roomSecrets.length > 0) {
@@ -2399,7 +2479,7 @@ class PairDeviceDialog extends Dialog {
                     this.$editPairedDevicesHeaderBtn.setAttribute('hidden', true);
                     this.$footerInstructionsPairedDevices.setAttribute('hidden', true);
                 }
-                Events.fire('evaluate-footer-badges');
+                meshdropEvents.fire('evaluate-footer-badges');
             });
     }
 }
@@ -2408,13 +2488,13 @@ class EditPairedDevicesDialog extends Dialog {
     constructor() {
         super('edit-paired-devices-dialog');
         this.$pairedDevicesWrapper = this.$el.querySelector('.paired-devices-wrapper');
-        this.$footerBadgePairedDevices = $$('.discovery-wrapper .badge-room-secret');
+        this.$footerBadgePairedDevices = meshdropQuery('.discovery-wrapper .badge-room-secret');
 
-        $('edit-paired-devices').addEventListener('click', _ => this._onEditPairedDevices());
+        meshdropGetById('edit-paired-devices').addEventListener('click', _ => this._onEditPairedDevices());
         this.$footerBadgePairedDevices.addEventListener('click', _ => this._onEditPairedDevices());
 
-        Events.on('peer-display-name-changed', e => this._onPeerDisplayNameChanged(e));
-        Events.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('peer-display-name-changed', e => this._onPeerDisplayNameChanged(e));
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
     }
 
     _onKeyDown(e) {
@@ -2426,10 +2506,10 @@ class EditPairedDevicesDialog extends Dialog {
     }
 
     async _initDOM() {
-        const pairedDeviceRemovedString = Localization.getTranslation("dialogs.paired-device-removed");
-        const unpairString = Localization.getTranslation("dialogs.unpair").toUpperCase();
-        const autoAcceptString = Localization.getTranslation("dialogs.auto-accept").toLowerCase();
-        const roomSecretsEntries = await PersistentStorage.getAllRoomSecretEntries();
+        const pairedDeviceRemovedString = meshdropLocalization.getTranslation("dialogs.paired-device-removed");
+        const unpairString = meshdropLocalization.getTranslation("dialogs.unpair").toUpperCase();
+        const autoAcceptString = meshdropLocalization.getTranslation("dialogs.auto-accept").toLowerCase();
+        const roomSecretsEntries = await meshdropPersistentStorage.getAllRoomSecretEntries();
 
         roomSecretsEntries
             .forEach(roomSecretsEntry => {
@@ -2464,10 +2544,10 @@ class EditPairedDevicesDialog extends Dialog {
                 $pairedDevice
                     .querySelector('input[type="checkbox"]')
                     .addEventListener('click', e => {
-                        PersistentStorage
+                        meshdropPersistentStorage
                             .updateRoomSecretAutoAccept(roomSecretsEntry.secret, e.target.checked)
                             .then(roomSecretsEntry => {
-                                Events.fire('auto-accept-updated', {
+                                meshdropEvents.fire('auto-accept-updated', {
                                     'roomSecret': roomSecretsEntry.entry.secret,
                                     'autoAccept': e.target.checked
                                 });
@@ -2476,12 +2556,12 @@ class EditPairedDevicesDialog extends Dialog {
 
                 $pairedDevice
                     .querySelector('button')
-                    .addEventListener('click', e => {
-                        PersistentStorage
+                    .addEventListener('click', _e => {
+                        meshdropPersistentStorage
                             .deleteRoomSecret(roomSecretsEntry.secret)
                             .then(roomSecret => {
-                                Events.fire('room-secrets-deleted', [roomSecret]);
-                                Events.fire('evaluate-number-room-secrets');
+                                meshdropEvents.fire('room-secrets-deleted', [roomSecret]);
+                                meshdropEvents.fire('evaluate-number-room-secrets');
                                 $pairedDevice.innerText = "";
                             });
                     })
@@ -2506,15 +2586,15 @@ class EditPairedDevicesDialog extends Dialog {
     }
 
     _clearRoomSecrets() {
-        PersistentStorage
+        meshdropPersistentStorage
             .getAllRoomSecrets()
             .then(roomSecrets => {
-                PersistentStorage
+                meshdropPersistentStorage
                     .clearRoomSecrets()
                     .finally(() => {
-                        Events.fire('room-secrets-deleted', roomSecrets);
-                        Events.fire('evaluate-number-room-secrets');
-                        Events.fire('notify-user', Localization.getTranslation("notifications.pairing-cleared"));
+                        meshdropEvents.fire('room-secrets-deleted', roomSecrets);
+                        meshdropEvents.fire('evaluate-number-room-secrets');
+                        meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.pairing-cleared"));
                         this.hide();
                     })
             });
@@ -2522,7 +2602,7 @@ class EditPairedDevicesDialog extends Dialog {
 
     _onPeerDisplayNameChanged(e) {
         const peerId = e.detail.peerId;
-        const peerNode = $(peerId);
+        const peerNode = meshdropGetById(peerId);
 
         if (!peerNode) return;
 
@@ -2530,7 +2610,7 @@ class EditPairedDevicesDialog extends Dialog {
 
         if (!peer || !peer._roomIds["secret"]) return;
 
-        PersistentStorage
+        meshdropPersistentStorage
             .updateRoomSecretNames(peer._roomIds["secret"], peer.name.displayName, peer.name.deviceName)
             .then(roomSecretEntry => {
                 console.log(`Successfully updated DisplayName and DeviceName for roomSecretEntry ${roomSecretEntry.key}`);
@@ -2548,8 +2628,8 @@ class PublicRoomDialog extends Dialog {
         this.$closeBtn = this.$el.querySelector('[close]');
         this.$leaveBtn = this.$el.querySelector('.leave-room');
         this.$joinSubmitBtn = this.$el.querySelector('button[type="submit"]');
-        this.$headerBtnJoinPublicRoom = $('join-public-room');
-        this.$footerBadgePublicRoomDevices = $$('.discovery-wrapper .badge-room-public-id');
+        this.$headerBtnJoinPublicRoom = meshdropGetById('join-public-room');
+        this.$footerBadgePublicRoomDevices = meshdropQuery('.discovery-wrapper .badge-room-public-id');
 
 
         this.$form.addEventListener('submit', e => this._onSubmit(e));
@@ -2567,17 +2647,17 @@ class PublicRoomDialog extends Dialog {
             () => this._submit()
         );
 
-        Events.on('keydown', e => this._onKeyDown(e));
-        Events.on('public-room-created', e => this._onPublicRoomCreated(e.detail));
-        Events.on('peers', e => this._onPeers(e.detail));
-        Events.on('peer-joined', e => this._onPeerJoined(e.detail));
-        Events.on('public-room-id-invalid', e => this._onPublicRoomIdInvalid(e.detail));
-        Events.on('public-room-left', _ => this._onPublicRoomLeft());
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('public-room-created', e => this._onPublicRoomCreated(e.detail));
+        meshdropEvents.on('peers', e => this._onPeers(e.detail));
+        meshdropEvents.on('peer-joined', e => this._onPeerJoined(e.detail));
+        meshdropEvents.on('public-room-id-invalid', e => this._onPublicRoomIdInvalid(e.detail));
+        meshdropEvents.on('public-room-left', _ => this._onPublicRoomLeft());
         this.$el.addEventListener('paste', e => this._onPaste(e));
         this.$qrCode.addEventListener('click', _ => this._copyShareRoomUrl());
 
-        Events.on('ws-connected', _ => this._onWsConnected());
-        Events.on('translation-loaded', _ => this.setFooterBadge());
+        meshdropEvents.on('ws-connected', _ => this._onWsConnected());
+        meshdropEvents.on('translation-loaded', _ => this.setFooterBadge());
     }
 
     _onKeyDown(e) {
@@ -2604,7 +2684,7 @@ class PublicRoomDialog extends Dialog {
     }
 
     _createPublicRoom() {
-        Events.fire('create-public-room');
+        meshdropEvents.fire('create-public-room');
     }
 
     _onPublicRoomCreated(roomId) {
@@ -2623,7 +2703,7 @@ class PublicRoomDialog extends Dialog {
         this.$key.innerText = this.roomId.toUpperCase();
 
         // Display the QR code for the url
-        const qr = new QRCode({
+        const qr = new globalThis.QRCode({
             content: this._getShareRoomUrl(),
             width: 130,
             height: 130,
@@ -2633,7 +2713,7 @@ class PublicRoomDialog extends Dialog {
             ecl: "L",
             join: true
         });
-        this.$qrCode.innerHTML = qr.svg();
+        MeshDropSafeDom.setQrSvg(this.$qrCode, qr.svg());
 
         this.setFooterBadge();
     }
@@ -2642,12 +2722,12 @@ class PublicRoomDialog extends Dialog {
         if (!this.roomId) return;
 
         this.$footerBadgePublicRoomDevices.dataset.roomId = this.roomId.toUpperCase();
-        this.$footerBadgePublicRoomDevices.innerText = Localization.getTranslation("footer.public-room-devices", null, {
+        this.$footerBadgePublicRoomDevices.innerText = meshdropLocalization.getTranslation("footer.public-room-devices", null, {
             roomId: this.roomId.toUpperCase()
         });
         this.$footerBadgePublicRoomDevices.removeAttribute('hidden');
 
-        Events.fire('evaluate-footer-badges');
+        meshdropEvents.fire('evaluate-footer-badges');
     }
 
     _getShareRoomUrl() {
@@ -2659,10 +2739,10 @@ class PublicRoomDialog extends Dialog {
     _copyShareRoomUrl() {
         navigator.clipboard.writeText(this._getShareRoomUrl())
             .then(_ => {
-                Events.fire('notify-user', Localization.getTranslation("notifications.room-url-copied-to-clipboard"));
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.room-url-copied-to-clipboard"));
             })
             .catch(_ => {
-                Events.fire('notify-user', Localization.getTranslation("notifications.copied-to-clipboard-error"));
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.copied-to-clipboard-error"));
             })
     }
 
@@ -2694,7 +2774,7 @@ class PublicRoomDialog extends Dialog {
 
             this.inputKeyContainer.focusLastChar();
 
-            Events.fire('join-public-room', {
+            meshdropEvents.fire('join-public-room', {
                 roomId: roomId,
                 createIfInvalid: createIfInvalid
             });
@@ -2729,21 +2809,21 @@ class PublicRoomDialog extends Dialog {
     }
 
     _onPublicRoomIdInvalid(roomId) {
-        Events.fire('notify-user', Localization.getTranslation("notifications.public-room-id-invalid"));
+        meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.public-room-id-invalid"));
         if (roomId === sessionStorage.getItem('public_room_id')) {
             sessionStorage.removeItem('public_room_id');
         }
     }
 
     _leavePublicRoom() {
-        Events.fire('leave-public-room', this.roomId);
+        meshdropEvents.fire('leave-public-room', this.roomId);
     }
 
     _onPublicRoomLeft() {
         let publicRoomId = this.roomId.toUpperCase();
         this.hide();
         this._cleanUp();
-        Events.fire('notify-user', Localization.getTranslation("notifications.public-room-left", null, {publicRoomId: publicRoomId}));
+        meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.public-room-left", null, {publicRoomId: publicRoomId}));
     }
 
     show() {
@@ -2762,7 +2842,7 @@ class PublicRoomDialog extends Dialog {
         sessionStorage.removeItem('public_room_id');
         delete this.$footerBadgePublicRoomDevices.dataset.roomId;
         this.$footerBadgePublicRoomDevices.setAttribute('hidden', true);
-        Events.fire('evaluate-footer-badges');
+        meshdropEvents.fire('evaluate-footer-badges');
     }
 }
 
@@ -2779,8 +2859,8 @@ class SendTextDialog extends Dialog {
         this.$text.addEventListener('paste', e => this._onPaste(e));
         this.$text.addEventListener('drop', e => this._onDrop(e));
 
-        Events.on('text-recipient', e => this._onRecipient(e.detail.peerId, e.detail.deviceName));
-        Events.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('text-recipient', e => this._onRecipient(e.detail.peerId, e.detail.deviceName));
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
     }
 
     _onKeyDown(e) {
@@ -2850,7 +2930,7 @@ class SendTextDialog extends Dialog {
         this.correspondingPeerId = peerId;
         this.$peerDisplayName.innerText = deviceName;
         this.$peerDisplayName.classList.remove("badge-room-ip", "badge-room-secret", "badge-room-public-id");
-        this.$peerDisplayName.classList.add($(peerId).ui._badgeClassName());
+        this.$peerDisplayName.classList.add(meshdropGetById(peerId).ui._badgeClassName());
 
         this.show();
 
@@ -2868,7 +2948,7 @@ class SendTextDialog extends Dialog {
     }
 
     _send() {
-        Events.fire('send-text', {
+        meshdropEvents.fire('send-text', {
             to: this.correspondingPeerId,
             text: this.$text.innerText
         });
@@ -2880,7 +2960,7 @@ class SendTextDialog extends Dialog {
 class ReceiveTextDialog extends Dialog {
     constructor() {
         super('receive-text-dialog');
-        Events.on('text-received', e => this._onText(e.detail.text, e.detail.peerId));
+        meshdropEvents.on('text-received', e => this._onText(e.detail.text, e.detail.peerId));
         this.$text = this.$el.querySelector('#text');
         this.$copy = this.$el.querySelector('#copy');
         this.$close = this.$el.querySelector('#close');
@@ -2888,7 +2968,7 @@ class ReceiveTextDialog extends Dialog {
         this.$copy.addEventListener('click', _ => this._onCopy());
         this.$close.addEventListener('click', _ => this.hide());
 
-        Events.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
 
         this.$displayName = this.$el.querySelector('.display-name');
         this._receiveTextQueue = [];
@@ -2914,7 +2994,7 @@ class ReceiveTextDialog extends Dialog {
         window.blop.play();
         this._receiveTextQueue.push({text: text, peerId: peerId});
         this._setDocumentTitleMessages();
-        changeFavicon("images/favicon-96x96-notification.png");
+        meshdropChangeFavicon("images/favicon-96x96-notification.png");
 
         if (this.isShown() || this._hideTimeout) return;
 
@@ -2923,85 +3003,22 @@ class ReceiveTextDialog extends Dialog {
 
     _dequeueRequests() {
         this._setDocumentTitleMessages();
-        changeFavicon("images/favicon-96x96-notification.png");
+        meshdropChangeFavicon("images/favicon-96x96-notification.png");
 
         let {text, peerId} = this._receiveTextQueue.shift();
         this._showReceiveTextDialog(text, peerId);
     }
 
     _showReceiveTextDialog(text, peerId) {
-        this.$displayName.innerText = $(peerId).ui._displayName();
+        this.$displayName.innerText = meshdropGetById(peerId).ui._displayName();
         this.$displayName.classList.remove("badge-room-ip", "badge-room-secret", "badge-room-public-id");
-        this.$displayName.classList.add($(peerId).ui._badgeClassName());
+        this.$displayName.classList.add(meshdropGetById(peerId).ui._badgeClassName());
 
         this.$text.innerText = text;
 
         // Beautify text if text is not too long
         if (this.$text.innerText.length <= 300000) {
-            // Hacky workaround to replace URLs with link nodes in all cases
-            // 1. Use text variable, find all valid URLs via regex and replace URLs with placeholder
-            // 2. Use html variable, find placeholders with regex and replace them with link nodes
-
-            let $textShadow = document.createElement('div');
-            $textShadow.innerText = text;
-
-            let linkNodes = {};
-            let searchHTML = $textShadow.innerHTML;
-            const p = "@";
-            const pRgx = new RegExp(`${p}\\d+`, 'g');
-            let occP = searchHTML.match(pRgx) || [];
-
-            let m = 0;
-
-            const chrs = `a-zA-Z0-9áàäčçđéèêŋńñóòôöšŧüžæøåëìíîïðùúýþćěłřśţźǎǐǒǔǥǧǩǯəʒâûœÿãõāēīōūăąĉċďĕėęĝğġģĥħĩĭįıĵķĸĺļľņňŏőŕŗŝşťũŭůűųŵŷżאבגדהוזחטיךכלםמןנסעףפץצקרשתװױײ`; // allowed chars in domain names
-            const rgxWhitespace = `(^|\\n|\\s)`;
-            const rgxScheme = `(https?:\\/\\/)`
-            const rgxSchemeMail = `(mailto:)`
-            const rgxUserinfo = `(?:(?:[${chrs}.%]*(?::[${chrs}.%]*)?)@)`;
-            const rgxHost = `(?:(?:[${chrs}](?:[${chrs}-]{0,61}[${chrs}])?\\.)+[${chrs}][${chrs}-]{0,61}[${chrs}])`;
-            const rgxPort = `(:\\d*)`;
-            const rgxPath = `(?:(?:\\/[${chrs}\\-\\._~!$&'\\(\\)\\*\\+,;=:@%]*)*)`;
-            const rgxQueryAndFragment = `(\\?[${chrs}\\-_~:\\/#\\[\\]@!$&'\\(\\)*+,;=%.]*)`;
-            const rgxUrl = `(${rgxScheme}?${rgxHost}${rgxPort}?${rgxPath}${rgxQueryAndFragment}?)`;
-            const rgxMail = `(${rgxSchemeMail}${rgxUserinfo}${rgxHost})`;
-            const rgxUrlAll = new RegExp(`${rgxWhitespace}${rgxUrl}`, 'g');
-            const rgxMailAll = new RegExp(`${rgxWhitespace}${rgxMail}`, 'g');
-
-            const replaceMatchWithPlaceholder = function(match, whitespace, url, scheme) {
-                let link = url;
-
-                // prefix www.example.com with http scheme to prevent it from being a relative link
-                if (!scheme && link.startsWith('www')) {
-                    link = "http://" + link
-                }
-
-                if (!isUrlValid(link)) {
-                    // link is not valid -> do not replace
-                    return match;
-                }
-
-                // link is valid -> replace with link node placeholder
-                // find linkNodePlaceholder that is not yet present in text node
-                m++;
-                while (occP.includes(`${p}${m}`)) {
-                    m++;
-                }
-                let linkNodePlaceholder = `${p}${m}`;
-
-                // add linkNodePlaceholder to text node and save a reference to linkNodes object
-                linkNodes[linkNodePlaceholder] = `<a href="${link}" target="_blank" rel="noreferrer">${url}</a>`;
-                return `${whitespace}${linkNodePlaceholder}`;
-            }
-
-            text = text.replace(rgxUrlAll, replaceMatchWithPlaceholder);
-            $textShadow.innerText = text.replace(rgxMailAll, replaceMatchWithPlaceholder);
-
-
-            this.$text.innerHTML = $textShadow.innerHTML.replace(pRgx,
-                (m) => {
-                    let urlNode = linkNodes[m];
-                    return urlNode ? urlNode : m;
-                });
+            MeshDropSafeDom.renderReceivedText(this.$text, text);
         }
 
         this._evaluateOverflowing(this.$text);
@@ -3010,8 +3027,8 @@ class ReceiveTextDialog extends Dialog {
 
     _setDocumentTitleMessages() {
         document.title = this._receiveTextQueue.length <= 1
-            ? `${ Localization.getTranslation("document-titles.message-received") } - MeshDrop`
-            : `${ Localization.getTranslation("document-titles.message-received-plural", null, {count: this._receiveTextQueue.length + 1}) } - MeshDrop`;
+            ? `${ meshdropLocalization.getTranslation("document-titles.message-received") } - MeshDrop`
+            : `${ meshdropLocalization.getTranslation("document-titles.message-received-plural", null, {count: this._receiveTextQueue.length + 1}) } - MeshDrop`;
     }
 
     async _onCopy() {
@@ -3019,11 +3036,11 @@ class ReceiveTextDialog extends Dialog {
         navigator.clipboard
             .writeText(sanitizedText)
             .then(_ => {
-                Events.fire('notify-user', Localization.getTranslation("notifications.copied-to-clipboard"));
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.copied-to-clipboard"));
                 this.hide();
             })
             .catch(_ => {
-                Events.fire('notify-user', Localization.getTranslation("notifications.copied-to-clipboard-error"));
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.copied-to-clipboard-error"));
             });
     }
 
@@ -3061,8 +3078,8 @@ class ShareTextDialog extends Dialog {
         this._setCheckboxValueToLocalStorage();
 
         this.$checkbox.addEventListener('change', _ => this._setCheckboxValueToLocalStorage());
-        Events.on('share-text-dialog', e => this._onShareText(e.detail));
-        Events.on('keydown', e => this._onKeyDown(e));
+        meshdropEvents.on('share-text-dialog', e => this._onShareText(e.detail));
+        meshdropEvents.on('keydown', e => this._onKeyDown(e));
         this.$text.addEventListener('input', _ => this._evaluateEmptyText());
     }
 
@@ -3110,7 +3127,7 @@ class ShareTextDialog extends Dialog {
     }
 
     _approveShareText() {
-        Events.fire('activate-share-mode', {text: this.$text.innerText});
+        meshdropEvents.fire('activate-share-mode', {text: this.$text.innerText});
         this.hide();
     }
 
@@ -3131,7 +3148,7 @@ class Base64Dialog extends Dialog {
     }
 
     async evaluateBase64Text(base64Text, hash) {
-        this.$title.innerText = Localization.getTranslation('dialogs.base64-title-text');
+        this.$title.innerText = meshdropLocalization.getTranslation('dialogs.base64-title-text');
 
         if (base64Text === 'paste') {
             // ?base64text=paste
@@ -3154,7 +3171,7 @@ class Base64Dialog extends Dialog {
     }
 
     async evaluateBase64Zip(base64Zip, hash) {
-        this.$title.innerText = Localization.getTranslation('dialogs.base64-title-files');
+        this.$title.innerText = meshdropLocalization.getTranslation('dialogs.base64-title-files');
 
         if (base64Zip === 'paste') {
             // ?base64zip=paste || ?base64zip=true
@@ -3170,26 +3187,28 @@ class Base64Dialog extends Dialog {
 
     _setPasteBtnToProcessing() {
         this.$pasteBtn.style.pointerEvents = "none";
-        this.$pasteBtn.innerText = Localization.getTranslation("dialogs.base64-processing");
+        this.$pasteBtn.innerText = meshdropLocalization.getTranslation("dialogs.base64-processing");
     }
 
     preparePasting(type) {
         const translateType = type === 'text'
-            ? Localization.getTranslation("dialogs.base64-text")
-            : Localization.getTranslation("dialogs.base64-files");
+            ? meshdropLocalization.getTranslation("dialogs.base64-text")
+            : meshdropLocalization.getTranslation("dialogs.base64-files");
 
         if (navigator.clipboard.readText) {
-            this.$pasteBtn.innerText = Localization.getTranslation("dialogs.base64-tap-to-paste", null, {type: translateType});
+            this.$pasteBtn.innerText = meshdropLocalization.getTranslation("dialogs.base64-tap-to-paste", null, {type: translateType});
             this._clickCallback = _ => this.processClipboard(type);
-            this.$pasteBtn.addEventListener('click', _ => this._clickCallback());
+            this._clickListener = _ => this._clickCallback();
+            this.$pasteBtn.addEventListener('click', this._clickListener);
         }
         else {
             console.log("`navigator.clipboard.readText()` is not available on your browser.\nOn Firefox you can set `dom.events.asyncClipboard.readText` to true under `about:config` for convenience.")
             this.$pasteBtn.setAttribute('hidden', true);
-            this.$fallbackTextarea.setAttribute('placeholder', Localization.getTranslation("dialogs.base64-paste-to-send", null, {type: translateType}));
+            this.$fallbackTextarea.setAttribute('placeholder', meshdropLocalization.getTranslation("dialogs.base64-paste-to-send", null, {type: translateType}));
             this.$fallbackTextarea.removeAttribute('hidden');
             this._inputCallback = _ => this.processInput(type);
-            this.$fallbackTextarea.addEventListener('input', _ => this._inputCallback());
+            this._inputListener = _ => this._inputCallback();
+            this.$fallbackTextarea.addEventListener('input', this._inputListener);
             this.$fallbackTextarea.focus();
         }
     }
@@ -3214,8 +3233,8 @@ class Base64Dialog extends Dialog {
                 await this.processBase64Zip(base64);
             }
         }
-        catch(e) {
-            Events.fire('notify-user', Localization.getTranslation("notifications.clipboard-content-incorrect"));
+        catch(_e) {
+            meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.clipboard-content-incorrect"));
             console.log("Clipboard content is incorrect.")
         }
         this.hide();
@@ -3225,16 +3244,16 @@ class Base64Dialog extends Dialog {
         this._setPasteBtnToProcessing();
 
         try {
-            const decodedText = await decodeBase64Text(base64);
+            const decodedText = await meshdropDecodeBase64Text(base64);
             if (ShareTextDialog.isApproveShareTextSet()) {
-                Events.fire('share-text-dialog', decodedText);
+                meshdropEvents.fire('share-text-dialog', decodedText);
             }
             else {
-                Events.fire('activate-share-mode', {text: decodedText});
+                meshdropEvents.fire('activate-share-mode', {text: decodedText});
             }
         }
-        catch (e) {
-            Events.fire('notify-user', Localization.getTranslation("notifications.text-content-incorrect"));
+        catch (_e) {
+            meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.text-content-incorrect"));
             console.log("Text content incorrect.");
         }
 
@@ -3245,11 +3264,11 @@ class Base64Dialog extends Dialog {
         this._setPasteBtnToProcessing();
 
         try {
-            const decodedFiles = await decodeBase64Files(base64);
-            Events.fire('activate-share-mode', {files: decodedFiles});
+            const decodedFiles = await meshdropDecodeBase64Files(base64);
+            meshdropEvents.fire('activate-share-mode', {files: decodedFiles});
         }
-        catch (e) {
-            Events.fire('notify-user', Localization.getTranslation("notifications.file-content-incorrect"));
+        catch (_e) {
+            meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.file-content-incorrect"));
             console.log("File content incorrect.");
         }
 
@@ -3257,8 +3276,8 @@ class Base64Dialog extends Dialog {
     }
 
     hide() {
-        this.$pasteBtn.removeEventListener('click', _ => this._clickCallback());
-        this.$fallbackTextarea.removeEventListener('input', _ => this._inputCallback());
+        if (this._clickListener) this.$pasteBtn.removeEventListener('click', this._clickListener);
+        if (this._inputListener) this.$fallbackTextarea.removeEventListener('input', this._inputListener);
         this.$fallbackTextarea.setAttribute('disabled', true);
         this.$fallbackTextarea.blur();
         super.hide();
@@ -3267,13 +3286,13 @@ class Base64Dialog extends Dialog {
 
 class AboutUI {
     constructor() {
-        this.$donationBtn = $('donation-btn');
-        this.$twitterBtn = $('x-twitter-btn');
-        this.$mastodonBtn = $('mastodon-btn');
-        this.$blueskyBtn = $('bluesky-btn');
-        this.$customBtn = $('custom-btn');
-        this.$privacypolicyBtn = $('privacypolicy-btn');
-        Events.on('config', e => this._onConfig(e.detail.buttons));
+        this.$donationBtn = meshdropGetById('donation-btn');
+        this.$twitterBtn = meshdropGetById('x-twitter-btn');
+        this.$mastodonBtn = meshdropGetById('mastodon-btn');
+        this.$blueskyBtn = meshdropGetById('bluesky-btn');
+        this.$customBtn = meshdropGetById('custom-btn');
+        this.$privacypolicyBtn = meshdropGetById('privacypolicy-btn');
+        meshdropEvents.on('config', e => this._onConfig(e.detail.buttons));
     }
 
     async _onConfig(btnConfig) {
@@ -3319,8 +3338,8 @@ class Toast extends Dialog {
         this.$text = this.$el.querySelector('span');
 
         this.$closeBtn.addEventListener('click', _ => this.hide());
-        Events.on('notify-user', e => this._onNotify(e.detail));
-        Events.on('share-mode-changed', _ => this.hide());
+        meshdropEvents.on('notify-user', e => this._onNotify(e.detail));
+        meshdropEvents.on('share-mode-changed', _ => this.hide());
     }
 
     _onNotify(message) {
@@ -3345,25 +3364,25 @@ class Notifications {
         // Check if the browser supports notifications
         if (!('Notification' in window)) return;
 
-        this.$headerNotificationButton = $('notification');
-        this.$downloadBtn = $('download-btn');
+        this.$headerNotificationButton = meshdropGetById('notification');
+        this.$downloadBtn = meshdropGetById('download-btn');
 
         this.$headerNotificationButton.addEventListener('click', _ => this._requestPermission());
 
 
-        Events.on('text-received', e => this._messageNotification(e.detail.text, e.detail.peerId));
-        Events.on('files-received', e => this._downloadNotification(e.detail.files));
-        Events.on('files-transfer-request', e => this._requestNotification(e.detail.request, e.detail.peerId));
+        meshdropEvents.on('text-received', e => this._messageNotification(e.detail.text, e.detail.peerId));
+        meshdropEvents.on('files-received', e => this._downloadNotification(e.detail.files));
+        meshdropEvents.on('files-transfer-request', e => this._requestNotification(e.detail.request, e.detail.peerId));
     }
 
     async _requestPermission() {
         await Notification.
             requestPermission(permission => {
                 if (permission !== 'granted') {
-                    Events.fire('notify-user', Localization.getTranslation("notifications.notifications-permissions-error"));
+                    meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.notifications-permissions-error"));
                     return;
                 }
-                Events.fire('notify-user', Localization.getTranslation("notifications.notifications-enabled"));
+                meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.notifications-enabled"));
                 this.$headerNotificationButton.setAttribute('hidden', true);
             });
     }
@@ -3376,33 +3395,33 @@ class Notifications {
         let notification;
         try {
             notification = new Notification(title, config);
-        } catch (e) {
+        } catch (_e) {
             // Android doesn't support "new Notification" if service worker is installed
-            if (!serviceWorker || !serviceWorker.showNotification) return;
-            notification = serviceWorker.showNotification(title, config);
+            if (!globalThis.serviceWorker || !globalThis.serviceWorker.showNotification) return;
+            notification = globalThis.serviceWorker.showNotification(title, config);
         }
 
         // Notification is persistent on Android. We have to close it manually
         const visibilitychangeHandler = () => {
             if (document.visibilityState === 'visible') {
                 notification.close();
-                Events.off('visibilitychange', visibilitychangeHandler);
+                meshdropEvents.off('visibilitychange', visibilitychangeHandler);
             }
         };
-        Events.on('visibilitychange', visibilitychangeHandler);
+        meshdropEvents.on('visibilitychange', visibilitychangeHandler);
 
         return notification;
     }
 
     _messageNotification(message, peerId) {
         if (document.visibilityState !== 'visible') {
-            const peerDisplayName = $(peerId).ui._displayName();
-            if (/^((https?:\/\/|www)[abcdefghijklmnopqrstuvwxyz0123456789\-._~:\/?#\[\]@!$&'()*+,;=]+)$/.test(message.toLowerCase())) {
-                const notification = this._notify(Localization.getTranslation("notifications.link-received", null, {name: peerDisplayName}), message);
+            const peerDisplayName = meshdropGetById(peerId).ui._displayName();
+            if (/^((https?:\/\/|www)[abcdefghijklmnopqrstuvwxyz0123456789\-._~:/?#[\]@!$&'()*+,;=]+)$/.test(message.toLowerCase())) {
+                const notification = this._notify(meshdropLocalization.getTranslation("notifications.link-received", null, {name: peerDisplayName}), message);
                 this._bind(notification, _ => window.open(message, '_blank', "noreferrer"));
             }
             else {
-                const notification = this._notify(Localization.getTranslation("notifications.message-received", null, {name: peerDisplayName}), message);
+                const notification = this._notify(meshdropLocalization.getTranslation("notifications.message-received", null, {name: peerDisplayName}), message);
                 this._bind(notification, _ => this._copyText(message, notification));
             }
         }
@@ -3420,17 +3439,17 @@ class Notifications {
                 let fileOther;
                 if (files.length === 2) {
                     fileOther = imagesOnly
-                        ? Localization.getTranslation("dialogs.file-other-description-image")
-                        : Localization.getTranslation("dialogs.file-other-description-file");
+                        ? meshdropLocalization.getTranslation("dialogs.file-other-description-image")
+                        : meshdropLocalization.getTranslation("dialogs.file-other-description-file");
                 }
                 else {
                     fileOther = imagesOnly
-                        ? Localization.getTranslation("dialogs.file-other-description-image-plural", null, {count: files.length - 1})
-                        : Localization.getTranslation("dialogs.file-other-description-file-plural", null, {count: files.length - 1});
+                        ? meshdropLocalization.getTranslation("dialogs.file-other-description-image-plural", null, {count: files.length - 1})
+                        : meshdropLocalization.getTranslation("dialogs.file-other-description-file-plural", null, {count: files.length - 1});
                 }
                 title = `${files[0].name} ${fileOther}`
             }
-            const notification = this._notify(title, Localization.getTranslation("notifications.click-to-download"));
+            const notification = this._notify(title, meshdropLocalization.getTranslation("notifications.click-to-download"));
             this._bind(notification, _ => this._download(notification));
         }
     }
@@ -3438,28 +3457,28 @@ class Notifications {
     _requestNotification(request, peerId) {
         if (document.visibilityState !== 'visible') {
             let imagesOnly = request.header.every(header => header.mime.split('/')[0] === 'image');
-            let displayName = $(peerId).querySelector('.name').textContent;
+            let displayName = meshdropGetById(peerId).querySelector('.name').textContent;
 
             let descriptor;
             if (request.header.length === 1) {
                 descriptor = imagesOnly
-                    ? Localization.getTranslation("dialogs.title-image")
-                    : Localization.getTranslation("dialogs.title-file");
+                    ? meshdropLocalization.getTranslation("dialogs.title-image")
+                    : meshdropLocalization.getTranslation("dialogs.title-file");
             }
             else {
                 descriptor = imagesOnly
-                    ? Localization.getTranslation("dialogs.title-image-plural")
-                    : Localization.getTranslation("dialogs.title-file-plural");
+                    ? meshdropLocalization.getTranslation("dialogs.title-image-plural")
+                    : meshdropLocalization.getTranslation("dialogs.title-file-plural");
             }
 
-            let title = Localization
+            let title = meshdropLocalization
                 .getTranslation("notifications.request-title", null, {
                     name: displayName,
                     count: request.header.length,
                     descriptor: descriptor.toLowerCase()
                 });
 
-            const notification = this._notify(title, Localization.getTranslation("notifications.click-to-show"));
+            this._notify(title, meshdropLocalization.getTranslation("notifications.click-to-show"));
         }
     }
 
@@ -3471,20 +3490,20 @@ class Notifications {
     async _copyText(message, notification) {
         if (await navigator.clipboard.writeText(message)) {
             notification.close();
-            this._notify(Localization.getTranslation("notifications.copied-text"));
+            this._notify(meshdropLocalization.getTranslation("notifications.copied-text"));
         }
         else {
-            this._notify(Localization.getTranslation("notifications.copied-text-error"));
+            this._notify(meshdropLocalization.getTranslation("notifications.copied-text-error"));
         }
     }
 
     _bind(notification, handler) {
         if (notification.then) {
             notification.then(_ => {
-                serviceWorker
+                globalThis.serviceWorker
                     .getNotifications()
                     .then(_ => {
-                        serviceWorker.addEventListener('notificationclick', handler);
+                        globalThis.serviceWorker.addEventListener('notificationclick', handler);
                     })
             });
         }
@@ -3497,20 +3516,20 @@ class Notifications {
 class NetworkStatusUI {
 
     constructor() {
-        Events.on('offline', _ => this._showOfflineMessage());
-        Events.on('online', _ => this._showOnlineMessage());
+        meshdropEvents.on('offline', _ => this._showOfflineMessage());
+        meshdropEvents.on('online', _ => this._showOnlineMessage());
         if (!navigator.onLine) this._showOfflineMessage();
     }
 
     _showOfflineMessage() {
-        Events.fire('notify-user', {
-            message: Localization.getTranslation("notifications.offline"),
+        meshdropEvents.fire('notify-user', {
+            message: meshdropLocalization.getTranslation("notifications.offline"),
             persistent: true
         });
     }
 
     _showOnlineMessage() {
-        Events.fire('notify-user', Localization.getTranslation("notifications.online"));
+        meshdropEvents.fire('notify-user', meshdropLocalization.getTranslation("notifications.online"));
     }
 }
 
@@ -3530,10 +3549,10 @@ class WebShareTargetUI {
             }
 
             if (ShareTextDialog.isApproveShareTextSet()) {
-                Events.fire('share-text-dialog', shareTargetText);
+                meshdropEvents.fire('share-text-dialog', shareTargetText);
             }
             else {
-                Events.fire('activate-share-mode', {text: shareTargetText});
+                meshdropEvents.fire('activate-share-mode', {text: shareTargetText});
             }
         }
         else if (shareTargetType === "files") {
@@ -3554,7 +3573,7 @@ class WebShareTargetUI {
                     const clearRequest = store.clear()
                     clearRequest.onsuccess = _ => db.close();
 
-                    Events.fire('activate-share-mode', {files: filesReceived})
+                    meshdropEvents.fire('activate-share-mode', {files: filesReceived})
                 }
             }
         }
@@ -3564,9 +3583,9 @@ class WebShareTargetUI {
 // Keep for legacy reasons even though this is removed from new PWA installations
 class WebFileHandlersUI {
     async evaluateLaunchQueue() {
-        if (!"launchQueue" in window) return;
+        if (!("launchQueue" in window)) return;
 
-        launchQueue.setConsumer(async launchParams => {
+        globalThis.launchQueue.setConsumer(async launchParams => {
             console.log("Launched with: ", launchParams);
 
             if (!launchParams.files.length) return;
@@ -3580,14 +3599,14 @@ class WebFileHandlersUI {
                 files.push(file);
             }
 
-            Events.fire('activate-share-mode', {files: files})
+            meshdropEvents.fire('activate-share-mode', {files: files})
         });
     }
 }
 
 class NoSleepUI {
     constructor() {
-        NoSleepUI._nosleep = new NoSleep();
+        NoSleepUI._nosleep = new globalThis.NoSleep();
     }
 
     static enable() {
@@ -3598,9 +3617,32 @@ class NoSleepUI {
     }
 
     static disable() {
-        if ($$('x-peer[status]') === null) {
+        if (meshdropQuery('x-peer[status]') === null) {
             clearInterval(NoSleepUI._interval);
             NoSleepUI._nosleep.disable();
         }
     }
 }
+
+Object.assign(globalThis, {
+    AboutUI,
+    Base64Dialog,
+    EditPairedDevicesDialog,
+    LanguageSelectDialog,
+    NetworkStatusUI,
+    NoSleepUI,
+    Notifications,
+    PairDeviceDialog,
+    PeersUI,
+    ProtocolSettingsDialog,
+    PublicRoomDialog,
+    ReceiveFileDialog,
+    ReceiveRequestDialog,
+    ReceiveTextDialog,
+    SendTextDialog,
+    ShareTextDialog,
+    Toast,
+    TransferChoiceDialog,
+    WebFileHandlersUI,
+    WebShareTargetUI
+});

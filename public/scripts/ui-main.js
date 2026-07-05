@@ -1,6 +1,8 @@
 // Selector shortcuts
 const $ = query => document.getElementById(query);
 const $$ = query => document.querySelector(query);
+const uiMainLocalization = globalThis.Localization;
+const uiMainPersistentStorage = globalThis.PersistentStorage;
 
 if (window.crypto && typeof window.crypto.randomUUID !== "function" && typeof window.crypto.getRandomValues === "function") {
     window.crypto.randomUUID = () => {
@@ -144,7 +146,7 @@ class HeaderUI {
         this.$header.classList.remove('overflow-expanded');
 
 
-        const rtlLocale = Localization.currentLocaleIsRtl();
+        const rtlLocale = uiMainLocalization.currentLocaleIsRtl();
         let icon;
         const $headerIconsShown = document.querySelectorAll('body > header:first-of-type > *:not([hidden])');
 
@@ -299,7 +301,7 @@ class FooterUI {
         this.$badges.publicRoom.toggleAttribute('hidden', !publicRoom);
         if (publicRoom) {
             this.$badges.publicRoom.dataset.roomId = publicRoom.roomId;
-            this.$badges.publicRoom.innerText = Localization.getTranslation("footer.public-room-devices", null, {
+            this.$badges.publicRoom.innerText = uiMainLocalization.getTranslation("footer.public-room-devices", null, {
                 roomId: publicRoom.roomId
             });
         }
@@ -405,14 +407,14 @@ class FooterUI {
         if (newDisplayName === savedDisplayName) return;
 
         if (newDisplayName) {
-            PersistentStorage.set('edited_display_name', newDisplayName)
+            uiMainPersistentStorage.set('edited_display_name', newDisplayName)
                 .then(_ => {
-                    Events.fire('notify-user', Localization.getTranslation("notifications.display-name-changed-permanently"));
+                    Events.fire('notify-user', uiMainLocalization.getTranslation("notifications.display-name-changed-permanently"));
                 })
                 .catch(_ => {
                     console.log("This browser does not support IndexedDB. Use localStorage instead.");
                     localStorage.setItem('edited_display_name', newDisplayName);
-                    Events.fire('notify-user', Localization.getTranslation("notifications.display-name-changed-temporarily"));
+                    Events.fire('notify-user', uiMainLocalization.getTranslation("notifications.display-name-changed-temporarily"));
                 })
                 .finally(() => {
                     Events.fire('self-display-name-changed', newDisplayName);
@@ -420,13 +422,13 @@ class FooterUI {
                 });
         }
         else {
-            PersistentStorage.delete('edited_display_name')
+            uiMainPersistentStorage.delete('edited_display_name')
                 .catch(_ => {
                     console.log("This browser does not support IndexedDB. Use localStorage instead.")
                     localStorage.removeItem('edited_display_name');
                 })
                 .finally(() => {
-                    Events.fire('notify-user', Localization.getTranslation("notifications.display-name-random-again"));
+                    Events.fire('notify-user', uiMainLocalization.getTranslation("notifications.display-name-random-again"));
                     Events.fire('self-display-name-changed', '');
                     Events.fire('broadcast-send', {type: 'self-display-name-changed', detail: ''});
                 });
@@ -435,7 +437,7 @@ class FooterUI {
 
     _getSavedDisplayName() {
         return new Promise((resolve) => {
-            PersistentStorage.get('edited_display_name')
+            uiMainPersistentStorage.get('edited_display_name')
                 .then(displayName => {
                     if (!displayName) displayName = "";
                     resolve(displayName);
@@ -682,3 +684,14 @@ class BackgroundCanvas {
         return {init, startAnimation, switchAnimation, onShareModeChange};
     }
 }
+
+Object.assign(globalThis, {
+    $,
+    $$,
+    BackgroundCanvas,
+    CenterUI,
+    Events,
+    FooterUI,
+    HeaderUI,
+    ThemeUI
+});

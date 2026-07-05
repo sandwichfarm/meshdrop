@@ -147,7 +147,7 @@ class PersistentStorage {
             }
             console.log(`Request successful. Retrieved ${secrets.length} room_secrets`);
             return(secrets);
-        } catch (e) {
+        } catch (_e) {
             this.logBrowserNotCapable();
             return [];
         }
@@ -286,7 +286,7 @@ class PersistentStorage {
 
                         const objectStoreRequestUpdate = objectStore.put(updatedRoomSecretEntry, roomSecretEntry.key);
 
-                        objectStoreRequestUpdate.onsuccess = e => {
+                        objectStoreRequestUpdate.onsuccess = _e => {
                             console.log(`Request successful. Updated room_secret: ${roomSecretEntry.key}`);
                             resolve({
                                 "entry": updatedRoomSecretEntry,
@@ -305,3 +305,5 @@ class PersistentStorage {
         })
     }
 }
+
+globalThis.PersistentStorage = PersistentStorage;
