@@ -18,6 +18,7 @@ Android WebView now uses viewport safe-area padding, keeps Nostr login reachable
 - Added safe-area CSS and `viewport-fit=cover` for the top Android system bar.
 - Fixed physical-device Android launch detection to use explicit `MainActivity` start plus `ResumedActivity` readback.
 - Made the Android picker UI smoke fall back to CDP click events when API 36 `uiautomator` omits the WebView bounds from the hierarchy dump.
+- Made the Docker smoke choose browser-extension sign-in deterministically when Remote Signer is also advertised, added step logs and child-process watchdogs, and raised the Docker CI job budget for the expanded runtime proof.
 
 ## Evidence
 
@@ -43,10 +44,11 @@ Android WebView now uses viewport safe-area padding, keeps Nostr login reachable
   - `webRtc: "function"`
   - `webSocket: "function"`
   - `online: true`
+- `timeout 1800 npm run test:docker`
+  - Proof: `docker-admin-settings`, `docker-local-webrtc`, `docker-pollen-webrtc`, and `docker-two-host-nostr-webrtc` passed against the built `meshdrop:smoke` image.
 
 ## Known Gaps
 
 - Full-repo AI-slop baseline still fails on pre-existing warnings outside changed code: bundled noble-ciphers unused expressions/TODOs, large legacy scripts, duplicate blocks in `public/scripts/network.js`, `server/nostr-identity.js` hardcoded URL, and one unused `message` parameter.
-- Changed-code AI-slop now reports style warnings on `scripts/e2e-smoke.mjs` because the CI expectation fix touches a pre-existing 1064-line smoke harness with long functions.
 - Static Android APK has no MeshDrop backend service. FIPS/Pollen remain hidden there because runtime config reports no backend-only transport support; tests prove they remain visible when the backend config says those transports are supported but temporarily unavailable.
 - Remote Signer baseline path is present, but NIP-46 pairing is still not implemented; it currently reports that remote signer pairing is not configured.
