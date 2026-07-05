@@ -37,12 +37,16 @@ try {
     assert.equal(manifest.transports.webrtc, false);
     assert.equal(manifest.transports.nostr, false);
     assert.equal(manifest.transports.bluetooth, false);
+    assert(manifest.remainingProof.includes("physical Android device install UAT"));
+    assert(manifest.remainingProof.includes("native Android WebView file transfer UAT"));
     assert(manifest.remainingProof.includes("native Android WebRTC transfer UAT"));
 
     const proof = JSON.parse(await readTarEntry(result.artifactPath, `${prefix}/apk/build-proof.json`));
     assert.equal(proof.gradleTask, "assembleDebug");
     assert.equal(proof.apk, "meshdrop-android-debug.apk");
     assert.equal(proof.releaseSigned, false);
+    assert(proof.notProven.includes("physical Android device install UAT"));
+    assert(proof.notProven.includes("native Android WebView file transfer UAT"));
 
     const extractDir = path.join(tempDir, "extract");
     await fs.mkdir(extractDir);

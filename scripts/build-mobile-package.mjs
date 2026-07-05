@@ -167,7 +167,8 @@ function createTargetManifest(target, version, nativeSource, androidApk) {
         },
         remainingProof: androidApk
             ? [
-                "Android device or emulator install UAT",
+                "physical Android device install UAT",
+                "native Android WebView file transfer UAT",
                 "native Android WebRTC transfer UAT",
                 "mobile file picker and share sheet",
                 "Bluetooth transport negotiation",
@@ -297,7 +298,8 @@ async function buildAndroidDebugApk(stageDir, env) {
         signed: "debug",
         releaseSigned: false,
         notProven: [
-            "Android device or emulator install UAT",
+            "physical Android device install UAT",
+            "native Android WebView file transfer UAT",
             "native Android WebRTC transfer UAT",
             "mobile file picker and share sheet",
             "Bluetooth transport negotiation",
