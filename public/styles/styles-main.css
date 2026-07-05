@@ -134,13 +134,13 @@ header {
     position: relative;
     align-items: flex-start;
     align-content: flex-start;
-    padding: 8px 12px;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
     box-sizing: border-box;
     width: 100vw;
     z-index: 20;
     top: 0;
     right: 0;
-    min-height: 56px;
+    min-height: calc(56px + env(safe-area-inset-top, 0px));
 }
 
 header.overflow-hidden {
@@ -153,7 +153,7 @@ header.overflow-hidden:has(#theme-wrapper:focus-within) {
 }
 
 header:not(.overflow-expanded) {
-    height: 56px;
+    height: calc(56px + env(safe-area-inset-top, 0px));
 }
 
 @media (max-width: 520px) {

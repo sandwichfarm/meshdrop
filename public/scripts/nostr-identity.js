@@ -1,13 +1,11 @@
 class NostrIdentityController {
 
-    static pubkeyRegex = /^[0-9a-f]{64}$/i;
-    static bech32Charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-
     constructor() {
         this.$button = globalThis.$("nostr-identity");
         this._identity = this._withServerListState(this.getStoredIdentity());
-        this._signerAvailable = this.hasSigner();
-        if (this._identity && !this._signerAvailable) {
+        this._signer = this._defaultSigner();
+        this._signerAvailable = this.hasAnySigner();
+        if (this._identity && !this.hasAnySigner()) {
             this._identity = null;
             localStorage.removeItem("meshdrop_nostr_identity");
         }
@@ -50,16 +48,22 @@ class NostrIdentityController {
     }
 
     async connect() {
-        if (!this.hasSigner()) {
-            globalThis.Events.fire("notify-user", globalThis.Localization.getTranslation("notifications.nostr-extension-required"));
+        const method = await this._chooseLoginMethod();
+        if (!method) return;
+        if (method === "remote-signer") {
+            this._openRemoteSigner();
             return;
         }
 
         try {
-            const pubkey = this._normalizePubkey(await window.nostr.getPublicKey());
+            const signer = method === "android-signer"
+                ? this._androidSigner()
+                : this._browserExtensionSigner();
+            if (!signer) throw new Error("Nostr signer is unavailable");
+            const pubkey = this._normalizePubkey(await signer.getPublicKey());
 
             const displayName = this._displayNameFromPubkey(pubkey);
-            const event = await this._signIdentityEvent(pubkey, displayName);
+            const event = await this._signIdentityEvent(signer, pubkey, displayName);
 
             this._identity = {
                 pubkey,
@@ -73,6 +77,7 @@ class NostrIdentityController {
                 event,
                 verified: !!event
             };
+            this._signer = signer;
 
             localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(this._identity));
             globalThis.Events.fire("notify-user", globalThis.Localization.getTranslation("notifications.nostr-connected"));
@@ -87,9 +92,11 @@ class NostrIdentityController {
         }
     }
 
-    async _signIdentityEvent(pubkey, displayName) {
+    async _signIdentityEvent(signer, pubkey, displayName) {
+        if (!signer?.signEvent) return null;
+
         try {
-            const event = await window.nostr.signEvent({
+            const event = await signer.signEvent({
                 kind: 27235,
                 created_at: Math.floor(Date.now() / 1000),
                 tags: [
@@ -126,12 +133,17 @@ class NostrIdentityController {
     }
 
     async signEvent(event) {
-        if (!this.hasSigner()) throw new Error("NIP-07 signer is unavailable");
-        return window.nostr.signEvent(event);
+        const signer = this._signer || this._defaultSigner();
+        if (!signer?.signEvent) throw new Error("Nostr signer is unavailable");
+        return signer.signEvent(event);
     }
 
     hasSigner() {
         return !!(window.nostr?.getPublicKey && window.nostr?.signEvent);
+    }
+
+    hasAnySigner() {
+        return this.hasSigner() || this._hasAndroidSigner();
     }
 
     canEncrypt() {
@@ -226,7 +238,7 @@ class NostrIdentityController {
     _render() {
         if (!this.$button) return;
 
-        this.$button.toggleAttribute("hidden", !this._signerAvailable);
+        this.$button.removeAttribute("hidden");
 
         const translationKey = this._identity
             ? "header.nostr-identity-disconnect"
@@ -234,6 +246,67 @@ class NostrIdentityController {
 
         this.$button.title = globalThis.Localization.getTranslation(`${translationKey}_title`);
         this.$button.classList.toggle("selected", !!this._identity);
+    }
+
+    async _chooseLoginMethod() {
+        const methods = this._loginMethods();
+        if (methods.length === 0) return null;
+        if (methods.length === 1) return methods[0].id;
+
+        const chooser = globalThis.meshdropNostrLoginDialog;
+        if (chooser?.choose) return chooser.choose(methods);
+
+        return methods[0].id;
+    }
+
+    _loginMethods() {
+        const methods = [];
+        if (this.hasSigner()) {
+            methods.push({
+                id: "browser-extension",
+                label: "Browser Extension",
+                description: "Use the NIP-07 signer injected into this browser."
+            });
+        }
+        methods.push({
+            id: "remote-signer",
+            label: "Remote Signer",
+            description: "Use a remote signer or Nostr Connect signer."
+        });
+        if (this._hasAndroidSigner()) {
+            methods.push({
+                id: "android-signer",
+                label: "Open in Amber",
+                description: "Open the installed Android Nostr signer."
+            });
+        }
+        return methods;
+    }
+
+    _openRemoteSigner() {
+        globalThis.Events.fire(
+            "notify-user",
+            globalThis.Localization.getTranslation("notifications.nostr-remote-signer-unavailable")
+        );
+    }
+
+    _defaultSigner() {
+        return this._browserExtensionSigner() || this._androidSigner();
+    }
+
+    _browserExtensionSigner() {
+        if (!this.hasSigner()) return null;
+        return window.nostr;
+    }
+
+    _hasAndroidSigner() {
+        return globalThis.AndroidNostrSigner?.isAvailable?.() || false;
+    }
+
+    _androidSigner() {
+        if (!this._hasAndroidSigner()) return null;
+
+        return new globalThis.AndroidNostrSigner(() => this._identity);
     }
 
     _displayNameFromPubkey(pubkey) {
@@ -294,99 +367,13 @@ class NostrIdentityController {
     }
 
     _normalizePubkey(pubkey) {
-        if (typeof pubkey !== "string") throw new Error("NIP-07 signer returned a non-string public key");
-
-        const trimmed = pubkey.trim();
-        if (NostrIdentityController.pubkeyRegex.test(trimmed)) return trimmed.toLowerCase();
-        if (trimmed.toLowerCase().startsWith("npub1")) return this._npubToHex(trimmed);
-
-        throw new Error("NIP-07 signer returned an invalid public key");
-    }
-
-    _npubToHex(npub) {
-        const decoded = this._bech32Decode(npub);
-        if (decoded.hrp !== "npub") throw new Error("NIP-07 signer returned an invalid npub public key");
-
-        const bytes = this._convertBits(decoded.words, 5, 8, false);
-        if (bytes.length !== 32) throw new Error("NIP-07 signer returned an invalid npub public key");
-
-        return bytes.map(byte => byte.toString(16).padStart(2, "0")).join("");
-    }
-
-    _bech32Decode(value) {
-        const bech32 = value.toLowerCase();
-        const separator = bech32.lastIndexOf("1");
-        if (separator < 1) throw new Error("NIP-07 signer returned an invalid npub public key");
-
-        const hrp = bech32.slice(0, separator);
-        const data = bech32.slice(separator + 1);
-        const values = [...data].map(char => NostrIdentityController.bech32Charset.indexOf(char));
-        if (values.includes(-1) || values.length < 6) {
-            throw new Error("NIP-07 signer returned an invalid npub public key");
-        }
-
-        if (!this._bech32VerifyChecksum(hrp, values)) {
-            throw new Error("NIP-07 signer returned an invalid npub checksum");
-        }
-
-        return {hrp, words: values.slice(0, -6)};
-    }
-
-    _bech32VerifyChecksum(hrp, values) {
-        return this._bech32Polymod([...this._bech32HrpExpand(hrp), ...values]) === 1;
-    }
-
-    _bech32HrpExpand(hrp) {
-        const highBits = [...hrp].map(char => char.charCodeAt(0) >> 5);
-        const lowBits = [...hrp].map(char => char.charCodeAt(0) & 31);
-        return [...highBits, 0, ...lowBits];
-    }
-
-    _bech32Polymod(values) {
-        const generators = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
-        let chk = 1;
-
-        for (const value of values) {
-            const top = chk >> 25;
-            chk = ((chk & 0x1ffffff) << 5) ^ value;
-            for (let i = 0; i < generators.length; i++) {
-                if ((top >> i) & 1) chk ^= generators[i];
-            }
-        }
-
-        return chk;
-    }
-
-    _convertBits(data, fromBits, toBits, pad) {
-        let accumulator = 0;
-        let bits = 0;
-        const result = [];
-        const maxValue = (1 << toBits) - 1;
-        const maxAccumulator = (1 << (fromBits + toBits - 1)) - 1;
-
-        for (const value of data) {
-            if (value < 0 || (value >> fromBits) !== 0) throw new Error("NIP-07 signer returned an invalid npub public key");
-            accumulator = ((accumulator << fromBits) | value) & maxAccumulator;
-            bits += fromBits;
-            while (bits >= toBits) {
-                bits -= toBits;
-                result.push((accumulator >> bits) & maxValue);
-            }
-        }
-
-        if (pad) {
-            if (bits > 0) result.push((accumulator << (toBits - bits)) & maxValue);
-        } else if (bits >= fromBits || ((accumulator << (toBits - bits)) & maxValue)) {
-            throw new Error("NIP-07 signer returned an invalid npub public key");
-        }
-
-        return result;
+        return globalThis.NostrPubkey.normalize(pubkey);
     }
 
     _watchSignerAvailability() {
         let checksRemaining = 40;
         const update = () => {
-            const signerAvailable = this.hasSigner();
+            const signerAvailable = this.hasAnySigner();
             if (signerAvailable !== this._signerAvailable) {
                 this._signerAvailable = signerAvailable;
                 if (!signerAvailable && this._identity) this.disconnect();

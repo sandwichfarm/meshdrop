@@ -6,29 +6,30 @@ const container = `meshdrop-smoke-${process.pid}`;
 const smokeAdminSecretKey = generateSecretKey();
 const smokeAdminSecretKeyHex = bytesToHex(smokeAdminSecretKey);
 const smokeAdminPubkey = getPublicKey(smokeAdminSecretKey);
+const minute = 60 * 1000;
 
 async function main() {
-    await run("docker", ["build", "-t", image, "."]);
+    await step("build Docker image", () => run("docker", ["build", "-t", image, "."], {timeoutMs: 10 * minute}));
 
     let started = false;
     try {
-        await startContainer();
+        await step("start container", startContainer);
         started = true;
 
-        const port = await mappedPort();
+        const port = await step("resolve mapped port", mappedPort);
         const baseUrl = `http://127.0.0.1:${port}`;
 
-        await waitForHttp(`${baseUrl}/config`);
-        await waitForHealth();
-        await assertContainerConfig(baseUrl);
-        await assertFipsStatus(baseUrl);
-        await assertPollenStatus(baseUrl);
-        await assertFederation(baseUrl);
-        await assertServedPage(baseUrl);
-        await assertRuntimeCapabilitiesScript(baseUrl);
-        await runBrowserSmoke(baseUrl);
-        await assertAdminGuiDroveFipsCommands();
-        await runTwoHostRelaySmoke();
+        await step("wait for /config", () => waitForHttp(`${baseUrl}/config`));
+        await step("wait for healthcheck", waitForHealth);
+        await step("assert /config", () => assertContainerConfig(baseUrl));
+        await step("assert FIPS status", () => assertFipsStatus(baseUrl));
+        await step("assert Pollen status", () => assertPollenStatus(baseUrl));
+        await step("assert federation descriptor", () => assertFederation(baseUrl));
+        await step("assert served page", () => assertServedPage(baseUrl));
+        await step("assert runtime capabilities script", () => assertRuntimeCapabilitiesScript(baseUrl));
+        await step("run browser transfer smoke", () => runBrowserSmoke(baseUrl));
+        await step("assert admin GUI FIPS commands", assertAdminGuiDroveFipsCommands);
+        await step("run two-host relay smoke", runTwoHostRelaySmoke);
 
         console.log(`Docker smoke passed for ${image} on ${baseUrl}`);
     }
@@ -125,6 +126,7 @@ async function assertRuntimeCapabilitiesScript(baseUrl) {
 
 async function runBrowserSmoke(baseUrl) {
     await run("node", ["scripts/docker-browser-transfer-smoke.mjs"], {
+        timeoutMs: 8 * minute,
         env: {
             MESHDROP_DOCKER_TRANSFER_BASE_URL: baseUrl,
             MESHDROP_DOCKER_ADMIN_SECRET_KEY: smokeAdminSecretKeyHex
@@ -142,6 +144,7 @@ async function assertAdminGuiDroveFipsCommands() {
 
 async function runTwoHostRelaySmoke() {
     await run("node", ["scripts/docker-two-host-relay-smoke.mjs"], {
+        timeoutMs: 8 * minute,
         env: {
             MESHDROP_DOCKER_IMAGE: image,
             MESHDROP_DOCKER_SKIP_BUILD: "1"
@@ -158,6 +161,11 @@ function run(command, args, options = {}) {
         });
         let stdout = "";
         let stderr = "";
+        let timedOut = false;
+        const timeout = options.timeoutMs ? setTimeout(() => {
+            timedOut = true;
+            child.kill("SIGTERM");
+        }, options.timeoutMs) : null;
 
         if (options.capture) {
             child.stdout.on("data", chunk => stdout += chunk.toString("utf8"));
@@ -166,6 +174,11 @@ function run(command, args, options = {}) {
 
         child.on("error", reject);
         child.on("close", code => {
+            if (timeout) clearTimeout(timeout);
+            if (timedOut) {
+                reject(new Error(`${command} ${args.join(" ")} timed out after ${options.timeoutMs}ms\n${stderr}`));
+                return;
+            }
             if (code === 0 || options.allowFailure) {
                 resolve(stdout.trim());
             }
@@ -174,6 +187,14 @@ function run(command, args, options = {}) {
             }
         });
     });
+}
+
+async function step(name, action) {
+    const started = Date.now();
+    console.log(`[docker-smoke] start: ${name}`);
+    const result = await action();
+    console.log(`[docker-smoke] done: ${name} (${Date.now() - started}ms)`);
+    return result;
 }
 
 async function mappedPort() {

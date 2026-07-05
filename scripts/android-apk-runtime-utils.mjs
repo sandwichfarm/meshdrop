@@ -79,10 +79,10 @@ export async function installAndLaunchDebugApk(adb, serial, apkPath) {
     const resolvedActivity = await run(adb, ["-s", serial, "shell", "cmd", "package", "resolve-activity", "--brief", androidPackageName]);
     assert.match(stripCarriageReturns(resolvedActivity.stdout), new RegExp(`${androidPackageName}/\\.MainActivity`));
 
-    await run(adb, ["-s", serial, "shell", "monkey", "-p", androidPackageName, "-c", "android.intent.category.LAUNCHER", "1"]);
+    await run(adb, ["-s", serial, "shell", "am", "start", "-W", "-n", androidMainActivity]);
     await sleep(3000);
-    const topActivity = await run(adb, ["-s", serial, "shell", "dumpsys", "activity", "top"]);
-    assert.match(stripCarriageReturns(topActivity.stdout), new RegExp(`ACTIVITY ${androidPackageName}/\\.MainActivity`));
+    const activities = await run(adb, ["-s", serial, "shell", "dumpsys", "activity", "activities"]);
+    assert.match(stripCarriageReturns(activities.stdout), new RegExp(`ResumedActivity: ActivityRecord.* ${androidPackageName}/\\.MainActivity`));
 }
 
 export async function getAndroidDeviceInfo(adb, serial) {
@@ -172,7 +172,7 @@ async function waitForBoot(adb, deviceSerial, timeoutMs, emulatorProcess = null)
     while (Date.now() < deadline) {
         const {stdout} = await run(adb, ["devices"]);
         if (stdout.split("\n").some(row => row.trim() === `${deviceSerial}\tdevice`)) break;
-        if (emulatorProcess?.exitCode !== null) {
+        if (emulatorProcess && emulatorProcess.exitCode !== null) {
             throw new Error(`Android emulator exited before ADB saw ${deviceSerial}.\n${emulatorProcess.output}`);
         }
         await sleep(1000);
@@ -182,7 +182,7 @@ async function waitForBoot(adb, deviceSerial, timeoutMs, emulatorProcess = null)
         throw new Error(`Timed out waiting for ${deviceSerial} to appear in ADB.\n${emulatorProcess?.output || stdout}`);
     }
     while (Date.now() < deadline) {
-        if (emulatorProcess?.exitCode !== null) {
+        if (emulatorProcess && emulatorProcess.exitCode !== null) {
             throw new Error(`Android emulator exited before ${deviceSerial} booted.\n${emulatorProcess.output}`);
         }
         const {stdout} = await run(adb, ["-s", deviceSerial, "shell", "getprop", "sys.boot_completed"]);

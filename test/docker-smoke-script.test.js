@@ -26,7 +26,14 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerTransfer, /scenario=\$\{options\.name\}/);
     assert.match(dockerTransfer, /transport=\$\{options\.transportId\}/);
     assert.match(dockerTransfer, /meshdropPollenTransfer\.enable/);
-    assert.match(dockerTransfer, /undefined, \{timeout: 45000\}/);
+    assert.match(dockerTransfer, /const transferTimeoutMs = 45000/);
+    assert.match(dockerTransfer, /\{timeout: transferTimeoutMs\}/);
+    assert.match(dockerTransfer, /setDefaultTimeout\(pageReadyTimeoutMs\)/);
+    assert.match(dockerTransfer, /setDefaultNavigationTimeout\(pageReadyTimeoutMs\)/);
+    assert.match(dockerTransfer, /Docker browser transfer smoke start:/);
+    assert.match(dockerTransfer, /method\.id === "browser-extension"/);
+    assert.match(dockerSmoke, /\[docker-smoke\] start:/);
+    assert.match(dockerSmoke, /timeoutMs: 8 \* minute/);
     assert.match(dockerSmoke, /MESHDROP_DOCKER_ADMIN_SECRET_KEY/);
     assert.match(dockerSmoke, /scripts\/fips-control-smoke-mock\.mjs/);
     assert.match(dockerSmoke, /scripts\/docker-two-host-relay-smoke\.mjs/);

@@ -8,6 +8,9 @@ const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
 const adminSecretKey = secretKeyFromHex(process.env.MESHDROP_DOCKER_ADMIN_SECRET_KEY || "");
 const adminFipsPeerNpub = process.env.MESHDROP_DOCKER_ADMIN_FIPS_PEER_NPUB || "npub1peer";
 const proofPrefix = process.env.MESHDROP_DOCKER_TRANSFER_PROOF_PREFIX || "docker";
+const pageReadyTimeoutMs = 30000;
+const adminActionTimeoutMs = 30000;
+const transferTimeoutMs = 45000;
 
 async function main() {
     if (!baseUrl) throw new Error("MESHDROP_DOCKER_TRANSFER_BASE_URL or base URL argument is required");
@@ -18,11 +21,13 @@ async function main() {
 
     try {
         if (adminSecretKey) await runAdminSettingsProof(browser, adminSecretKey);
+        console.log(`Docker browser transfer smoke start: ${proofPrefix}-local-webrtc`);
         await runProofTransfer(browser, {
             name: `${proofPrefix}-local-webrtc`,
             roomType: "ip",
             transportId: "local"
         });
+        console.log(`Docker browser transfer smoke start: ${proofPrefix}-pollen-webrtc`);
         await runProofTransfer(browser, {
             name: `${proofPrefix}-pollen-webrtc`,
             roomType: "pollen",
@@ -30,7 +35,9 @@ async function main() {
             setupBoth: async pages => {
                 await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropPollenTransfer.enable())));
                 await Promise.all(pages.map(page => (
-                    page.waitForFunction(() => globalThis.meshdropPollenTransfer.isActive())
+                    page.waitForFunction(() => globalThis.meshdropPollenTransfer.isActive(), undefined, {
+                        timeout: pageReadyTimeoutMs
+                    })
                 )));
             }
         });
@@ -43,6 +50,7 @@ async function main() {
 }
 
 async function runAdminSettingsProof(browser, secretKey) {
+    console.log("Docker browser transfer smoke start: docker-admin-settings");
     const adminContext = await newContext(browser, {signerSecretKey: secretKey});
     const nonAdminContext = await newContext(browser, {signerSecretKey: generateSecretKey()});
     const adminPage = await adminContext.newPage();
@@ -50,44 +58,62 @@ async function runAdminSettingsProof(browser, secretKey) {
     const logs = watchPages("docker-admin-settings", [adminPage, nonAdminPage]);
 
     try {
-        await Promise.all([
+        await smokeStep("docker-admin-settings load pages", () => Promise.all([
             adminPage.goto(baseUrl, {waitUntil: "domcontentloaded"}),
             nonAdminPage.goto(baseUrl, {waitUntil: "domcontentloaded"})
-        ]);
-        await Promise.all([waitForHydration(adminPage), waitForHydration(nonAdminPage)]);
+        ]));
+        await smokeStep(
+            "docker-admin-settings wait hydration",
+            () => Promise.all([waitForHydration(adminPage), waitForHydration(nonAdminPage)])
+        );
 
-        await connectNostrIdentity(nonAdminPage);
-        await assertFipsSettingsHidden(nonAdminPage);
-        const nonAdminError = await nonAdminPage.evaluate(async () => {
+        await smokeStep("docker-admin-settings connect non-admin identity", () => connectNostrIdentity(nonAdminPage));
+        await smokeStep("docker-admin-settings assert non-admin controls hidden", () => assertFipsSettingsHidden(nonAdminPage));
+        const nonAdminError = await smokeStep("docker-admin-settings assert non-admin request rejected", () => nonAdminPage.evaluate(async timeoutMs => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
             try {
                 await fetch("/settings/fips/peers", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({peers: []})
+                    body: JSON.stringify({peers: []}),
+                    signal: controller.signal
                 });
                 return "";
             } catch (error) {
                 return error.message;
+            } finally {
+                clearTimeout(timeout);
             }
-        });
+        }, adminActionTimeoutMs));
         assert(
             nonAdminError.includes("configured admin npub is not connected"),
             `non-admin settings request was not rejected by the GUI signer gate: ${nonAdminError}`
         );
 
-        await connectNostrIdentity(adminPage);
-        await adminPage.waitForFunction(() => globalThis.AdminSettingsProtocol.canManageCurrentServerSettings());
-        await adminPage.waitForFunction(() => !document.querySelector('[data-settings-tab="fips"]')?.hasAttribute("hidden"));
-        await adminPage.click("#protocol-settings");
-        await adminPage.click('[data-settings-tab="fips"]');
-        await adminPage.click(".fips-add-peer");
-        await adminPage.fill('.fips-peer-row [data-field="npub"]', adminFipsPeerNpub);
-        await adminPage.fill('.fips-peer-row [data-field="address"]', "203.0.113.9:2121");
-        await adminPage.selectOption('.fips-peer-row [data-field="transport"]', "tcp");
-        await adminPage.click(".fips-save-peers");
-        await adminPage.waitForFunction(() => (
-            document.querySelector(".fips-settings-status")?.textContent.includes("Saved FIPS peers")
+        await smokeStep("docker-admin-settings connect admin identity", () => connectNostrIdentity(adminPage));
+        await smokeStep("docker-admin-settings wait admin capability", () => adminPage.waitForFunction(
+            () => globalThis.AdminSettingsProtocol.canManageCurrentServerSettings(),
+            undefined,
+            {timeout: adminActionTimeoutMs}
         ));
+        await smokeStep("docker-admin-settings wait FIPS tab", () => adminPage.waitForFunction(
+            () => !document.querySelector('[data-settings-tab="fips"]')?.hasAttribute("hidden"),
+            undefined,
+            {timeout: adminActionTimeoutMs}
+        ));
+        await smokeStep("docker-admin-settings save FIPS peer", async () => {
+            await adminPage.click("#protocol-settings");
+            await adminPage.click('[data-settings-tab="fips"]');
+            await adminPage.click(".fips-add-peer");
+            await adminPage.fill('.fips-peer-row [data-field="npub"]', adminFipsPeerNpub);
+            await adminPage.fill('.fips-peer-row [data-field="address"]', "203.0.113.9:2121");
+            await adminPage.selectOption('.fips-peer-row [data-field="transport"]', "tcp");
+            await adminPage.click(".fips-save-peers");
+        });
+        await smokeStep("docker-admin-settings wait save status", () => adminPage.waitForFunction(() => (
+            document.querySelector(".fips-settings-status")?.textContent.includes("Saved FIPS peers")
+        ), undefined, {timeout: adminActionTimeoutMs}));
 
         assert(!logs.pageErrors.length, `docker-admin-settings: page errors: ${logs.pageErrors.join("\n")}`);
         console.log("Proof docker-admin-settings: signed admin GUI saved FIPS peers");
@@ -95,6 +121,13 @@ async function runAdminSettingsProof(browser, secretKey) {
     finally {
         await Promise.allSettled([adminContext.close(), nonAdminContext.close()]);
     }
+}
+
+async function smokeStep(name, action) {
+    console.log(`Docker browser transfer smoke step: ${name}`);
+    const result = await action();
+    console.log(`Docker browser transfer smoke done: ${name}`);
+    return result;
 }
 
 async function runProofTransfer(browser, options) {
@@ -130,6 +163,8 @@ async function runProofTransfer(browser, options) {
 
 async function newContext(browser, options = {}) {
     const context = await browser.newContext({serviceWorkers: "block"});
+    context.setDefaultTimeout(pageReadyTimeoutMs);
+    context.setDefaultNavigationTimeout(pageReadyTimeoutMs);
     if (options.signerSecretKey) {
         const pubkey = getPublicKey(options.signerSecretKey);
         await context.exposeFunction("__meshdropDockerGetPublicKey", () => pubkey);
@@ -193,12 +228,24 @@ async function waitForHydration(page) {
         && globalThis.__meshdropDockerTransfer.configLoaded
         && globalThis.__meshdropDockerTransfer.wsConnected
         && document.querySelector("x-peers")
-    ));
+    ), undefined, {timeout: pageReadyTimeoutMs});
 }
 
 async function connectNostrIdentity(page) {
-    await page.evaluate(() => globalThis.meshdropNostrIdentity.connect());
-    await page.waitForFunction(() => !!globalThis.meshdropNostrIdentity.getIdentity());
+    await page.evaluate(() => {
+        if (globalThis.meshdropNostrLoginDialog) {
+            globalThis.meshdropNostrLoginDialog.choose = methods => (
+                methods.find(method => method.id === "browser-extension")?.id || methods[0]?.id || null
+            );
+        }
+
+        void globalThis.meshdropNostrIdentity.connect();
+    });
+    await page.waitForFunction(
+        () => !!globalThis.meshdropNostrIdentity.getIdentity(),
+        undefined,
+        {timeout: adminActionTimeoutMs}
+    );
 }
 
 async function assertFipsSettingsHidden(page) {
@@ -214,7 +261,7 @@ async function waitForConnectedPeer(page, roomType) {
         if (!peer) return "";
         if (!globalThis.__meshdropDockerTransfer.connected.includes(peer.id)) return "";
         return peer.id;
-    }, roomType, {timeout: 20000});
+    }, roomType, {timeout: pageReadyTimeoutMs});
 
     return peerId.jsonValue();
 }
@@ -248,7 +295,7 @@ async function waitForReceivedFiles(page, name) {
             const batch = globalThis.__meshdropDockerTransfer.received.at(-1);
             if (!batch || batch.files.length !== 1) return null;
             return batch.files;
-        }, undefined, {timeout: 45000});
+        }, undefined, {timeout: transferTimeoutMs});
     } catch (error) {
         throw new Error(`${name}: ${error.message}\nstate=${JSON.stringify(await debugPageState(page))}`);
     }

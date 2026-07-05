@@ -35,6 +35,7 @@ test("CI gates baseline browser and Docker runtime smokes by change scope", () =
     assert.match(ciWorkflow, /docker-smoke:/);
     assert.match(ciWorkflow, /name: Docker smoke/);
     assertRuntimeChangeGate("docker-smoke");
+    assert.match(ciWorkflow, /docker-smoke:\n(?:    .+\n)+    timeout-minutes: 35/);
 });
 
 test("CI runs desktop and mobile target artifact transfer smoke", () => {

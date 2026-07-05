@@ -45,7 +45,7 @@ try {
 
     progress("click WebView file input");
     const point = await installAndLocatePickerInput(webview.cdp);
-    await tapWebViewPoint(device.adb, device.serial, point);
+    await tapWebViewPoint(device.adb, device.serial, point, webview.cdp);
 
     progress("wait for native picker UI");
     const pickerActivity = await waitForTopActivity(device.adb, device.serial, /documentsui|resolver|file/i);
@@ -150,13 +150,33 @@ async function installAndLocatePickerInput(cdp) {
     })()`);
 }
 
-async function tapWebViewPoint(adb, serial, point) {
+async function tapWebViewPoint(adb, serial, point, cdp) {
     const xml = await dumpUiHierarchy(adb, serial);
     const bounds = findBounds(xml, "android.webkit.WebView");
-    assert(bounds, "Android UI hierarchy did not expose the WebView bounds");
+    if (!bounds) {
+        await dispatchWebViewClick(cdp, point);
+        return;
+    }
     const x = bounds.left + Math.round(point.x * point.devicePixelRatio);
     const y = bounds.top + Math.round(point.y * point.devicePixelRatio);
     await run(adb, ["-s", serial, "shell", "input", "tap", String(x), String(y)]);
+}
+
+async function dispatchWebViewClick(cdp, point) {
+    await cdp.send("Input.dispatchMouseEvent", {
+        type: "mousePressed",
+        x: point.x,
+        y: point.y,
+        button: "left",
+        clickCount: 1
+    });
+    await cdp.send("Input.dispatchMouseEvent", {
+        type: "mouseReleased",
+        x: point.x,
+        y: point.y,
+        button: "left",
+        clickCount: 1
+    });
 }
 
 async function waitForTopActivity(adb, serial, pattern) {

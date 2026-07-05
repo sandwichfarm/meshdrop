@@ -6,7 +6,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <!-- Web App Config -->
     <title>MeshDrop | Transfer Files Cross-Platform. No Setup, No Signup.</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#3367d6">
     <meta name="color-scheme" content="dark light">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -629,6 +629,20 @@
                     </div>
                     <div class="transfer-choice-list column"></div>
                 </div>
+                <div class="row-reverse center btn-row wrap">
+                    <button class="btn btn-rounded btn-grey" type="button" data-i18n-key="dialogs.cancel" data-i18n-attrs="text" close></button>
+                </div>
+            </x-paper>
+        </x-background>
+    </x-dialog>
+    <!-- Nostr Login Dialog -->
+    <x-dialog id="nostr-login-dialog">
+        <x-background class="full center">
+            <x-paper shadow="2">
+                <div class="row center p-2">
+                    <h2 class="dialog-title" data-i18n-key="dialogs.nostr-login-title" data-i18n-attrs="text"></h2>
+                </div>
+                <div class="column center p-2 nostr-login-methods"></div>
                 <div class="row-reverse center btn-row wrap">
                     <button class="btn btn-rounded btn-grey" type="button" data-i18n-key="dialogs.cancel" data-i18n-attrs="text" close></button>
                 </div>

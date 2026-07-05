@@ -187,7 +187,7 @@ async function runVisibilityScenario(browser, baseUrl) {
             fips: document.getElementById("fips-discovery").hasAttribute("hidden")
         }));
 
-        assert(visibility.nostrIdentity, "Nostr sign-in should be hidden without a NIP-07 signer");
+        assert(!visibility.nostrIdentity, "Nostr sign-in should stay visible for Remote Signer without NIP-07");
         assert(visibility.nostrMesh, "Nostr mesh should be hidden before sign-in");
         assert(visibility.blossom, "Blossom transfer should be hidden before sign-in");
         assert(visibility.hashtree, "Hashtree transfer should be hidden before sign-in");
