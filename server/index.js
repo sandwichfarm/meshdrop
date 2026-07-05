@@ -7,33 +7,32 @@ import FipsControlClient, {createFipsConfig} from "./fips-control.js";
 import PollenTransferClient, {createPollenConfig} from "./pollen-transfer.js";
 import MeshFederation, {createFederationConfig} from "./federation.js";
 
-// Handle SIGINT
+const writeStdout = (...parts) => process.stdout.write(`${parts.join(" ")}\n`);
+const writeStderr = value => process.stderr.write(`${value}\n`);
+
 process.on('SIGINT', () => {
-    console.info("SIGINT Received, exiting...")
+    writeStdout("SIGINT Received, exiting...")
     process.exit(0)
 })
 
-// Handle SIGTERM
 process.on('SIGTERM', () => {
-    console.info("SIGTERM Received, exiting...")
+    writeStdout("SIGTERM Received, exiting...")
     process.exit(0)
 })
 
-// Handle APP ERRORS
 process.on('uncaughtException', (error, origin) => {
-    console.log('----- Uncaught exception -----')
-    console.log(error)
-    console.log('----- Exception origin -----')
-    console.log(origin)
+    writeStderr('----- Uncaught exception -----')
+    writeStderr(error?.stack || error)
+    writeStderr('----- Exception origin -----')
+    writeStderr(origin)
 })
 process.on('unhandledRejection', (reason, promise) => {
-    console.log('----- Unhandled Rejection at -----')
-    console.log(promise)
-    console.log('----- Reason -----')
-    console.log(reason)
+    writeStderr('----- Unhandled Rejection at -----')
+    writeStderr(promise)
+    writeStderr('----- Reason -----')
+    writeStderr(reason?.stack || reason)
 })
 
-// Evaluate arguments for deployment with Docker and Node.js
 let conf = {};
 
 conf.debugMode = process.env.DEBUG_MODE === "true";
@@ -133,28 +132,33 @@ conf.buttons = {
     }
 };
 
-// Evaluate arguments for deployment with Node.js only
 conf.autoStart = process.argv.includes('--auto-restart');
 
 conf.localhostOnly = process.argv.includes('--localhost-only');
 
 
-// Validate configuration
 if (conf.ipv6Localize) {
     if (!(0 < conf.ipv6Localize && conf.ipv6Localize < 8)) {
         console.error("ipv6Localize must be an integer between 1 and 7");
         process.exit(1);
     }
 
-    console.log("IPv6 client IPs will be localized to",
+    writeStdout("IPv6 client IPs will be localized to",
         conf.ipv6Localize,
         conf.ipv6Localize === 1 ? "segment" : "segments");
 }
 
 if (conf.signalingServer) {
-    const isValidUrl = /[a-z|0-9|\-._~:\/?#\[\]@!$&'()*+,;=]+$/.test(conf.signalingServer);
-    const containsProtocol = /:\/\//.test(conf.signalingServer)
-    const endsWithSlash = /\/$/.test(conf.signalingServer)
+    let isValidUrl = false;
+    try {
+        new URL(`wss://${conf.signalingServer}`);
+        isValidUrl = true;
+    } catch {
+        isValidUrl = false;
+    }
+
+    const containsProtocol = conf.signalingServer.includes("://")
+    const endsWithSlash = conf.signalingServer.endsWith("/")
     if (!isValidUrl || containsProtocol) {
         console.error("SIGNALING_SERVER must be a valid url without the protocol prefix.\n" +
             "Examples of valid values: `meshdrop.example`, `meshdrop.example:3000`, `example.com/meshdrop`");
@@ -173,16 +177,14 @@ if (conf.signalingServer) {
     }
 }
 
-// Logs for debugging
 if (conf.debugMode) {
-    console.log("DEBUG_MODE is active. To protect privacy, do not use in production.");
-    console.debug("\n");
-    console.debug("----DEBUG ENVIRONMENT VARIABLES----")
-    console.debug(JSON.stringify(conf, null, 4));
-    console.debug("\n");
+    writeStdout("DEBUG_MODE is active. To protect privacy, do not use in production.");
+    writeStdout("");
+    writeStdout("----DEBUG ENVIRONMENT VARIABLES----")
+    writeStdout(JSON.stringify(conf, null, 4));
+    writeStdout("");
 }
 
-// Start a new MeshDrop instance when an uncaught exception occurs
 if (conf.autoStart) {
     process.on(
         'uncaughtException',
@@ -204,19 +206,17 @@ if (conf.autoStart) {
     );
 }
 
-// Start server to serve client files
 const meshDropServer = new PairDropServer(conf);
 
 if (!conf.signalingServer) {
-    // Start websocket server if SIGNALING_SERVER is not set
     const wsServer = new PairDropWsServer(meshDropServer.server, conf);
     conf.federationClient.attachWsServer(wsServer);
     conf.federationClient.start();
 } else {
-    console.log(
+    writeStdout(
         "This instance does not include a signaling server. Clients on this instance connect to the following signaling server:",
         conf.signalingServer
     );
 }
 
-console.log('\nMeshDrop is running on port', conf.port);
+writeStdout('\nMeshDrop is running on port', conf.port);
