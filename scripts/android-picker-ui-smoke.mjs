@@ -202,10 +202,22 @@ async function scrollPicker(adb, serial) {
 }
 
 async function dumpUiHierarchy(adb, serial) {
-    const remotePath = "/sdcard/meshdrop-window.xml";
-    await run(adb, ["-s", serial, "shell", "uiautomator", "dump", remotePath], {timeoutMs: 10000});
-    const {stdout} = await run(adb, ["-s", serial, "shell", "cat", remotePath]);
-    return stripCarriageReturns(stdout);
+    const remotePath = "/data/local/tmp/meshdrop-window.xml";
+    let lastError = "";
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        const dumped = await run(adb, ["-s", serial, "shell", "uiautomator", "dump", remotePath], {timeoutMs: 10000})
+            .catch(error => {
+                lastError = error.message;
+                return null;
+            });
+        const read = await run(adb, ["-s", serial, "shell", "cat", remotePath]).catch(error => {
+            lastError = `${dumped?.stdout || ""}\n${dumped?.stderr || ""}\n${error.message}`;
+            return null;
+        });
+        if (read?.stdout) return stripCarriageReturns(read.stdout);
+        await sleep(500);
+    }
+    throw new Error(`Could not dump Android UI hierarchy from ${remotePath}\n${lastError}`);
 }
 
 function findNode(xml, needle) {
