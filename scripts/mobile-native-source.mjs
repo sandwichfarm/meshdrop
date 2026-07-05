@@ -943,6 +943,7 @@ function androidNostrSignerBridge() {
         "                intent.putExtra(\"id\", request.optString(\"id\", \"\"));",
         "                if (request.has(\"current_user\")) intent.putExtra(\"current_user\", request.optString(\"current_user\", \"\"));",
         "                if (request.has(\"pubkey\")) intent.putExtra(\"pubkey\", request.optString(\"pubkey\", \"\"));",
+        "                if (request.has(\"permissions\")) intent.putExtra(\"permissions\", request.optString(\"permissions\", \"\"));",
         "                if (request.has(\"returnType\")) intent.putExtra(\"returnType\", request.optString(\"returnType\", \"\"));",
         "                String packageName = request.optString(\"package\", \"\");",
         "                if (!packageName.isEmpty()) intent.setPackage(packageName);",

@@ -83,6 +83,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 | 2026-07-05 | `260705-apd-android-physical-device-uat-harness` | complete | Physical Android UAT harness rejects no-device/emulator/ambiguous states and runs existing Android smokes by serial; hardware pass remains open |
 | 2026-07-05 | `260705-dtu-deployed-target-uat-harness` | complete | Start9/Umbrel deployed UAT harnesses require installed service URLs, validate `/config`, and run local/Pollen WebRTC transfer proof; real device/node pass remains open |
 | 2026-07-05 | `260705-asa-android-safe-area-and-signer-options` | complete | Focused 28/28; e2e transfer smoke passed after CI expectation fix; `npm test` 220/220; physical Android WebView WebRTC/WebSocket proof on `28031FDH300BS5`; live CDP shows safe-area, Nostr button visible, Amber signer options |
+| 2026-07-06 | `260706-amber-nip04-webrtc` | complete | Android Amber signer exposes NIP-04/NIP-44 through active identity signer; focused 30/30; `npm test` 222/222; Android APK build; e2e transfer smoke; diff/slop gates |
 
 ## Active Quick Task
 
