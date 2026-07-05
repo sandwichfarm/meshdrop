@@ -144,6 +144,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /Proof android-picker-ui/);
     assert.match(mobile, /native picker UI selected `meshdrop-picker-proof\.txt`/);
     assert.match(mobile, /meshdrop-android-share-proof\.txt/);
+    assert.match(mobile, /npm run test:android-physical-device/);
+    assert.match(mobile, /Proof android-physical-device-uat/);
+    assert.match(mobile, /rejects emulator-only runs/);
     assert.match(mobile, /npm run test:target-artifacts/);
     assert.match(mobile, /Android WebView transfer proof does not prove physical Android device install UAT/);
     assert.match(mobile, /Android release APK artifact proves a release APK signed with a generated UAT keystore/);
@@ -260,7 +263,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, unsigned device app proof, share extension source scaffold, and Bluetooth negotiation proof exist; signed\/device UAT open \|/);
     assert.match(
         targetStatus,
-        /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, and native picker UI proof exist; physical-device UAT open \|/
+        /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, native picker UI proof, and physical-device UAT harness exist; physical-device hardware pass open \|/
     );
     assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `npm run build:ios:simulator-app`; `npm run build:ios:device-app`; `npm run test:ios-xcode-build`; `npm run test:ios-simulator-app`; `npm run test:ios-device-app`; `node --test test\/mobile-package\.test\.js`/);
     assert.match(targetStatus, /wires iOS 18\.4\+ file inputs to `UIDocumentPickerViewController`/);
@@ -289,7 +292,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /Android WebView `RTCPeerConnection`\/`WebSocket`\/`RTCDataChannel` capability evidence and Bluetooth API negotiation/);
     assert.match(targetStatus, /Android WebView sent `meshdrop-android-webview-proof\.txt`/);
     assert.match(targetStatus, /Android received an `ACTION_SEND` stream for `meshdrop-android-share-proof\.txt`/);
-    assert.match(targetStatus, /Physical Android device install UAT/);
+    assert.match(targetStatus, /node --test test\/android-physical-device-uat\.test\.js` proves the physical-device harness/);
+    assert.match(targetStatus, /Passing `npm run test:android-physical-device` on physical Android hardware/);
     assert.doesNotMatch(targetStatus, /Physical Android device install UAT and Bluetooth negotiation/);
     assert.doesNotMatch(targetStatus, /Android native file picker UI UAT/);
     assert.doesNotMatch(targetStatus, /signed Android release APK or AAB package/);
