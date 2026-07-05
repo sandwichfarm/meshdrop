@@ -21,12 +21,12 @@ const RuntimeCapabilities = {
                 servers: []
             },
             pollen: {
-                enabled: false,
+                enabled: staticTransports.pollen,
                 maxUploadBytes: 0,
                 room: ""
             },
             fips: {
-                enabled: false,
+                enabled: staticTransports.fips,
                 room: ""
             },
             admin: {

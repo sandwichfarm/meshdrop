@@ -314,3 +314,49 @@ test("static config uses native shell injected target manifest before xhr fallba
     assert.equal(configEvent.detail.capabilities.runtime.platform, "desktop");
     assert.deepEqual(sockets, []);
 });
+
+test("static config exposes Android APK FIPS and Pollen transport options", async () => {
+    const {context, fired, opened, sockets} = createContext({
+        responses: [
+            {status: 0, body: ""}
+        ]
+    });
+    context.__meshdropTargetManifest = {
+        target: "android",
+        nativeShellBuilt: true,
+        runtime: {
+            target: "android",
+            platform: "mobile",
+            hasBackend: false,
+            sharedInstance: false
+        },
+        transports: {
+            localDiscovery: false,
+            webrtc: true,
+            nostr: true,
+            blossom: true,
+            hashtree: true,
+            pollen: true,
+            fips: true,
+            bluetooth: false
+        }
+    };
+
+    new context.__meshdropTest.ServerConnection();
+    await flushPromises();
+    await flushPromises();
+
+    const configEvent = fired.find(event => event.type === "config");
+
+    assert.deepEqual(opened, [
+        {method: "GET", url: "config"}
+    ]);
+    assert.equal(configEvent.detail.capabilities.runtime.target, "android");
+    assert.equal(configEvent.detail.capabilities.runtime.platform, "mobile");
+    assert.equal(configEvent.detail.capabilities.runtime.hasBackend, false);
+    assert.equal(configEvent.detail.fips.enabled, true);
+    assert.equal(configEvent.detail.pollen.enabled, true);
+    assert.equal(configEvent.detail.capabilities.transports.fips.supported, true);
+    assert.equal(configEvent.detail.capabilities.transports.pollen.supported, true);
+    assert.deepEqual(sockets, []);
+});
