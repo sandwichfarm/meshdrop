@@ -37,7 +37,7 @@ Repeat with `target=start9` and `target=umbrel`.
 3. Confirm the GitHub release contains source, Node runtime, SPA tarball, Desktop Native source tarball, Desktop Native
    Linux shell tarball, Desktop Chromium shell tarball, Desktop Chromium bundled shell tarball, signed Desktop Chromium
    installer `.run`, installer `.asc`, installer `.sha256`, installer `.pubkey.asc`, iOS source tarball,
-   iOS native-source tarball, iOS Simulator app tarball, iOS unsigned device archive tarball, Android source tarball,
+   iOS native-source tarball, iOS Simulator app tarball, iOS unsigned device app tarball, Android source tarball,
    Android native-source tarball, Android debug APK tarball, Android release APK tarball, Start9 source tarball, Umbrel package tarball, and
    `SHA256SUMS` artifacts.
 4. Confirm GHCR has both tag-preserving and version-only tags for each target:
@@ -90,7 +90,7 @@ Repeat with `target=start9` and `target=umbrel`.
   `unauthorized` for `ghcr.io/sandwichfarm/meshdrop:v0.1.4-standalone`.
 - The local GitHub token lacks `read:packages`, so this session cannot inspect package visibility through the Packages
   REST API. Making `ghcr.io/sandwichfarm/meshdrop` public is still required before anonymous manifest readback can pass.
-- The iOS source, native-source, unsigned Simulator app, and unsigned device archive artifacts are not complete native
+- The iOS source, native-source, unsigned Simulator app, and unsigned device app artifacts are not complete native
   targets until signed device-installable packages and transfer UAT pass.
 - Android APK artifacts are not complete until physical-device install UAT passes. The release APK artifact uses
   generated UAT signing and is not Play Store upload signing or AAB proof.

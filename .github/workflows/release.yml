@@ -41,8 +41,8 @@ jobs:
       - name: Build iOS Simulator app artifact
         run: npm run build:ios:simulator-app -- --version "${{ steps.release.outputs.version }}" --out-dir dist
 
-      - name: Build iOS device archive artifact
-        run: npm run build:ios:device-archive -- --version "${{ steps.release.outputs.version }}" --out-dir dist
+      - name: Build iOS device app artifact
+        run: npm run build:ios:device-app -- --version "${{ steps.release.outputs.version }}" --out-dir dist
 
       - name: Upload iOS Simulator app artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -52,11 +52,11 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Upload iOS device archive artifact
+      - name: Upload iOS device app artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: meshdrop-ios-device-archive-${{ steps.release.outputs.version }}
-          path: dist/meshdrop-ios-device-archive-${{ steps.release.outputs.version }}.tar.gz
+          name: meshdrop-ios-device-app-${{ steps.release.outputs.version }}
+          path: dist/meshdrop-ios-device-app-${{ steps.release.outputs.version }}.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -146,10 +146,10 @@ jobs:
           name: meshdrop-ios-simulator-app-${{ steps.release.outputs.version }}
           path: dist
 
-      - name: Download iOS device archive artifact
+      - name: Download iOS device app artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: meshdrop-ios-device-archive-${{ steps.release.outputs.version }}
+          name: meshdrop-ios-device-app-${{ steps.release.outputs.version }}
           path: dist
 
       - name: Create release checksums

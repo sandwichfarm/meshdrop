@@ -19,7 +19,7 @@ test("release workflow publishes GHCR images for alpha target packages", () => {
     assert.match(releaseWorkflow, /ios-apple-artifacts:/);
     assert.match(releaseWorkflow, /runs-on: macos-latest/);
     assert.match(releaseWorkflow, /npm run build:ios:simulator-app -- --version "\$\{\{ steps\.release\.outputs\.version \}\}" --out-dir dist/);
-    assert.match(releaseWorkflow, /npm run build:ios:device-archive -- --version "\$\{\{ steps\.release\.outputs\.version \}\}" --out-dir dist/);
+    assert.match(releaseWorkflow, /npm run build:ios:device-app -- --version "\$\{\{ steps\.release\.outputs\.version \}\}" --out-dir dist/);
     assert.match(releaseWorkflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4\.6\.2/);
     assert.match(releaseWorkflow, /needs: ios-apple-artifacts/);
     assert.match(releaseWorkflow, /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4\.3\.0/);
@@ -92,7 +92,7 @@ test("release verification workflow reads back assets, manifests, and pulled sta
     assert.match(releaseVerifyWorkflow, /meshdrop-desktop-chromium-bundled-installer-\$\{version\}\.run\.sha256/);
     assert.match(releaseVerifyWorkflow, /meshdrop-desktop-linux-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-ios-\$\{version\}\.tar\.gz/);
-    assert.match(releaseVerifyWorkflow, /meshdrop-ios-device-archive-\$\{version\}\.tar\.gz/);
+    assert.match(releaseVerifyWorkflow, /meshdrop-ios-device-app-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-ios-native-source-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-ios-simulator-app-\$\{version\}\.tar\.gz/);
     assert.match(releaseVerifyWorkflow, /meshdrop-android-\$\{version\}\.tar\.gz/);

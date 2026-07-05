@@ -4,8 +4,8 @@ Use this runbook for the dependency-free mobile source artifacts built by `npm r
 `npm run build:android`, plus the native wrapper source artifacts built by `npm run build:ios:native-source` and
 `npm run build:android:native-source`, the Android debug APK artifact built by `npm run build:android:apk`, and the
 UAT-signed Android release APK artifact built by `npm run build:android:release-apk`, and the unsigned iOS Simulator
-app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS device archive artifact built by
-`npm run build:ios:device-archive`.
+app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS device app artifact built by
+`npm run build:ios:device-app`.
 
 ## Build
 
@@ -16,12 +16,12 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 5. Run `npm run build:android:apk -- --version <version>`.
 6. Run `npm run build:android:release-apk -- --version <version>`.
 7. On macOS with Xcode installed, run `npm run build:ios:simulator-app -- --version <version>`.
-8. On macOS with Xcode installed, run `npm run build:ios:device-archive -- --version <version>`.
+8. On macOS with Xcode installed, run `npm run build:ios:device-app -- --version <version>`.
 9. Confirm `dist/meshdrop-ios-<version>.tar.gz` and `dist/meshdrop-android-<version>.tar.gz` exist.
 10. Confirm `dist/meshdrop-ios-native-source-<version>.tar.gz` and
    `dist/meshdrop-android-native-source-<version>.tar.gz` exist.
 11. Confirm `dist/meshdrop-ios-simulator-app-<version>.tar.gz` exists.
-12. Confirm `dist/meshdrop-ios-device-archive-<version>.tar.gz` exists.
+12. Confirm `dist/meshdrop-ios-device-app-<version>.tar.gz` exists.
 13. Confirm `dist/meshdrop-android-apk-<version>.tar.gz` exists.
 14. Confirm `dist/meshdrop-android-release-apk-<version>.tar.gz` exists.
 15. Confirm each source archive contains `app/index.html`, `meshdrop-target.json`, a target README, and `UAT-MOBILE.md`.
@@ -89,16 +89,15 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 5. Do not treat this artifact as App Store, TestFlight, signed-device, App Group provisioning, picker UAT, or native
    transfer proof.
 
-## iOS Device Archive Acceptance
+## iOS Device App Acceptance
 
-1. Confirm the iOS device archive artifact contains `MeshDrop.xcarchive/Info.plist`.
-2. Confirm the archive contains `MeshDrop.xcarchive/Products/Applications/MeshDrop.app/Info.plist`.
-3. Confirm the artifact contains `build-proof.json`.
-4. Confirm `build-proof.json` reports `packageType` as `unsigned-device-archive`.
-5. Confirm `build-proof.json` reports `sdk` as `iphoneos`, `destination` as `generic/platform=iOS`, and
+1. Confirm the iOS device app artifact contains `MeshDrop.app/Info.plist`.
+2. Confirm the artifact contains `build-proof.json`.
+3. Confirm `build-proof.json` reports `packageType` as `unsigned-device-app`.
+4. Confirm `build-proof.json` reports `sdk` as `iphoneos`, `destination` as `generic/platform=iOS`, and
    `codeSigningAllowed` as `false`.
-6. Confirm `build-proof.json` reports `deviceInstallable` and `appStoreReady` as `false`.
-7. Do not treat this artifact as a signed IPA, App Store/TestFlight package, App Group provisioning proof, picker UAT,
+5. Confirm `build-proof.json` reports `deviceInstallable` and `appStoreReady` as `false`.
+6. Do not treat this artifact as a signed IPA, App Store/TestFlight package, App Group provisioning proof, picker UAT,
    share-sheet UAT, or native transfer proof.
 
 ## Android Release APK Acceptance
@@ -191,13 +190,13 @@ npm run build:ios -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:ios:native-source -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:ios:simulator-app -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
-npm run build:ios:device-archive -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
+npm run build:ios:device-app -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android:native-source -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android:apk -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 npm run build:android:release-apk -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-mobile-smoke
 node --test test/mobile-package.test.js
 npm run test:ios-simulator-app
-npm run test:ios-device-archive
+npm run test:ios-device-app
 npm run test:android-apk
 npm run test:android-release-apk
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-apk-install
@@ -209,7 +208,7 @@ npm run test:target-artifacts
 ```
 
 This smoke proves source artifact shape, native-source wrapper source shape, target metadata, runtime capability metadata,
-an unsigned iOS Simulator app package build, an unsigned `iphoneos` iOS device archive build, an Android debug APK build,
+an unsigned iOS Simulator app package build, an unsigned `iphoneos` iOS device app build, an Android debug APK build,
 a UAT-signed Android release APK build with `apksigner` proof, Android emulator
 install/launch proof, native Android picker UI file selection, Android WebView runtime capability evidence including
 Bluetooth API negotiation with transfer disabled, Android WebView-to-Chromium Nostr WebRTC transfer through a local fake
@@ -226,7 +225,7 @@ records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API
 - Android WebView transfer proof does not prove physical Android device install UAT.
 - These artifacts do not prove physical Android device install UAT.
 - The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.
-- The iOS device archive artifact proves an unsigned generic `iphoneos` `.xcarchive` package only; it does not prove a
+- The iOS device app artifact proves an unsigned generic `iphoneos` `.app` build product only; it does not prove a
   signed device-installable IPA, App Store/TestFlight packaging, App Group provisioning, or physical-device install.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
 - The iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18.4+ open-panel hook,

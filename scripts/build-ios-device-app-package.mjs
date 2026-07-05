@@ -4,15 +4,16 @@ import {fileURLToPath} from "node:url";
 
 import {sanitizeArtifactPart} from "./build-spa-artifact.mjs";
 import {
+    iosDeviceAppPath,
     prepareIosNativeSource,
     run,
-    runIosDeviceArchiveBuild
+    runIosDeviceAppBuild
 } from "./ios-xcode-smoke-helpers.mjs";
 
 const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const packageJson = JSON.parse(await fs.readFile(path.join(repoRoot, "package.json"), "utf8"));
 
-export function parseIosDeviceArchiveArgs(argv) {
+export function parseIosDeviceAppArgs(argv) {
     const args = {
         version: packageJson.version,
         outDir: path.join(repoRoot, "dist")
@@ -35,37 +36,37 @@ export function parseIosDeviceArchiveArgs(argv) {
     return args;
 }
 
-export async function buildIosDeviceArchivePackage(options = {}) {
+export async function buildIosDeviceAppPackage(options = {}) {
     const version = sanitizeArtifactPart(options.version || packageJson.version);
     const outDir = path.resolve(options.outDir || path.join(repoRoot, "dist"));
-    const prefix = `meshdrop-ios-device-archive-${version}`;
+    const prefix = `meshdrop-ios-device-app-${version}`;
     const artifactPath = path.join(outDir, `${prefix}.tar.gz`);
     const prepared = await prepareIosNativeSource({
         version,
-        smokeName: "ios-device-archive-package",
-        buildId: "ios-device-archive-package",
+        smokeName: "ios-device-app-package",
+        buildId: "ios-device-app-package",
         env: options.env || process.env
     });
 
     try {
-        const archivePath = path.join(prepared.workDir, "MeshDrop.xcarchive");
-        await runIosDeviceArchiveBuild({
+        const derivedDataPath = path.join(prepared.workDir, "DerivedData");
+        await runIosDeviceAppBuild({
             projectPath: prepared.projectPath,
-            archivePath,
+            derivedDataPath,
             env: options.env || process.env
         });
-        await fs.access(path.join(archivePath, "Info.plist"));
-        await fs.access(path.join(archivePath, "Products", "Applications", "MeshDrop.app", "Info.plist"));
+        const appPath = iosDeviceAppPath(derivedDataPath);
+        await fs.access(path.join(appPath, "Info.plist"));
 
-        const stageRoot = path.join(outDir, ".ios-device-archive-stage");
+        const stageRoot = path.join(outDir, ".ios-device-app-stage");
         const stageDir = path.join(stageRoot, prefix);
         await fs.rm(stageRoot, {recursive: true, force: true});
         await fs.mkdir(stageDir, {recursive: true});
-        await fs.cp(archivePath, path.join(stageDir, "MeshDrop.xcarchive"), {recursive: true});
+        await fs.cp(appPath, path.join(stageDir, "MeshDrop.app"), {recursive: true});
         await fs.writeFile(path.join(stageDir, "build-proof.json"), `${JSON.stringify({
             schemaVersion: 1,
             target: "ios",
-            packageType: "unsigned-device-archive",
+            packageType: "unsigned-device-app",
             xcodeProject: "MeshDrop.xcodeproj",
             scheme: "MeshDrop",
             sdk: "iphoneos",
@@ -74,7 +75,7 @@ export async function buildIosDeviceArchivePackage(options = {}) {
             codeSigningAllowed: false,
             deviceInstallable: false,
             appStoreReady: false,
-            archiveBundle: "MeshDrop.xcarchive",
+            appBundle: "MeshDrop.app",
             remainingProof: [
                 "signed/device-installable iOS package",
                 "App Group entitlement provisioning",
@@ -88,7 +89,7 @@ export async function buildIosDeviceArchivePackage(options = {}) {
         await run("tar", ["-czf", artifactPath, "-C", stageRoot, prefix]);
         await fs.rm(stageRoot, {recursive: true, force: true});
 
-        return {artifactPath, prefix, version, packageType: "unsigned-device-archive"};
+        return {artifactPath, prefix, version, packageType: "unsigned-device-app"};
     }
     finally {
         await prepared.cleanup();
@@ -96,8 +97,8 @@ export async function buildIosDeviceArchivePackage(options = {}) {
 }
 
 async function main() {
-    const args = parseIosDeviceArchiveArgs(process.argv.slice(2));
-    const result = await buildIosDeviceArchivePackage(args);
+    const args = parseIosDeviceAppArgs(process.argv.slice(2));
+    const result = await buildIosDeviceAppPackage(args);
     console.log(`Built ${result.artifactPath}`);
 }
 
