@@ -45,11 +45,13 @@ UAT-signed Android release APK artifact built by `npm run build:android:release-
 
 1. Confirm the iOS native-source artifact contains `native/ios/MeshDrop/MeshDropViewController.swift`.
 2. Confirm the iOS native-source artifact contains `native/ios/MeshDrop/Resources/meshdrop/index.html`.
-3. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
-4. Confirm the Android native-source artifact contains
+3. Confirm the iOS native-source wrapper sets `WKUIDelegate` and uses the iOS 18.4+ `WKOpenPanelParameters` hook with
+   `UIDocumentPickerViewController` for WKWebView file inputs.
+4. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
+5. Confirm the Android native-source artifact contains
    `native/android/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`.
-5. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
-6. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
+6. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
+7. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
 
 ## Android APK Acceptance
 
@@ -178,5 +180,6 @@ between two browser peers served from the generated iOS and Android source artif
 - Android WebView transfer proof does not prove physical Android device install UAT.
 - These artifacts do not prove physical Android device install UAT.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
-- These artifacts do not prove native iOS file-picker or share-sheet integration.
+- The iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18.4+ open-panel hook,
+  but does not prove iOS device picker UAT or native iOS share-sheet integration.
 - These artifacts do not prove Bluetooth transport support.
