@@ -84,6 +84,7 @@ jobs:
             echo "meshdrop-desktop-linux-${version}.tar.gz"
             echo "meshdrop-ios-${version}.tar.gz"
             echo "meshdrop-ios-native-source-${version}.tar.gz"
+            echo "meshdrop-ios-simulator-app-${version}.tar.gz"
             echo "meshdrop-spa-${version}.tar.gz"
             echo "meshdrop-start9-${version}.tar.gz"
             echo "meshdrop-umbrel-${version}.tar.gz"
