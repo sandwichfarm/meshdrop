@@ -17,6 +17,7 @@ Android WebView now uses viewport safe-area padding, keeps Nostr login reachable
 - Kept FIPS and Pollen controls visible when runtime config says those backend transports are supported but temporarily unavailable.
 - Added safe-area CSS and `viewport-fit=cover` for the top Android system bar.
 - Fixed physical-device Android launch detection to use explicit `MainActivity` start plus `ResumedActivity` readback.
+- Made the Android picker UI smoke fall back to CDP click events when API 36 `uiautomator` omits the WebView bounds from the hierarchy dump.
 
 ## Evidence
 
@@ -27,6 +28,9 @@ Android WebView now uses viewport safe-area padding, keeps Nostr login reachable
 - `npm test` -> 220/220 pass
 - `git diff --check`
 - `npx --yes aislop scan --changes .` -> exits 0; initial app changes clean, final e2e assertion touch reports pre-existing style warnings on the large `scripts/e2e-smoke.mjs`
+- `node --check scripts/android-picker-ui-smoke.mjs`
+- `MESHDROP_ANDROID_SERIAL=28031FDH300BS5 ANDROID_HOME=/home/sandwich/Android/Sdk ANDROID_SDK_ROOT=/home/sandwich/Android/Sdk JAVA_HOME=/usr/lib/jvm/java-17-openjdk npm run test:android-picker-ui`
+  - Proof: `native picker UI selected meshdrop-picker-proof.txt and returned it to farm.sandwich.meshdrop/.MainActivity`
 - `MESHDROP_ANDROID_SERIAL=28031FDH300BS5 ANDROID_HOME="$HOME/Android/Sdk" ANDROID_SDK_ROOT="$HOME/Android/Sdk" JAVA_HOME=/usr/lib/jvm/java-17-openjdk npm run test:android-webview-capabilities`
   - Proof: `farm.sandwich.meshdrop/.MainActivity exposed RTCPeerConnection=function, WebSocket=function, RTCDataChannel label=meshdrop-probe`
 - Live Android WebView CDP snapshot on `28031FDH300BS5`
