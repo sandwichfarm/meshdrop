@@ -189,9 +189,14 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 7. Confirm the proof uploads and downloads `android-native-pollen-proof` from inside the installed WebView.
 8. Do not treat this as Pollen WASM/pln proof until the Android backend uses that substrate instead of the in-app
    native object store.
-9. If Android-native `fipsctl` or `pln` binaries are supplied during packaging, confirm the installed APK extracts them
-   from `meshdrop-native/<abi>/`, makes them executable in app-private storage, and the proof output reports
+9. If Android-native `fipsctl` or `pln` binaries are supplied during packaging, confirm the installed APK packages them
+   as `jniLibs/<abi>/libmeshdrop_<tool>.so`, executes them from the app native library directory, and proof output reports
    `android-native-fipsctl` or `android-native-pln` instead of the fallback object-store path.
+10. When `pln` is supplied, confirm the installed APK starts `pln up --port 0` from app-private state before Pollen
+    status, upload, or download claims are recorded.
+11. Current emulator proof for Android `pln` uses an x86_64 binary built from `/home/sandwich/Develop/pollen` with
+    NDK 27.2.12479018 and runs:
+    `MESHDROP_ANDROID_PLN_X86_64=/tmp/meshdrop-pln-android-x86_64 npm run test:android-fips-pollen`.
 
 ## Android Share/File Input Acceptance
 
@@ -284,8 +289,9 @@ available.
 - These artifacts do not prove app-store packages, Play Store upload signing, AABs, or IPAs.
 - The Android debug APK artifact alone does not prove install UAT; `npm run test:android-apk-install` provides the
   emulator install proof.
-- The Android native backend can package explicit per-ABI `fips`, `fipsctl`, and `pln` tool assets, but the default
-  smoke artifact does not include Android Rust FIPS or Android pln binaries.
+- The Android native backend can package explicit per-ABI `fips`, `fipsctl`, and `pln` tool binaries. The default smoke
+  artifact still does not include Android Rust FIPS or Android pln binaries; the Android `pln` proof requires
+  `MESHDROP_ANDROID_PLN_<ABI>` to point at a real Android `pln` binary.
 - Android WebView transfer proof alone does not prove physical Android device install UAT; the current physical-device
   claim is backed by `npm run test:android-physical-device` passing on Google Pixel 7 Pro `28031FDH300BS5`.
 - The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.

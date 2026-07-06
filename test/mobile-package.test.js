@@ -130,9 +130,11 @@ for (const target of ["ios", "android"]) {
                 assert(entries.includes(`${nativeRoot}/app/src/main/res/xml/network_security_config.xml`));
                 assert(entries.includes(`${nativeRoot}/app/src/main/assets/meshdrop/index.html`));
                 assert(entries.includes(`${nativeRoot}/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`));
-                assert(entries.includes(`${nativeRoot}/app/src/main/assets/meshdrop-native/x86_64/fips`));
-                assert(entries.includes(`${nativeRoot}/app/src/main/assets/meshdrop-native/x86_64/fipsctl`));
-                assert(entries.includes(`${nativeRoot}/app/src/main/assets/meshdrop-native/x86_64/pln`));
+                assert(entries.includes(`${nativeRoot}/app/src/main/jniLibs/x86_64/libmeshdrop_fips.so`));
+                assert(entries.includes(`${nativeRoot}/app/src/main/jniLibs/x86_64/libmeshdrop_fipsctl.so`));
+                assert(entries.includes(`${nativeRoot}/app/src/main/jniLibs/x86_64/libmeshdrop_pln.so`));
+                const gradleSource = await readTarEntry(result.artifactPath, `${nativeRoot}/app/build.gradle`);
+                assert.match(gradleSource, /useLegacyPackaging true/);
             }
 
             const manifest = JSON.parse(await readTarEntry(result.artifactPath, `${prefix}/meshdrop-target.json`));
@@ -278,7 +280,12 @@ for (const target of ["ios", "android"]) {
                 assert.match(wrapperSource, /meshdropAndroidBridge/);
                 assert.match(wrapperSource, /MeshDropNativeBackend/);
                 assert.match(wrapperSource, /prepareNativeTools/);
-                assert.match(wrapperSource, /meshdrop-native/);
+                assert.match(wrapperSource, /nativeLibraryDir/);
+                assert.match(wrapperSource, /libmeshdrop_/);
+                assert.match(wrapperSource, /startLongRunningTool\("pln"/);
+                assert.match(wrapperSource, /"up", "--port", "0"/);
+                assert.match(wrapperSource, /startLongRunningTool\("fips"/);
+                assert.match(wrapperSource, /writeFipsConfig/);
                 assert.match(wrapperSource, /runTool\("pln"/);
                 assert.match(wrapperSource, /runTool\("fipsctl"/);
                 assert.match(wrapperSource, /android-native-pln/);

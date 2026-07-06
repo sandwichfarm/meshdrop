@@ -12,6 +12,7 @@ import {
 import {connectAndroidWebView, evaluate} from "./android-webview-devtools.mjs";
 
 const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-android-fips-pollen-smoke-"));
+const expectAndroidPln = Object.keys(process.env).some(key => key.startsWith("MESHDROP_ANDROID_PLN_"));
 let device = null;
 let webview = null;
 
@@ -41,7 +42,12 @@ try {
     assert.equal(state.fipsStatus.error, "rust-fips-core-not-linked");
     assert.equal(state.pollenStatus.enabled, true);
     assert.equal(state.pollenStatus.available, true);
-    assert.equal(state.pollenStatus.backend, "android-native");
+    assert.equal(state.pollenStatus.backend, expectAndroidPln ? "android-native-pln" : "android-native");
+    if (expectAndroidPln) {
+        assert.equal(state.pollenStatus.substrate, "pln");
+        assert.equal(state.pollenStatus.pln, true);
+        assert.equal(state.pollenStatus.wasmRuntime, true);
+    }
     assert.equal(state.pollenRoundTripText, "android-native-pollen-proof");
     assert.equal(state.pollenDescriptor.size, "android-native-pollen-proof".length);
     assert.match(state.pollenDescriptor.hash, /^[0-9a-f]{64}$/);
@@ -49,7 +55,8 @@ try {
     console.log(
         `Proof android-fips-pollen: ${androidMainActivity} served ` +
         `FIPS status from ${state.fipsStatus.backend} with rustCore=${state.fipsStatus.rustCore}, ` +
-        `Pollen uploaded/downloaded ${state.pollenDescriptor.hash} via ${state.backendBaseUrl} on ${device.serial}`
+        `Pollen ${state.pollenStatus.backend} uploaded/downloaded ${state.pollenDescriptor.hash} ` +
+        `via ${state.backendBaseUrl} on ${device.serial}`
     );
 }
 finally {
@@ -59,7 +66,7 @@ finally {
 }
 
 async function waitForNativeBackendState(cdp) {
-    for (let i = 0; i < 40; i += 1) {
+    for (let i = 0; i < 80; i += 1) {
         const state = await evaluate(cdp, `(${nativeBackendProbe.toString()})()`, {awaitPromise: true});
         if (
             state.readyState !== "loading" &&
@@ -74,7 +81,8 @@ async function waitForNativeBackendState(cdp) {
         }
         await new Promise(resolve => setTimeout(resolve, 500));
     }
-    throw new Error("Timed out waiting for Android native FIPS/Pollen backend proof");
+    const state = await evaluate(cdp, `(${nativeBackendProbe.toString()})()`, {awaitPromise: true});
+    throw new Error(`Timed out waiting for Android native FIPS/Pollen backend proof: ${JSON.stringify(state)}`);
 }
 
 async function nativeBackendProbe() {
@@ -91,15 +99,23 @@ async function nativeBackendProbe() {
         ? await fetch(`${backendBaseUrl}/pollen/status`).then(response => response.json())
         : null;
     const file = new File(["android-native-pollen-proof"], "android-native-pollen-proof.txt", {type: "text/plain"});
-    const pollenDescriptor = globalThis.meshdropPollenTransfer && backendBaseUrl
-        ? await globalThis.meshdropPollenTransfer.uploadFile(file)
-        : null;
-    const pollenFile = pollenDescriptor && globalThis.meshdropPollenTransfer
-        ? await globalThis.meshdropPollenTransfer.downloadDescriptor(pollenDescriptor, {
-            name: "android-native-pollen-proof.txt",
-            mime: "text/plain"
-        })
-        : null;
+    let pollenDescriptor = null;
+    let pollenRoundTripText = "";
+    let pollenTransferError = "";
+    try {
+        pollenDescriptor = globalThis.meshdropPollenTransfer && backendBaseUrl
+            ? await globalThis.meshdropPollenTransfer.uploadFile(file)
+            : null;
+        const pollenFile = pollenDescriptor && globalThis.meshdropPollenTransfer
+            ? await globalThis.meshdropPollenTransfer.downloadDescriptor(pollenDescriptor, {
+                name: "android-native-pollen-proof.txt",
+                mime: "text/plain"
+            })
+            : null;
+        pollenRoundTripText = pollenFile ? await pollenFile.text() : "";
+    } catch (error) {
+        pollenTransferError = error.message;
+    }
 
     return {
         readyState: document.readyState,
@@ -112,7 +128,8 @@ async function nativeBackendProbe() {
         pollenHidden: document.getElementById("pollen-transfer")?.hasAttribute("hidden"),
         fipsStatus,
         pollenStatus,
+        pollenTransferError,
         pollenDescriptor,
-        pollenRoundTripText: pollenFile ? await pollenFile.text() : ""
+        pollenRoundTripText
     };
 }

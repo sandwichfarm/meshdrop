@@ -313,7 +313,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, unsigned device app proof, signed-device install-and-launch harness, share extension source bridge, web share-inbox consumption proof, and Bluetooth negotiation proof exist; signed\/device pass open \|/);
 	assert.match(
 		targetStatus,
-		/\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, native picker UI proof, native loopback FIPS\/Pollen backend smoke, and physical-device hardware UAT passed \|/
+		/\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, native picker UI proof, native loopback FIPS\/Pollen backend smoke, Android `pln` backend proof, and physical-device hardware UAT passed \|/
 	);
     assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `npm run build:ios:simulator-app`; `npm run build:ios:device-app`; `npm run test:ios-xcode-build`; `npm run test:ios-simulator-app`; `npm run test:ios-device-app`; `node --test test\/mobile-package\.test\.js`; `node --test test\/native-share-inbox\.test\.js`; `node --test test\/ios-signed-device-uat\.test\.js`/);
     assert.match(targetStatus, /wires iOS 18\.4\+ file inputs to `UIDocumentPickerViewController`/);
@@ -350,11 +350,14 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
 	assert.match(targetStatus, /Android WebView sent `meshdrop-android-webview-proof\.txt`/);
 	assert.match(targetStatus, /Android received an `ACTION_SEND` stream for `meshdrop-android-share-proof\.txt`/);
 	assert.match(targetStatus, /Android native loopback served FIPS status and Pollen status\/upload\/download from the installed WebView with `rustCore=false`/);
-	assert.match(targetStatus, /generated Android source can package explicit per-ABI `fips`, `fipsctl`, and `pln` tool assets/);
-	assert.match(targetStatus, /delegate native backend calls to `fipsctl`\/`pln` when those Android binaries are present/);
+	assert.match(targetStatus, /generated Android source can package explicit per-ABI `fips`, `fipsctl`, and `pln` tool binaries as `jniLibs\/<abi>/);
+	assert.match(targetStatus, /starts packaged `pln up --port 0` before serving Pollen requests/);
+	assert.match(targetStatus, /installed WebView's `meshdropPollenTransfer` uploaded and downloaded through `android-native-pln`/);
+	assert.match(targetStatus, /backend delegates native FIPS calls to `fipsctl` when Android FIPS binaries are present/);
 	assert.match(targetStatus, /node --test test\/android-physical-device-uat\.test\.js` proves the physical-device harness/);
 	assert.match(targetStatus, /`npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`/);
-	assert.match(targetStatus, /Native Android Rust FIPS core integration; native Android Pollen WASM\/pln integration/);
+	assert.match(targetStatus, /Native Android Rust FIPS core integration/);
+	assert.doesNotMatch(targetStatus, /Native Android Rust FIPS core integration; native Android Pollen WASM\/pln integration/);
     assert.doesNotMatch(targetStatus, /Physical Android device install UAT and Bluetooth negotiation/);
     assert.doesNotMatch(targetStatus, /Android native file picker UI UAT/);
     assert.doesNotMatch(targetStatus, /signed Android release APK or AAB package/);
