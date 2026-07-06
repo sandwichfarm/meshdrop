@@ -24,7 +24,6 @@ Files must transfer between peers reliably over every negotiated transport that 
 
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
 - [ ] Cut and verify a new alpha release from current `master` so latest Android, Desktop Chromium bundled installer, iOS Simulator/device app, and Android release APK artifacts are present in the published release.
-- [ ] Run physical Android hardware UAT with `npm run test:android-physical-device`.
 - [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services.
 - [ ] Obtain signed/device-installable iOS package proof and iOS device file-picker/share-sheet/native transfer UAT.
 

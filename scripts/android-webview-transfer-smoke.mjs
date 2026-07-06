@@ -18,6 +18,7 @@ import {
     addBrowserInitScript,
     androidDebugState,
     browserDebugState,
+    connectAndroidNostrSource,
     createAndroidCallerIdentityPair,
     initScriptSource,
     watchBrowserPage
@@ -257,10 +258,7 @@ async function installAndroidHarness(cdp, identity, relayUrls) {
 }
 
 async function connectAndroidNostr(cdp) {
-    await evaluate(cdp, `(() => {
-        if (globalThis.meshdropNostrIdentity.getIdentity()) return true;
-        return globalThis.meshdropNostrIdentity.connect().then(() => true);
-    })()`, {awaitPromise: true});
+    await evaluate(cdp, connectAndroidNostrSource(), {awaitPromise: true});
 }
 
 async function connectBrowserNostr(page) {

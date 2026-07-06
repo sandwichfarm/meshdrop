@@ -109,6 +109,7 @@ export function initScriptSource({identity, relayUrls, targetName}) {
         const relays = ${JSON.stringify(relayUrls)};
         const targetName = ${JSON.stringify(targetName)};
         globalThis.__meshdropDisableNostrRelayNetwork = true;
+        globalThis.__meshdropProofIdentityPubkey = proofIdentity.pubkey;
         localStorage.setItem("meshdrop_relay_settings", JSON.stringify({
             bootstrapRelays: relays,
             webRtcRelays: relays,
@@ -159,6 +160,13 @@ export function initScriptSource({identity, relayUrls, targetName}) {
                 decrypt: async (_pubkey, ciphertext) => ciphertext
             }
         };
+        if (globalThis.meshdropNostrLoginDialog?.choose) {
+            globalThis.meshdropNostrLoginDialog.choose = async methods => (
+                methods.find(method => method.id === "browser-extension")?.id
+                || methods[0]?.id
+                || null
+            );
+        }
         globalThis.__meshdropE2E = {
             config: null,
             configLoaded: false,
@@ -228,4 +236,17 @@ export function initScriptSource({identity, relayUrls, targetName}) {
             globalThis.__meshdropE2E.wsConfig = event.detail;
         });
     })();`;
+}
+
+export function connectAndroidNostrSource() {
+    return `(() => {
+        const controller = globalThis.meshdropNostrIdentity;
+        const expectedPubkey = globalThis.__meshdropProofIdentityPubkey || "";
+        const identity = controller.getIdentity();
+        if (identity?.pubkey && expectedPubkey && identity.pubkey !== expectedPubkey) {
+            controller.disconnect();
+        }
+        if (controller.getIdentity()) return true;
+        return controller.connect().then(() => true);
+    })()`;
 }

@@ -35,8 +35,8 @@ Current status: complete for Docker shared-instance admin contract and automated
 
 Goal: make every target platform buildable and testable with explicit UAT runbooks.
 
-Current status: mostly complete. Build artifacts, automated smokes, and runbooks exist. Hardware/node UAT remains open
-for physical Android, signed iOS device packages, StartOS, and Umbrel.
+Current status: mostly complete. Build artifacts, automated smokes, Android physical hardware UAT, and runbooks exist.
+Hardware/node UAT remains open for signed iOS device packages, StartOS, and Umbrel.
 
 - Docker standalone smoke and UAT.
 - SPA capability-limited runtime.

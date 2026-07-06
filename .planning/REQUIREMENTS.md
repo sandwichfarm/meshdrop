@@ -73,7 +73,7 @@ published tag and anonymous GHCR readback still fails with `unauthorized`.
 
 - Current `master` has not been released after PR #105. A new `v0.*.*` tag must publish and read back the latest target artifacts.
 - Anonymous GHCR readback fails for `v0.1.4` with `unauthorized`; the active token also lacks `read:packages`, so this session cannot inspect or change package visibility.
-- Real-device/node UAT remains open for physical Android hardware, StartOS, Umbrel, and signed iOS device packages.
+- Real-device/node UAT remains open for StartOS, Umbrel, and signed iOS device packages.
 
 **Coverage:**
 - v1 requirements: 18 total
