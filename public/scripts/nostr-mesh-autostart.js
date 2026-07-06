@@ -23,6 +23,8 @@ class NostrMeshAutostartController {
     }
 
     _startIfReady() {
+        if (globalThis.__meshdropDisableNostrRelayNetwork && !globalThis.__meshdropAllowNostrRelayAutostart) return;
+
         const anchor = $("nostr-mesh");
         if (anchor?.getAttribute("aria-hidden") !== "true") return;
 
@@ -43,7 +45,9 @@ class NostrMeshAutostartController {
     _publishStartupPresence(mesh) {
         [500, 1500, 3500].forEach(delay => {
             setTimeout(() => {
-                if (mesh._active) mesh._publishPresence("connect");
+                if (!mesh._active) return;
+                mesh._identity = globalThis.meshdropNostrIdentity?.getIdentity?.() || mesh._identity;
+                mesh._publishPresence("connect");
             }, delay);
         });
     }
