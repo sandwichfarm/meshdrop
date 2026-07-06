@@ -13,6 +13,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
         "docs/uat/desktop.md",
         "docs/uat/mobile.md",
         "docs/uat/release-target-images.md",
+        "docs/uat/external-finishline-closeout.md",
         "docs/uat/target-status.md",
     ];
 
@@ -216,6 +217,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /temporary `DOCKER_CONFIG`/);
     assert.match(releaseTargets, /npm run test:external-uat -- v0\.x\.y/);
     assert.match(releaseTargets, /Proof external-uat-finishline/);
+    assert.match(releaseTargets, /docs\/uat\/external-finishline-closeout\.md/);
     assert.match(releaseTargets, /v0\.1\.5` release assets and authenticated GHCR readback are proven by release run `28760231569`/);
     assert.match(releaseTargets, /meshdrop-spa-0\.1\.5\.tar\.gz/);
     assert.match(releaseTargets, /meshdrop-desktop-0\.1\.5\.tar\.gz/);
@@ -253,6 +255,23 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /npm run test:external-uat -- v0\.x\.y/);
     assert.match(targetStatus, /Start9 deployed UAT, Umbrel deployed UAT, iOS signed physical-device UAT, and anonymous GHCR readback/);
     assert.match(targetStatus, /Proof external-uat-finishline/);
+    assert.match(targetStatus, /docs\/uat\/external-finishline-closeout\.md/);
+
+    const externalFinishline = readDoc("docs/uat/external-finishline-closeout.md");
+    assert.match(externalFinishline, /MacBook/);
+    assert.match(externalFinishline, /npm run test:external-uat -- v0\.1\.5/);
+    assert.match(externalFinishline, /gh auth refresh -h github\.com -s read:packages/);
+    assert.match(externalFinishline, /npm run verify:ghcr-anonymous -- v0\.1\.5/);
+    assert.match(externalFinishline, /MESHDROP_START9_UAT_URL/);
+    assert.match(externalFinishline, /npm run test:start9-deployed/);
+    assert.match(externalFinishline, /MESHDROP_UMBREL_UAT_URL/);
+    assert.match(externalFinishline, /npm run test:umbrel-deployed/);
+    assert.match(externalFinishline, /xcrun devicectl list devices/);
+    assert.match(externalFinishline, /MESHDROP_IOS_DEVELOPMENT_TEAM/);
+    assert.match(externalFinishline, /MESHDROP_IOS_DEVICE_UDID/);
+    assert.match(externalFinishline, /npm run test:ios-signed-device/);
+    assert.match(externalFinishline, /npm run test:android-physical-device/);
+    assert.match(externalFinishline, /Proof external-uat-finishline/);
     assert.match(
         targetStatus,
         /\| SPA \| Chromium\/Firefox\/WebKit backend-free transfer smoke exists; Chromium\/Firefox public relay UAT exists \|/

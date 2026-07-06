@@ -15,7 +15,8 @@ This ledger prevents release or UAT notes from overstating platform support.
 
 Run `npm run test:external-uat -- v0.x.y` only when the remaining external inputs are available. It executes the
 Start9 deployed UAT, Umbrel deployed UAT, iOS signed physical-device UAT, and anonymous GHCR readback harnesses, then
-prints `Proof external-uat-finishline` only after all four pass.
+prints `Proof external-uat-finishline` only after all four pass. Use `docs/uat/external-finishline-closeout.md` for the
+MacBook operator steps that close those inputs.
 
 ## Rules
 
