@@ -212,8 +212,9 @@ const FooterDiscoveryProtocol = {
         const badges = [];
 
         if (state.local) badges.push({id: "local", selector: "ip"});
-        if (state.webrtc) badges.push({id: "webrtc", selector: "nostr"});
         if (state.fips) badges.push({id: "fips", selector: "fips"});
+        if (state.pollen) badges.push({id: "pollen", selector: "pollen"});
+        if (state.webrtc) badges.push({id: "webrtc", selector: "nostr"});
         if (state.paired) badges.push({id: "paired", selector: "secret"});
         if (state.publicRoomId) {
             badges.push({id: "public-room", selector: "public-id", roomId: state.publicRoomId.toUpperCase()});
@@ -237,6 +238,7 @@ class FooterUI {
             local: this.$discoveryBadges.querySelector('.badge-room-ip'),
             webrtc: this.$discoveryBadges.querySelector('.badge-room-nostr'),
             fips: this.$discoveryBadges.querySelector('.badge-room-fips'),
+            pollen: this.$discoveryBadges.querySelector('.badge-room-pollen'),
             paired: this.$discoveryBadges.querySelector('.badge-room-secret'),
             publicRoom: this.$discoveryBadges.querySelector('.badge-room-public-id'),
             none: this.$discoveryBadges.querySelector('.badge-unavailable')
@@ -280,6 +282,7 @@ class FooterUI {
             local: globalThis.meshdropLocalDiscovery?.isEnabled?.() ?? true,
             webrtc: !!globalThis.meshdropNostrMesh?._active,
             fips: !!globalThis.meshdropFipsDiscovery?.isActive?.(),
+            pollen: !!globalThis.meshdropPollenTransfer?.isActive?.(),
             paired: !this.$badges.paired.hasAttribute('hidden'),
             publicRoomId: this.$badges.publicRoom.hasAttribute('hidden')
                 ? ""
@@ -293,6 +296,7 @@ class FooterUI {
         this.$badges.local.toggleAttribute('hidden', !visible.has('local'));
         this.$badges.webrtc.toggleAttribute('hidden', !visible.has('webrtc'));
         this.$badges.fips.toggleAttribute('hidden', !visible.has('fips'));
+        this.$badges.pollen.toggleAttribute('hidden', !visible.has('pollen'));
         this.$badges.paired.toggleAttribute('hidden', !visible.has('paired'));
         this.$badges.none.toggleAttribute('hidden', !visible.has('none'));
 

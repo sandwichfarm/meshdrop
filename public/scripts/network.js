@@ -77,6 +77,36 @@ const ServerConnectionIdentityProtocol = {
 
 globalThis.ServerConnectionIdentityProtocol = ServerConnectionIdentityProtocol;
 
+const TransferPrivacyProtocol = {
+    defaultMode: "private",
+    modes: [
+        {
+            id: "private",
+            label: "Private",
+            description: "Encrypt file bytes in this browser before they leave."
+        },
+        {
+            id: "unencrypted",
+            label: "Unencrypted",
+            description: "Send raw file bytes over the selected route."
+        }
+    ],
+
+    normalize(mode) {
+        return this.modes.some(entry => entry.id === mode) ? mode : this.defaultMode;
+    },
+
+    fromTransfer(transfer = null) {
+        return this.normalize(transfer?.privacyMode || transfer?.privacy?.mode || this.defaultMode);
+    },
+
+    isPrivate(transfer = null) {
+        return this.fromTransfer(transfer) === "private";
+    }
+};
+
+globalThis.TransferPrivacyProtocol = TransferPrivacyProtocol;
+
 class ServerConnection {
 
     constructor() {
@@ -520,7 +550,7 @@ class Peer {
     }
 
     // Is overwritten in expanding classes
-    _send(message) {}
+    _send(_message) {}
 
     sendDisplayName(displayName) {
         this.sendJSON({type: 'display-name-changed', displayName: displayName});
@@ -629,15 +659,27 @@ class Peer {
             return this.requestPollenFileTransfer(files, selectedTransfer);
         }
 
-        const request = await this._createFileTransferRequest(files, selectedTransfer);
-        this._filesRequested = files;
-        this._selectedTransfer = selectedTransfer;
+        try {
+            const request = await this._createFileTransferRequest(files, selectedTransfer);
+            const payload = await this._prepareTransferPayload(files, request.header, selectedTransfer);
+            this._filesRequested = payload.files.map((file, index) => ({
+                file,
+                header: payload.payloadHeaders?.[index] || null,
+                index
+            }));
+            this._selectedTransfer = selectedTransfer;
 
-        this.sendJSON({
-            type: 'request',
-            ...request
-        });
-        Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: selectedTransfer})
+            this.sendJSON({
+                type: 'request',
+                ...request,
+                ...payload.requestFields
+            });
+            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: selectedTransfer})
+        } catch (error) {
+            console.error(error);
+            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
+            Events.fire('notify-user', error.message);
+        }
     }
 
     _defaultTransferSelection() {
@@ -733,6 +775,65 @@ class Peer {
         throw new Error("Encrypted Blossom key delivery requires WebRTC data channel or NIP-44 signer support");
     }
 
+    async _prepareTransferPayload(files, headers, transfer = null) {
+        const privacyMode = TransferPrivacyProtocol.fromTransfer(transfer);
+        if (privacyMode !== "private") {
+            return {
+                files,
+                payloadHeaders: null,
+                requestFields: {
+                    payloadPrivacy: {mode: "unencrypted"}
+                }
+            };
+        }
+
+        if (!globalThis.BlossomTransferProtocol) {
+            throw new Error("Private transfer encryption is unavailable");
+        }
+
+        const contentKey = await BlossomTransferProtocol.generateContentKey();
+        const keyDelivery = await this._createBlossomKeyDelivery(contentKey);
+        const transferId = BlossomTransferProtocol.createTransferId();
+        const encryptedFiles = [];
+        const payloadHeaders = [];
+        const fileEnvelopes = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const encrypted = await BlossomTransferProtocol.encryptFile(files[i], contentKey, {
+                transferId,
+                index: i,
+                header: headers[i]
+            });
+            const encryptedFile = new File([encrypted.blob], headers[i].name, {
+                type: "application/octet-stream"
+            });
+            encryptedFiles.push(encryptedFile);
+            payloadHeaders.push({
+                name: headers[i].name,
+                mime: "application/octet-stream",
+                size: encryptedFile.size,
+                index: i
+            });
+            fileEnvelopes.push(encrypted.envelope);
+        }
+
+        return {
+            files: encryptedFiles,
+            payloadHeaders,
+            requestFields: {
+                payloadPrivacy: {mode: "private"},
+                payloadHeaders,
+                payloadEncryption: {
+                    version: BlossomTransferProtocol.encryptionVersion,
+                    algorithm: BlossomTransferProtocol.contentAlgorithm,
+                    transferId,
+                    files: fileEnvelopes,
+                    keyDelivery
+                }
+            }
+        };
+    }
+
     async _unwrapBlossomTransferKey(envelope) {
         const keyDelivery = envelope?.keyDelivery;
         if (!keyDelivery) throw new Error("Blossom key delivery envelope is missing");
@@ -771,7 +872,8 @@ class Peer {
     async requestHashtreeFileTransfer(files, transfer = {id: "hashtree", type: "storage", label: "Hashtree"}) {
         try {
             const request = await this._createFileTransferRequest(files, transfer);
-            const hashtreeManifest = await globalThis.meshdropHashtreeTransfer.uploadFiles(files, progress => {
+            const payload = await this._prepareTransferPayload(files, request.header, transfer);
+            const hashtreeManifest = await globalThis.meshdropHashtreeTransfer.uploadFiles(payload.files, progress => {
                 Events.fire('set-progress', {peerId: this._peerId, progress: 0.8 + 0.2 * progress, status: 'prepare', transport: transfer});
             });
 
@@ -779,6 +881,7 @@ class Peer {
             this.sendJSON({
                 type: 'hashtree-request',
                 ...request,
+                ...payload.requestFields,
                 hashtreeManifest
             });
             Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
@@ -793,7 +896,8 @@ class Peer {
     async requestPollenFileTransfer(files, transfer = {id: "pollen", type: "storage", label: "Pollen"}) {
         try {
             const request = await this._createFileTransferRequest(files, transfer);
-            const pollenDescriptors = await globalThis.meshdropPollenTransfer.uploadFiles(files, progress => {
+            const payload = await this._prepareTransferPayload(files, request.header, transfer);
+            const pollenDescriptors = await globalThis.meshdropPollenTransfer.uploadFiles(payload.files, progress => {
                 Events.fire('set-progress', {peerId: this._peerId, progress: 0.8 + 0.2 * progress, status: 'prepare', transport: transfer});
             });
 
@@ -801,6 +905,7 @@ class Peer {
             this.sendJSON({
                 type: 'pollen-request',
                 ...request,
+                ...payload.requestFields,
                 pollenDescriptors
             });
             Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
@@ -870,13 +975,22 @@ class Peer {
     }
 
     async _sendFile(file) {
+        const entry = file?.file ? file : {file, header: null, index: 0};
+        const fileToSend = entry.file;
+        const header = entry.header || {
+            size: fileToSend.size,
+            name: fileToSend.name,
+            mime: fileToSend.type,
+            index: entry.index
+        };
         this.sendJSON({
             type: 'header',
-            size: file.size,
-            name: file.name,
-            mime: file.type
+            size: header.size,
+            name: header.name,
+            mime: header.mime,
+            index: header.index ?? entry.index
         });
-        this._chunker = new FileChunker(file,
+        this._chunker = new FileChunker(fileToSend,
             chunk => this._send(chunk),
             offset => this._onPartitionEnd(offset));
         this._chunker.nextPartition();
@@ -1044,6 +1158,7 @@ class Peer {
         if (accepted) {
             this._requestAccepted = pendingRequest;
             this._totalBytesReceived = 0;
+            this._receivedFileIndex = 0;
             this._busy = true;
             this._filesReceived = [];
         }
@@ -1064,9 +1179,17 @@ class Peer {
 
     _onFileHeader(header) {
         if (this._requestAccepted && this._requestAccepted.header.length) {
+            const headerIndex = Number.isSafeInteger(Number(header.index))
+                ? Number(header.index)
+                : this._receivedFileIndex || 0;
+            this._activeReceiveHeaderIndex = headerIndex;
+            const expectedHeader = this._requestAccepted.payloadHeaders?.[headerIndex] || header;
+            const expectedTotalSize = this._requestAccepted.payloadHeaders
+                ? this._requestAccepted.payloadHeaders.reduce((total, payloadHeader) => total + payloadHeader.size, 0)
+                : this._requestAccepted.totalSize;
             this._lastProgress = 0;
-            this._digester = new FileDigester({size: header.size, name: header.name, mime: header.mime},
-                this._requestAccepted.totalSize,
+            this._digester = new FileDigester({size: expectedHeader.size, name: expectedHeader.name, mime: expectedHeader.mime},
+                expectedTotalSize,
                 this._totalBytesReceived,
                 fileBlob => this._onFileReceived(fileBlob)
             );
@@ -1105,33 +1228,69 @@ class Peer {
     }
 
     async _onFileReceived(fileBlob) {
-        const acceptedHeader = this._requestAccepted.header.shift();
+        const request = this._requestAccepted;
+        const fileIndex = this._activeReceiveHeaderIndex ?? 0;
+        request._originalHeaderSnapshot ||= [...request.header];
+        const acceptedHeader = request.header.shift();
+        const receivedFile = request.payloadEncryption
+            ? await this._decryptPayloadFile(fileBlob, request, fileIndex, acceptedHeader)
+            : fileBlob;
         this._totalBytesReceived += fileBlob.size;
+        this._receivedFileIndex = fileIndex + 1;
+        this._activeReceiveHeaderIndex = null;
 
         this.sendJSON({type: 'file-transfer-complete'});
 
-        const sameSize = fileBlob.size === acceptedHeader.size;
-        const sameName = fileBlob.name === acceptedHeader.name
+        const sameSize = receivedFile.size === acceptedHeader.size;
+        const sameName = receivedFile.name === acceptedHeader.name
         if (!sameSize || !sameName) {
             this._abortTransfer();
         }
 
         // include for compatibility with 'Snapdrop & PairDrop for Android' app
-        Events.fire('file-received', fileBlob);
+        Events.fire('file-received', receivedFile);
 
-        this._filesReceived.push(fileBlob);
-        if (!this._requestAccepted.header.length) {
+        this._filesReceived.push(receivedFile);
+        if (!request.header.length) {
             this._busy = false;
             Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
             Events.fire('files-received', {
                 peerId: this._peerId,
                 files: this._filesReceived,
-                imagesOnly: this._requestAccepted.imagesOnly,
-                totalSize: this._requestAccepted.totalSize
+                imagesOnly: request.imagesOnly,
+                totalSize: request.totalSize
             });
             this._filesReceived = [];
             this._requestAccepted = null;
         }
+    }
+
+    async _decryptPayloadFile(fileBlob, request, index, header) {
+        const payloadEncryption = BlossomTransferProtocol.validateEncryptionEnvelope(
+            request.payloadEncryption,
+            request._originalHeaderSnapshot || request.header
+        );
+        const contentKey = request._payloadContentKey
+            || await this._unwrapBlossomTransferKey(payloadEncryption);
+        request._payloadContentKey = contentKey;
+
+        return BlossomTransferProtocol.decryptFile(fileBlob, contentKey, {
+            transferId: payloadEncryption.transferId,
+            index,
+            header,
+            fileEnvelope: payloadEncryption.files.find(fileEnvelope => fileEnvelope.index === index)
+        });
+    }
+
+    async _decryptPayloadFiles(files, request) {
+        if (!request.payloadEncryption) return files;
+
+        request._originalHeaderSnapshot ||= [...request.header];
+        const decrypted = [];
+        for (let i = 0; i < files.length; i++) {
+            decrypted.push(await this._decryptPayloadFile(files[i], request, i, request.header[i]));
+        }
+        return decrypted;
     }
 
     async _downloadBlossomFiles(request) {
@@ -1186,11 +1345,12 @@ class Peer {
 
     async _downloadHashtreeFiles(request) {
         try {
-            const files = await globalThis.meshdropHashtreeTransfer.downloadFiles(
+            const downloadedFiles = await globalThis.meshdropHashtreeTransfer.downloadFiles(
                 request.hashtreeManifest,
-                request.header,
+                request.payloadHeaders || request.header,
                 progress => this._onDownloadProgress(progress)
             );
+            const files = await this._decryptPayloadFiles(downloadedFiles, request);
 
             this._filesReceived = files;
             files.forEach(file => Events.fire('file-received', file));
@@ -1219,20 +1379,24 @@ class Peer {
 
     async _downloadPollenFiles(request) {
         try {
-            const files = [];
+            const downloadedFiles = [];
+            const expectedTotalSize = request.payloadHeaders
+                ? request.payloadHeaders.reduce((total, payloadHeader) => total + payloadHeader.size, 0)
+                : request.totalSize;
             for (let i = 0; i < request.pollenDescriptors.length; i++) {
                 const file = await globalThis.meshdropPollenTransfer.downloadDescriptor(
                     request.pollenDescriptors[i],
-                    request.header[i]
+                    request.payloadHeaders?.[i] || request.header[i]
                 );
 
                 this._totalBytesReceived += file.size;
-                this._onDownloadProgress(this._totalBytesReceived / request.totalSize);
-                Events.fire('file-received', file);
-                files.push(file);
+                this._onDownloadProgress(this._totalBytesReceived / expectedTotalSize);
+                downloadedFiles.push(file);
             }
+            const files = await this._decryptPayloadFiles(downloadedFiles, request);
 
             this._filesReceived = files;
+            files.forEach(file => Events.fire('file-received', file));
             this._busy = false;
             Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
             Events.fire('files-received', {

@@ -10,8 +10,8 @@ const protocol = globalThis.FooterDiscoveryProtocol;
 test("footer discovery badges summarize enabled discovery mechanisms", () => {
     assert.deepEqual(protocol.badges({}).map(badge => badge.id), ["none"]);
     assert.deepEqual(
-        protocol.badges({local: true, webrtc: true, fips: true}).map(badge => badge.id),
-        ["local", "webrtc", "fips"]
+        protocol.badges({local: true, webrtc: true, fips: true, pollen: true}).map(badge => badge.id),
+        ["local", "fips", "pollen", "webrtc"]
     );
 });
 

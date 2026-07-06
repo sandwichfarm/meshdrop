@@ -405,20 +405,26 @@ async function runRouteChoiceScenario(browser, baseUrl) {
                 detail: {to: peer.id, files: [file]}
             }));
 
-            return [...document.querySelectorAll(".transport-choice-option")].map(option => ({
-                id: option.dataset.transportId,
-                label: option.querySelector(".transport-choice-label")?.textContent,
-                privacy: option.querySelector(".transport-choice-privacy")?.textContent,
-                details: [...option.querySelectorAll(".transport-choice-detail")].map(detail => detail.textContent)
-            }));
+            return {
+                privacyModes: [...document.querySelectorAll(".transfer-privacy-option")]
+                    .map(option => [option.dataset.privacyMode, option.dataset.selected]),
+                options: [...document.querySelectorAll(".transport-choice-option")].map(option => ({
+                    id: option.dataset.transportId,
+                    label: option.querySelector(".transport-choice-label")?.textContent,
+                    privacy: option.querySelector(".transport-choice-privacy")?.textContent,
+                    details: [...option.querySelectorAll(".transport-choice-detail")].map(detail => detail.textContent)
+                }))
+            };
         });
 
-        const pollen = options.find(option => option.id === "pollen-mesh");
-        const fips = options.find(option => option.id === "fips");
+        const pollen = options.options.find(option => option.id === "pollen-mesh");
+        const fips = options.options.find(option => option.id === "fips");
         assert(pollen, "Pollen mesh route was not selectable");
         assert(fips, "FIPS mesh route was not selectable");
-        assert(pollen.privacy === "Direct after Pollen discovery", "Pollen mesh privacy copy missing");
-        assert(fips.privacy === "Direct after FIPS discovery", "FIPS mesh privacy copy missing");
+        assert(pollen.privacy === "P2P after Pollen discovery", "Pollen mesh privacy copy missing");
+        assert(fips.privacy === "P2P after FIPS discovery", "FIPS mesh privacy copy missing");
+        assert(options.privacyModes.some(([mode, selected]) => mode === "private" && selected === "true"), "Private mode not selected by default");
+        assert(options.privacyModes.some(([mode]) => mode === "unencrypted"), "Unencrypted mode missing");
         assert(!logs.pageErrors.length, `routes: page errors: ${logs.pageErrors.join("\n")}`);
     }
     finally {
