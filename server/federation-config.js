@@ -36,7 +36,14 @@ export function createFederationConfig(env = process.env) {
             room: network.id,
             command: env.PLN_BIN || "pln",
             dir: env.PLN_DIR || "/var/lib/meshdrop/pln",
-            serviceName: env.POLLEN_FEDERATION_SERVICE || `${SERVICE_PREFIX}-${serverId.slice(0, 16)}`
+            serviceName: env.POLLEN_FEDERATION_SERVICE || `${SERVICE_PREFIX}-${serverId.slice(0, 16)}`,
+            name: env.POLLEN_NAME || "meshdrop",
+            port: Number.parseInt(env.POLLEN_PORT || "60611", 10) || 60611,
+            public: env.POLLEN_PUBLIC === "true",
+            ips: (env.POLLEN_IPS || "").split(",").map(ip => ip.trim()).filter(Boolean),
+            inviteTtl: env.POLLEN_INVITE_TTL || "5m",
+            clusterBootstrap: env.POLLEN_NOSTR_CLUSTER_BOOTSTRAP !== "false" && network.recipientPubkeys.length > 0,
+            daemonDeferred: env.POLLEN_DAEMON_DEFERRED === "1"
         },
         nostr: {
             enabled: env.POLLEN_NOSTR_BOOTSTRAP !== "false",

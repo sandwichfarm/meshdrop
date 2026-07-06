@@ -41,8 +41,11 @@ export default class MeshFederation {
             config,
             trace: (...parts) => this._trace(...parts),
             getFipsBaseUrl: () => this.localFipsBaseUrl,
+            getPollenIdentity: () => this.pollenTransport.identity(),
             discoverHttpServer: server => this._discoverHttpServer(server),
             connectPollenService: (serverId, serviceName) => this._connectPollenService(serverId, serviceName),
+            createPollenInvite: (pubkey, subjectNodeId) => this.pollenTransport.createInvite(subjectNodeId),
+            joinPollenInvite: payload => this.pollenTransport.joinInvite(payload.token),
             reportError: (...parts) => writeStderr(...parts)
         });
         this.relaySockets = this.nostrDiscovery.relaySockets;
@@ -82,6 +85,7 @@ export default class MeshFederation {
         this.timers = [];
         this.nostrDiscovery.stop();
         this.fipsTransport.closePeerEvents();
+        this.pollenTransport.stop();
         this.fipsPeerEvents = null;
     }
 
