@@ -214,6 +214,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(releaseTargets, /anonymous GHCR manifest readback/);
     assert.match(releaseTargets, /npm run verify:ghcr-anonymous -- v0\.x\.y/);
     assert.match(releaseTargets, /temporary `DOCKER_CONFIG`/);
+    assert.match(releaseTargets, /npm run test:external-uat -- v0\.x\.y/);
+    assert.match(releaseTargets, /Proof external-uat-finishline/);
     assert.match(releaseTargets, /v0\.1\.5` release assets and authenticated GHCR readback are proven by release run `28760231569`/);
     assert.match(releaseTargets, /meshdrop-spa-0\.1\.5\.tar\.gz/);
     assert.match(releaseTargets, /meshdrop-desktop-0\.1\.5\.tar\.gz/);
@@ -248,6 +250,9 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /Desktop Chromium bundled shell and installer, iOS source\/native-source\/Simulator app\/device app, Android source\/native-source\/debug APK\/release APK tarballs/);
     assert.match(targetStatus, /release readback `npm run verify:ghcr-anonymous -- v0\.1\.5` returns GHCR `unauthorized`/);
     assert.match(targetStatus, /Make `ghcr\.io\/sandwichfarm\/meshdrop` public/);
+    assert.match(targetStatus, /npm run test:external-uat -- v0\.x\.y/);
+    assert.match(targetStatus, /Start9 deployed UAT, Umbrel deployed UAT, iOS signed physical-device UAT, and anonymous GHCR readback/);
+    assert.match(targetStatus, /Proof external-uat-finishline/);
     assert.match(
         targetStatus,
         /\| SPA \| Chromium\/Firefox\/WebKit backend-free transfer smoke exists; Chromium\/Firefox public relay UAT exists \|/

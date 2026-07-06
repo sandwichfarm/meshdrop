@@ -83,6 +83,19 @@ Repeat with `target=start9` and `target=umbrel`.
    This command uses a temporary `DOCKER_CONFIG` and checks every `standalone`, `start9`, and `umbrel` tag pair for
    `linux/amd64` plus `linux/arm64`.
 
+10. When Start9, Umbrel, iOS, and GHCR public-readback inputs are all available, run the consolidated external
+    finish-line verifier:
+
+   ```sh
+   MESHDROP_START9_UAT_URL=<installed StartOS service URL> \
+   MESHDROP_UMBREL_UAT_URL=<installed Umbrel service URL> \
+   MESHDROP_IOS_DEVELOPMENT_TEAM=<team-id> \
+   MESHDROP_IOS_DEVICE_UDID=<device-udid> \
+   npm run test:external-uat -- v0.x.y
+   ```
+
+   Passing output includes `Proof external-uat-finishline`.
+
 ## Not proven
 
 - Anonymous local readback is not proven for `v0.1.5`: the release readback job failed at anonymous GHCR after Docker
