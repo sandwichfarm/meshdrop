@@ -144,7 +144,7 @@ header {
 }
 
 header.overflow-hidden {
-    overflow: hidden;
+    overflow: visible;
 }
 
 header.overflow-hidden:has(#theme-wrapper:hover),
@@ -154,6 +154,14 @@ header.overflow-hidden:has(#theme-wrapper:focus-within) {
 
 header:not(.overflow-expanded) {
     height: calc(56px + env(safe-area-inset-top, 0px));
+}
+
+header.overflow-hidden:not(.overflow-expanded):has(.protocol-toggle-group .protocol-toggle:not([hidden])) {
+    height: auto;
+}
+
+header.overflow-hidden:not(.overflow-expanded):has(.protocol-toggle-group .protocol-toggle:not([hidden])) #expand {
+    display: none;
 }
 
 @media (max-width: 520px) {
@@ -807,8 +815,11 @@ button::-moz-focus-inner {
     height: 40px;
 }
 
+#nostr-mesh[aria-hidden="true"] {
+    display: none !important;
+}
+
 .protocol-toggle-group {
-    gap: 3px;
     margin-left: 6px;
     margin-right: 6px;
     min-width: 0;
@@ -816,16 +827,6 @@ button::-moz-focus-inner {
 
 .protocol-toggle-group:not(:has(.protocol-toggle:not([hidden]))) {
     display: none;
-}
-
-.protocol-toggle-group-label {
-    color: color-mix(in srgb, rgb(var(--text-color)) 64%, rgb(var(--bg-color)));
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 11px;
-    text-align: center;
-    text-transform: uppercase;
-    white-space: nowrap;
 }
 
 .protocol-toggle-items {
@@ -875,11 +876,9 @@ header > a.icon-button:focus:before,
     --protocol-color: var(--primary-color);
     color: color-mix(in srgb, var(--protocol-color) 72%, currentColor);
     isolation: isolate;
-    width: auto;
-    min-width: 44px;
+    width: 40px;
+    min-width: 40px;
     height: 40px;
-    padding: 0 6px;
-    gap: 3px;
 }
 
 .protocol-toggle:before {
@@ -925,22 +924,6 @@ header > a.icon-button:focus:before,
     font-weight: 700;
     line-height: 12px;
     text-align: center;
-}
-
-.protocol-toggle-label {
-    max-width: 48px;
-    overflow: hidden;
-    color: currentColor;
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 10px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-#blossom-transfer .protocol-toggle-label,
-#hashtree-transfer .protocol-toggle-label {
-    max-width: 56px;
 }
 
 .protocol-toggle.selected:not([data-badge]):after {

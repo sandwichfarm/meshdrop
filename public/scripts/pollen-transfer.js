@@ -253,7 +253,7 @@ class PollenTransferController {
         this.$button.setAttribute("aria-busy", String(this._connecting));
         this.$button.setAttribute("aria-disabled", String(supported && !this._available));
         const userCount = globalThis.meshdropPeerAvailabilityCounts?.pollen;
-        if (this._active && !this._connecting) {
+        if (supported && !this._connecting) {
             this.$button.setAttribute("data-badge", String(typeof userCount === "number" ? userCount : 0));
         } else {
             this.$button.removeAttribute("data-badge");
