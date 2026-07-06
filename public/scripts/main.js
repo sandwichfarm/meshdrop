@@ -18,6 +18,7 @@ class PairDrop {
             "scripts/nostr-identity.js",
             "scripts/local-discovery.js",
             "scripts/nostr-mesh.js",
+            "scripts/nostr-mesh-autostart.js",
             "scripts/blossom-transfer.js",
             "scripts/hashtree-transfer.js",
             "scripts/pollen-transfer.js",
@@ -212,6 +213,7 @@ class PairDrop {
         this.nostrIdentity = new globalThis.NostrIdentityController();
         this.localDiscovery = new globalThis.LocalDiscoveryController();
         this.nostrMesh = new globalThis.NostrMeshConnection();
+        this.nostrMeshAutostart = new globalThis.NostrMeshAutostartController();
         this.blossomTransfer = new globalThis.BlossomTransferController();
         this.hashtreeTransfer = new globalThis.HashtreeTransferController();
         this.pollenTransfer = new globalThis.PollenTransferController();

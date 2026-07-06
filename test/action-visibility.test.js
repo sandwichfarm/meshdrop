@@ -100,6 +100,7 @@ await import("../public/scripts/nostr-android-signer.js");
 await import("../public/scripts/nostr-identity.js");
 await import("../public/scripts/local-discovery.js");
 await import("../public/scripts/nostr-mesh.js");
+await import("../public/scripts/nostr-mesh-autostart.js");
 await import("../public/scripts/blossom-transfer.js");
 await import("../public/scripts/hashtree-transfer.js");
 await import("../public/scripts/pollen-transfer.js");
@@ -120,6 +121,9 @@ function resetUi() {
     delete globalThis.meshdropHashtreeTransfer;
     delete globalThis.meshdropPollenTransfer;
     delete globalThis.meshdropFipsDiscovery;
+    delete globalThis.meshdropPeerAvailabilityCounts;
+    globalThis.__meshdropDisableNostrRelayNetwork = true;
+    globalThis.__meshdropAllowNostrRelayAutostart = true;
     globalThis.window.isRtcSupported = true;
     [
         "nostr-identity",
@@ -531,6 +535,94 @@ test("Nostr mesh selection is restored after refresh", async () => {
     }
 });
 
+test("Hidden Nostr relay discovery autostarts after identity is available", async () => {
+    resetUi();
+    const pubkey = "a".repeat(64);
+    installSigner(pubkey);
+    installStoredIdentity(pubkey);
+    const sockets = installOpenWebSocket();
+    buttons.get("nostr-mesh").setAttribute("aria-hidden", "true");
+
+    new globalThis.NostrIdentityController();
+    const controller = new globalThis.NostrMeshConnection();
+    new globalThis.NostrMeshAutostartController();
+
+    try {
+        globalThis.Events.fire("config", {nostrMesh: {relays: ["wss://relay.test"]}});
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        assert.equal(controller._active, true);
+        assert.equal(sockets.length, 1);
+    } finally {
+        controller.disconnect(false, false);
+    }
+});
+
+test("Hidden Nostr relay discovery autostart honors relay-network disable flag", async () => {
+    resetUi();
+    const pubkey = "a".repeat(64);
+    installSigner(pubkey);
+    installStoredIdentity(pubkey);
+    const sockets = installOpenWebSocket();
+    buttons.get("nostr-mesh").setAttribute("aria-hidden", "true");
+    globalThis.__meshdropDisableNostrRelayNetwork = true;
+    globalThis.__meshdropAllowNostrRelayAutostart = false;
+
+    new globalThis.NostrIdentityController();
+    const controller = new globalThis.NostrMeshConnection();
+    new globalThis.NostrMeshAutostartController();
+
+    try {
+        globalThis.Events.fire("config", {nostrMesh: {relays: ["wss://relay.test"]}});
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        assert.equal(controller._active, false);
+        assert.equal(sockets.length, 0);
+    } finally {
+        globalThis.__meshdropAllowNostrRelayAutostart = true;
+        controller.disconnect(false, false);
+    }
+});
+
+test("Hidden Nostr relay autostart republishes startup presence for late subscribers", () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    const delays = [];
+    const published = [];
+    const autostart = Object.create(globalThis.NostrMeshAutostartController.prototype);
+    const identity = {
+        pubkey: "b".repeat(64),
+        followListStatus: "found",
+        followPubkeys: ["c".repeat(64)]
+    };
+
+    globalThis.setTimeout = (callback, delay) => {
+        delays.push(delay);
+        callback();
+        return delays.length;
+    };
+    globalThis.meshdropNostrIdentity = {getIdentity: () => identity};
+
+    try {
+        const mesh = {
+            _active: true,
+            _publishPresence: type => published.push(type)
+        };
+
+        autostart._publishStartupPresence(mesh);
+
+        assert.deepEqual(delays, [500, 1500, 3500]);
+        assert.deepEqual(published, ["connect", "connect", "connect"]);
+        assert.equal(mesh._identity, identity);
+    } finally {
+        globalThis.setTimeout = originalSetTimeout;
+        delete globalThis.meshdropNostrIdentity;
+    }
+});
+
 test("Blossom, Hashtree, and Pollen transfer selections are restored after refresh", async () => {
     resetUi();
     storedValues.set("meshdrop_blossom_transfer_enabled", "true");
@@ -789,6 +881,34 @@ test("Nostr sign-in hydrates kind 0 profile and Blossom servers from outbox", as
     }
 });
 
+test("Nostr identity hydration preserves stored follow list when relay list is missing", async () => {
+    resetUi();
+    const pubkey = "6".repeat(64);
+    installSigner(pubkey);
+    installStoredIdentity(pubkey);
+    const originalRelays = globalThis.meshdropNostrRelays;
+    globalThis.meshdropNostrRelays = {
+        async lookupUser() {
+            return {
+                relays: {read: [], write: []},
+                followPubkeys: [],
+                followList: {status: "missing", pubkeys: []},
+                blossomServers: []
+            };
+        }
+    };
+
+    try {
+        const identity = new globalThis.NostrIdentityController();
+        await identity.hydrateIdentity();
+
+        assert.equal(identity.getIdentity().followListStatus, "missing");
+        assert.deepEqual(identity.getIdentity().followPubkeys, [pubkey]);
+    } finally {
+        globalThis.meshdropNostrRelays = originalRelays;
+    }
+});
+
 test("Nostr server auth display name does not overwrite hydrated kind 0 profile name", async () => {
     resetUi();
     const pubkey = "7".repeat(64);
@@ -921,6 +1041,20 @@ test("Pollen action shows mesh peer count while active", () => {
     assert.equal(button.hasAttribute("hidden"), false);
     assert.equal(button.classes.has("selected"), true);
     assert.equal(button.getAttribute("data-badge"), "3");
+});
+
+test("Pollen action shows zero badge while visible without known peers", () => {
+    resetUi();
+    const controller = new globalThis.PollenTransferController();
+    const button = buttons.get("pollen-transfer");
+
+    controller._config = {pollen: {enabled: true}};
+    controller._available = true;
+    controller._render();
+
+    assert.equal(button.hasAttribute("hidden"), false);
+    assert.equal(button.classes.has("selected"), false);
+    assert.equal(button.getAttribute("data-badge"), "0");
 });
 
 test("Local discovery action shows same-instance peer count while enabled", () => {

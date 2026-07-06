@@ -212,9 +212,12 @@ class NostrIdentityController {
             if (discovery?.profile?.displayName) this._identity.displayName = discovery.profile.displayName;
             if (discovery?.profile?.picture) this._identity.picture = discovery.profile.picture;
             this._identity.relays = discovery?.relays || {read: [], write: []};
+            const discoveredFollowPubkeys = discovery?.followList?.status === "found"
+                ? discovery?.followPubkeys || []
+                : this._identity.followPubkeys || [];
             this._setFollowListStatus(
                 discovery?.followList?.status || "missing",
-                discovery?.followPubkeys || [],
+                discoveredFollowPubkeys,
                 false
             );
             this._setServerListStatus(
