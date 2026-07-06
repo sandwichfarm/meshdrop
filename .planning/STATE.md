@@ -21,21 +21,22 @@ Merged PRs through #105 satisfy the source/runtime/harness portions of the origi
   focused tests plus Docker/admin UAT.
 - Phase 4 platform work is complete for automated build/run/runbook proof and Android physical hardware UAT, but not
   for StartOS/Umbrel node acceptance or signed iOS device acceptance.
-- Phase 5 CI/release automation is mostly complete, but current `master` still needs a new tag and anonymous GHCR
-  readback before release proof can be called complete.
+- Phase 5 CI/release automation is complete for authenticated release publication/readback through `v0.1.5`, but
+  anonymous GHCR readback still fails before release images can be called publicly readable.
 
 Current hard gaps:
 
-- `npm run verify:ghcr-anonymous -- v0.1.4` fails with GHCR `unauthorized`.
+- `npm run verify:ghcr-anonymous -- v0.1.5` fails with GHCR `unauthorized`.
 - `gh api /orgs/sandwichfarm/packages/container/meshdrop` fails with `403` because this token lacks `read:packages`, so
   this session cannot inspect or change package visibility.
-- Current `master` at PR #105 is unreleased; `v0.1.4` predates the latest release artifact set.
 - Deployed StartOS/Umbrel UAT and signed iOS device package/UAT remain unproven.
 
 Closed during this audit branch:
 
 - `npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`, proving APK install, WebView
   capability, WebView Nostr WebRTC transfer, Android share-intent transfer, and native picker UI on physical hardware.
+- `v0.1.5` was tagged from `5876d8e`, published release assets and GHCR target images, passed authenticated readback,
+  and failed only at anonymous GHCR manifest readback with `unauthorized`.
 
 ## Quick Tasks Completed
 
@@ -115,6 +116,7 @@ Closed during this audit branch:
 | 2026-07-05 | `260705-asa-android-safe-area-and-signer-options` | complete | Focused 28/28; e2e transfer smoke passed after CI expectation fix; `npm test` 220/220; physical Android WebView WebRTC/WebSocket proof on `28031FDH300BS5`; live CDP shows safe-area, Nostr button visible, Amber signer options |
 | 2026-07-06 | `260706-amber-nip04-webrtc` | complete | Android Amber signer exposes NIP-04/NIP-44 through active identity signer; focused 30/30; `npm test` 222/222; Android APK build; e2e transfer smoke; diff/slop gates |
 | 2026-07-06 | `260706-android-fips-pollen-options` | complete | Android APK manifest/static config exposes FIPS and Pollen; AVD WebView proof shows both visible; focused 37/37; `npm test` 223/223; e2e; changed-code slop clean |
+| 2026-07-06 | `260706-v15-release-readback` | complete | `v0.1.5` release assets, GHCR target images, authenticated readback, and Docker smoke passed; anonymous GHCR still returns `unauthorized` |
 
 ## Active Quick Task
 

@@ -33,10 +33,11 @@
 - [x] **PLAT-03**: Start9/Umbrel packaging targets have build and release artifacts.
 - [x] **PLAT-04**: Desktop/mobile target approach is planned with runtime capability model.
 - [x] **REL-01**: GitHub Actions CI/CT/CD runs necessary gates at PR/release points without redundant runs.
-- [ ] **REL-02**: Tagged alpha releases produce GitHub releases and target artifacts/images.
+- [x] **REL-02**: Tagged alpha releases produce GitHub releases and target artifacts/images.
 
-REL-02 remains open for the current `master` head because the latest merged artifact set is not yet present in a
-published tag and anonymous GHCR readback still fails with `unauthorized`.
+REL-02 is complete for the current `master` head through `v0.1.5`: release run `28760231569` published the expected
+GitHub release assets and all three GHCR target images, and authenticated readback verified release assets, multi-arch
+manifests, pulled target metadata, and Docker smoke. Anonymous GHCR readback remains a separate public-visibility gap.
 
 ## Out of Scope
 
@@ -67,12 +68,11 @@ published tag and anonymous GHCR readback still fails with `unauthorized`.
 | PLAT-03 | Phase 4 | Complete |
 | PLAT-04 | Phase 4 | Complete |
 | REL-01 | Phase 5 | Complete |
-| REL-02 | Phase 5 | Open |
+| REL-02 | Phase 5 | Complete |
 
 ## Remaining Proof Gaps
 
-- Current `master` has not been released after PR #105. A new `v0.*.*` tag must publish and read back the latest target artifacts.
-- Anonymous GHCR readback fails for `v0.1.4` with `unauthorized`; the active token also lacks `read:packages`, so this session cannot inspect or change package visibility.
+- Anonymous GHCR readback fails for `v0.1.5` with `unauthorized`; the active token also lacks `read:packages`, so this session cannot inspect or change package visibility.
 - Real-device/node UAT remains open for StartOS, Umbrel, and signed iOS device packages.
 
 **Coverage:**
@@ -82,4 +82,4 @@ published tag and anonymous GHCR readback still fails with `unauthorized`.
 
 ---
 *Requirements defined: 2026-07-04*
-*Last updated: 2026-07-06 after auditing merged PRs #1-#105, `v0.1.4`, and GHCR anonymous readback.*
+*Last updated: 2026-07-06 after auditing merged PRs #1-#107, `v0.1.5`, and GHCR anonymous readback.*

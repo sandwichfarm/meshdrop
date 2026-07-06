@@ -19,11 +19,11 @@ Files must transfer between peers reliably over every negotiated transport that 
 - ✓ Runtime capability negotiation gates GUI controls by target/runtime capability instead of hard-coded transport assumptions.
 - ✓ Docker shared-instance admin controls are gated by configured admin npub and backend-verified signed Nostr events.
 - ✓ Alpha release automation builds/readbacks target artifacts and GHCR images with authenticated GitHub Actions package access.
+- ✓ Alpha `v0.1.5` publishes the latest Android, Desktop Chromium bundled installer, iOS app, Start9, Umbrel, SPA, desktop, and Node artifacts.
 
 ### Active
 
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
-- [ ] Cut and verify a new alpha release from current `master` so latest Android, Desktop Chromium bundled installer, iOS Simulator/device app, and Android release APK artifacts are present in the published release.
 - [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services.
 - [ ] Obtain signed/device-installable iOS package proof and iOS device file-picker/share-sheet/native transfer UAT.
 
@@ -58,4 +58,4 @@ Files must transfer between peers reliably over every negotiated transport that 
 | Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | ✓ Good |
 
 ---
-*Last updated: 2026-07-06 after auditing merged PRs #1-#105 and current release/GHCR evidence.*
+*Last updated: 2026-07-06 after auditing merged PRs #1-#107 and `v0.1.5` release/GHCR evidence.*
