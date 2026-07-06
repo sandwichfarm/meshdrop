@@ -16,7 +16,7 @@ services:
       - DEBUG_MODE=false # Set to true to debug container and peer connections.
       - NOSTR_RELAYS=wss://bucket.coracle.social # Relay list for Nostr WEB-RTC signaling and announcements.
       - MESHDROP_DISCOVERY_NPUBS= # Comma-separated npubs or hex pubkeys this instance should discover for FIPS/Pollen federation.
-      - MESHDROP_ADMIN_NPUB= # Shared-instance admin npub allowed to sign server-side settings changes.
+      - MESHDROP_ADMIN_PUBKEY=e771af0b05c8e95fcdf6feb3500544d2fb1ccd384788e9f490bb3ee28e # Shared-instance admin pubkey allowed to sign server-side settings changes.
       - BLOSSOM_SERVERS= # Comma-separated Blossom servers for optional storage-backed transfers.
       - FIPS_DISCOVERY=true # Run and use the FIPS daemon inside this container.
       - FIPS_CONFIG=/etc/fips/fips.yaml # FIPS daemon config mounted from ./fips.yaml.
