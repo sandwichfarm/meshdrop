@@ -241,9 +241,13 @@ function capabilitiesFor(target, nativeSource) {
 
 function remainingProofFor(target, nativeSource, androidApk, androidPackage) {
     if (androidPackage) {
+        const nativeBackendProof = [
+            "native Android Rust FIPS core integration",
+            "native Android Pollen WASM/pln integration"
+        ];
         return androidApk
-            ? ["physical Android device install UAT", "signed Android release APK or AAB package"]
-            : ["physical Android device install UAT"];
+            ? ["physical Android device install UAT", "signed Android release APK or AAB package", ...nativeBackendProof]
+            : ["physical Android device install UAT", ...nativeBackendProof];
     }
     const remaining = [
         "native mobile app package build",

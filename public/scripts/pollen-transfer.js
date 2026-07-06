@@ -43,6 +43,13 @@ const PollenTransferProtocol = {
             size: Number(descriptor.size),
             type: descriptor.type || file?.type || "application/octet-stream"
         };
+    },
+
+    endpoint(path) {
+        const baseUrl = globalThis.__meshdropAndroidNativeBackend?.baseUrl;
+        if (!baseUrl) return path;
+
+        return `${baseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
     }
 };
 
@@ -145,7 +152,7 @@ class PollenTransferController {
     }
 
     async fetchStatus() {
-        const response = await fetch(PollenTransferProtocol.statusPath);
+        const response = await fetch(PollenTransferProtocol.endpoint(PollenTransferProtocol.statusPath));
         if (!response.ok) throw new Error(`Pollen status failed with ${response.status}`);
 
         const status = PollenTransferProtocol.summarizeStatus(await response.json());
@@ -166,7 +173,7 @@ class PollenTransferController {
     }
 
     async uploadFile(file) {
-        const response = await fetch(PollenTransferProtocol.uploadPath, {
+        const response = await fetch(PollenTransferProtocol.endpoint(PollenTransferProtocol.uploadPath), {
             method: "POST",
             headers: {
                 "Content-Type": file.type || "application/octet-stream"
@@ -184,7 +191,7 @@ class PollenTransferController {
 
     async downloadDescriptor(descriptor, header) {
         const pollenDescriptor = PollenTransferProtocol.validateDescriptor(descriptor);
-        const response = await fetch(`${PollenTransferProtocol.downloadPath}/${pollenDescriptor.hash}`);
+        const response = await fetch(PollenTransferProtocol.endpoint(`${PollenTransferProtocol.downloadPath}/${pollenDescriptor.hash}`));
         if (!response.ok) {
             const error = await response.json().catch(_ => ({}));
             throw new Error(error.error || `Pollen download failed with ${response.status}`);

@@ -271,6 +271,14 @@ for (const target of ["ios", "android"]) {
                 assert.match(wrapperSource, /onShowFileChooser/);
                 assert.match(wrapperSource, /meshdropAndroidNativeShare/);
                 assert.match(wrapperSource, /meshdropAndroidBridge/);
+                assert.match(wrapperSource, /MeshDropNativeBackend/);
+                assert.match(wrapperSource, /ServerSocket\(0, 50, java\.net\.InetAddress\.getByName\("127\.0\.0\.1"\)\)/);
+                assert.match(wrapperSource, /__meshdropAndroidNativeBackend/);
+                assert.match(wrapperSource, /\/pollen\/status/);
+                assert.match(wrapperSource, /\/pollen\/upload/);
+                assert.match(wrapperSource, /\/pollen\/download\//);
+                assert.match(wrapperSource, /\/fips\/status/);
+                assert.match(wrapperSource, /rust-fips-core-not-linked/);
                 assert.match(wrapperSource, /isNostrSignerInstalled/);
                 assert.match(wrapperSource, /requestNostrSigner/);
                 assert.match(wrapperSource, /android-nostr-signer-result/);

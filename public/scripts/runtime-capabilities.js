@@ -111,6 +111,8 @@ const RuntimeCapabilities = {
 
     staticTransports(targetManifest = null) {
         const transports = targetManifest?.transports || {};
+        const androidNativeBackend = this.androidNativeBackendAvailable(targetManifest);
+        const androidBackendReady = targetManifest?.target !== "android" || androidNativeBackend;
 
         return {
             localDiscovery: transports.localDiscovery === true,
@@ -119,9 +121,16 @@ const RuntimeCapabilities = {
             blossom: transports.blossom !== false,
             hashtree: transports.hashtree !== false,
             bluetooth: false,
-            pollen: transports.pollen === true,
-            fips: transports.fips === true
+            pollen: transports.pollen === true && androidBackendReady,
+            fips: transports.fips === true && androidBackendReady
         };
+    },
+
+    androidNativeBackendAvailable(targetManifest = null) {
+        if (targetManifest?.target !== "android") return false;
+
+        const backend = globalThis.__meshdropAndroidNativeBackend;
+        return backend?.alive === true && typeof backend.baseUrl === "string" && backend.baseUrl.length > 0;
     },
 
     bluetoothCapabilities(targetManifest = null) {

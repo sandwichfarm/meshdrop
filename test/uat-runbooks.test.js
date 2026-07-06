@@ -311,10 +311,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Passing `MESHDROP_UMBREL_UAT_URL=<url> npm run test:umbrel-deployed` after Umbrel UI install/);
     assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, unsigned device app proof, signed-device install-and-launch harness, share extension source bridge, web share-inbox consumption proof, and Bluetooth negotiation proof exist; signed\/device pass open \|/);
-    assert.match(
-        targetStatus,
-        /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, native picker UI proof, and physical-device hardware UAT passed \|/
-    );
+	assert.match(
+		targetStatus,
+		/\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, native picker UI proof, native loopback FIPS\/Pollen backend smoke, and physical-device hardware UAT passed \|/
+	);
     assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `npm run build:ios:simulator-app`; `npm run build:ios:device-app`; `npm run test:ios-xcode-build`; `npm run test:ios-simulator-app`; `npm run test:ios-device-app`; `node --test test\/mobile-package\.test\.js`; `node --test test\/native-share-inbox\.test\.js`; `node --test test\/ios-signed-device-uat\.test\.js`/);
     assert.match(targetStatus, /wires iOS 18\.4\+ file inputs to `UIDocumentPickerViewController`/);
     assert.match(targetStatus, /includes `MeshDrop\.xcodeproj` and shared App Group entitlement files/);
@@ -331,9 +331,10 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /Passing `MESHDROP_IOS_DEVELOPMENT_TEAM=<team-id> MESHDROP_IOS_DEVICE_UDID=<device-udid> npm run test:ios-signed-device`/);
     assert.match(targetStatus, /`npm run build:android`; `npm run build:android:native-source`; `npm run build:android:apk`/);
     assert.match(targetStatus, /`npm run build:android:release-apk`/);
-    assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-apk-install`/);
-    assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-picker-ui`/);
-    assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-webview-capabilities`/);
+	assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-apk-install`/);
+	assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-picker-ui`/);
+	assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-fips-pollen`/);
+	assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-webview-capabilities`/);
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-webview-transfer`/);
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-share-file`/);
     assert.match(targetStatus, /`npm run build:ios:native-source`/);
@@ -346,11 +347,12 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /Android emulator install\/launch of `farm\.sandwich\.meshdrop\/\.MainActivity`/);
     assert.match(targetStatus, /Android native picker UI selection of `meshdrop-picker-proof\.txt`/);
     assert.match(targetStatus, /Android WebView `RTCPeerConnection`\/`WebSocket`\/`RTCDataChannel` capability evidence and Bluetooth API negotiation/);
-    assert.match(targetStatus, /Android WebView sent `meshdrop-android-webview-proof\.txt`/);
-    assert.match(targetStatus, /Android received an `ACTION_SEND` stream for `meshdrop-android-share-proof\.txt`/);
-    assert.match(targetStatus, /node --test test\/android-physical-device-uat\.test\.js` proves the physical-device harness/);
-    assert.match(targetStatus, /`npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`/);
-    assert.match(targetStatus, /None recorded for Android physical-device UAT/);
+	assert.match(targetStatus, /Android WebView sent `meshdrop-android-webview-proof\.txt`/);
+	assert.match(targetStatus, /Android received an `ACTION_SEND` stream for `meshdrop-android-share-proof\.txt`/);
+	assert.match(targetStatus, /Android native loopback served FIPS status and Pollen status\/upload\/download from the installed WebView with `rustCore=false`/);
+	assert.match(targetStatus, /node --test test\/android-physical-device-uat\.test\.js` proves the physical-device harness/);
+	assert.match(targetStatus, /`npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`/);
+	assert.match(targetStatus, /Native Android Rust FIPS core integration; native Android Pollen WASM\/pln integration/);
     assert.doesNotMatch(targetStatus, /Physical Android device install UAT and Bluetooth negotiation/);
     assert.doesNotMatch(targetStatus, /Android native file picker UI UAT/);
     assert.doesNotMatch(targetStatus, /signed Android release APK or AAB package/);

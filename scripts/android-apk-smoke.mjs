@@ -41,7 +41,9 @@ try {
     assert.equal(manifest.transports.bluetooth, false);
     assert.deepEqual(manifest.remainingProof, [
         "physical Android device install UAT",
-        "signed Android release APK or AAB package"
+        "signed Android release APK or AAB package",
+        "native Android Rust FIPS core integration",
+        "native Android Pollen WASM/pln integration"
     ]);
     assert(!manifest.remainingProof.includes("Android native file picker UI UAT"));
     assert(!manifest.remainingProof.includes("mobile file picker and share sheet"));
@@ -55,7 +57,9 @@ try {
     assert.equal(proof.releaseSigned, false);
     assert.deepEqual(proof.notProven, [
         "physical Android device install UAT",
-        "signed Android release APK or AAB package"
+        "signed Android release APK or AAB package",
+        "native Android Rust FIPS core integration",
+        "native Android Pollen WASM/pln integration"
     ]);
     assert(!proof.notProven.includes("Android native file picker UI UAT"));
     assert(!proof.notProven.includes("mobile file picker and share sheet"));
