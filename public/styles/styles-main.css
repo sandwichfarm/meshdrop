@@ -162,6 +162,14 @@ header:not(.overflow-expanded) {
         overflow: visible;
     }
 
+    header.overflow-hidden:not(.overflow-expanded):has(.protocol-toggle-group-network .protocol-toggle:not([hidden])) {
+        min-height: calc(112px + env(safe-area-inset-top, 0px));
+    }
+
+    header.overflow-hidden:not(.overflow-expanded):has(.protocol-toggle-group-storage .protocol-toggle:not([hidden])) {
+        min-height: calc(164px + env(safe-area-inset-top, 0px));
+    }
+
     header.overflow-hidden:not(.overflow-expanded) #expand {
         display: none;
     }
@@ -191,10 +199,6 @@ header > a[href="#about"] {
     order: 5;
 }
 
-#protocol-settings {
-    order: 8;
-}
-
 #language-selector,
 #theme-wrapper,
 #notification,
@@ -209,21 +213,24 @@ header > a[href="#about"] {
     order: 15;
 }
 
-#local-discovery,
-#nostr-mesh,
-#fips-discovery,
-#blossom-transfer,
-#hashtree-transfer,
-#pollen-transfer {
+.protocol-toggle-group-identity {
+    order: 24;
+}
+
+.protocol-toggle-group-network {
+    order: 22;
+}
+
+.protocol-toggle-group-storage {
     order: 20;
 }
 
-.header-divider-network {
-    order: 25;
+#protocol-settings {
+    order: 18;
 }
 
-#nostr-identity {
-    order: 30;
+.header-divider-network {
+    order: 21;
 }
 
 #expand {
@@ -800,6 +807,33 @@ button::-moz-focus-inner {
     height: 40px;
 }
 
+.protocol-toggle-group {
+    gap: 3px;
+    margin-left: 6px;
+    margin-right: 6px;
+    min-width: 0;
+}
+
+.protocol-toggle-group:not(:has(.protocol-toggle:not([hidden]))) {
+    display: none;
+}
+
+.protocol-toggle-group-label {
+    color: color-mix(in srgb, rgb(var(--text-color)) 64%, rgb(var(--bg-color)));
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 11px;
+    text-align: center;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.protocol-toggle-items {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+}
+
 .icon-button:before {
     border-radius: 50%;
 }
@@ -841,6 +875,11 @@ header > a.icon-button:focus:before,
     --protocol-color: var(--primary-color);
     color: color-mix(in srgb, var(--protocol-color) 72%, currentColor);
     isolation: isolate;
+    width: auto;
+    min-width: 44px;
+    height: 40px;
+    padding: 0 6px;
+    gap: 3px;
 }
 
 .protocol-toggle:before {
@@ -886,6 +925,22 @@ header > a.icon-button:focus:before,
     font-weight: 700;
     line-height: 12px;
     text-align: center;
+}
+
+.protocol-toggle-label {
+    max-width: 48px;
+    overflow: hidden;
+    color: currentColor;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#blossom-transfer .protocol-toggle-label,
+#hashtree-transfer .protocol-toggle-label {
+    max-width: 56px;
 }
 
 .protocol-toggle.selected:not([data-badge]):after {
