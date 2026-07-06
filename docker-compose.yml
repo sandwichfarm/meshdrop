@@ -31,8 +31,6 @@ services:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - ./fips.yaml:/etc/fips/fips.yaml:ro
-      - /usr/bin/fips:/usr/local/bin/fips:ro
-      - /usr/bin/fipsctl:/usr/local/bin/fipsctl:ro
       - pollen-data:/var/lib/meshdrop/pln
     ports:
       - "3000:3000" # Web UI, exposed to this LAN for local-device testing.

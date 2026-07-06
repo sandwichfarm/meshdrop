@@ -21,6 +21,8 @@ async function main() {
 
         await step("wait for /config", () => waitForHttp(`${baseUrl}/config`));
         await step("wait for healthcheck", waitForHealth);
+        await step("assert FIPS binaries installed", assertFipsBinariesInstalled);
+        await step("assert FIPS startup logs", assertFipsStartupLogs);
         await step("assert /config", () => assertContainerConfig(baseUrl));
         await step("assert FIPS status", () => assertFipsStatus(baseUrl));
         await step("assert Pollen status", () => assertPollenStatus(baseUrl));
@@ -47,7 +49,7 @@ async function startContainer() {
         "-p",
         "127.0.0.1::3000",
         "-e",
-        "FIPS_DISCOVERY=true",
+        "FIPS_DISCOVERY=false",
         "-e",
         "FIPS_CONTROL_SOCKET=21210",
         "-e",
@@ -62,6 +64,29 @@ async function startContainer() {
         "-c",
         "node scripts/fips-control-smoke-mock.mjs & exec scripts/start-with-fips.sh"
     ]);
+}
+
+async function assertFipsBinariesInstalled() {
+    const output = await run("docker", [
+        "exec",
+        container,
+        "sh",
+        "-lc",
+        "command -v fips && command -v fipsctl && fips --version && fipsctl --version"
+    ], {capture: true});
+
+    assert(output.includes("/usr/local/bin/fips"), "Image fips binary was not installed in /usr/local/bin");
+    assert(output.includes("/usr/local/bin/fipsctl"), "Image fipsctl binary was not installed in /usr/local/bin");
+    assert(output.includes("fips 0.4.0"), "Image fips binary did not report v0.4.0");
+    assert(output.includes("fipsctl 0.4.0"), "Image fipsctl binary did not report v0.4.0");
+}
+
+async function assertFipsStartupLogs() {
+    const logs = await run("docker", ["logs", container], {capture: true});
+    assert(
+        !logs.includes("FIPS daemon not started: fips or fipsctl binary or config file is missing"),
+        "Container reported missing FIPS binaries or config during smoke"
+    );
 }
 
 async function assertContainerConfig(baseUrl) {
