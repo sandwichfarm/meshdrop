@@ -24,12 +24,12 @@ node scripts/set-service-worker-version.mjs
 if [ "${FIPS_DISCOVERY:-true}" != "false" ]; then
     mkdir -p /run/fips
 
-    if command -v fips >/dev/null 2>&1 && [ -f "${FIPS_CONFIG:-/etc/fips/fips.yaml}" ]; then
+    if command -v fips >/dev/null 2>&1 && command -v fipsctl >/dev/null 2>&1 && [ -f "${FIPS_CONFIG:-/etc/fips/fips.yaml}" ]; then
         echo "Starting FIPS daemon with ${FIPS_CONFIG:-/etc/fips/fips.yaml}"
         fips --config "${FIPS_CONFIG:-/etc/fips/fips.yaml}" &
         fips_pid="$!"
     else
-        echo "FIPS daemon not started: fips binary or config file is missing"
+        echo "FIPS daemon not started: fips or fipsctl binary or config file is missing"
     fi
 fi
 

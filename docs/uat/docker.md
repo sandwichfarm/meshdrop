@@ -22,6 +22,8 @@ For a shared-instance deployment, set these values in `docker-compose.yml` or an
 - `BLOSSOM_SERVERS`: optional comma-separated Blossom servers.
 
 Do not use `NOSTR_ROOM` or `FIPS_ROOM` for FIPS/Pollen federation UAT. Those paths are expected to use npub-network discovery.
+Do not bind-mount host `fips` or `fipsctl` binaries. The Docker image installs both tools under `/usr/local/bin`; compose
+only needs the `fips.yaml` config mount, `/dev/net/tun`, `NET_ADMIN`, FIPS/Pollen ports, and data volumes.
 
 ## Runtime Acceptance
 
@@ -51,10 +53,10 @@ npm run test:docker
 ```
 
 The smoke proves container boot, `/config`, runtime capability metadata, FIPS/Pollen npub-network discovery IDs,
-signed-admin capability exposure, a signed admin GUI FIPS peer save against a container-local FIPS control mock, Pollen
-local status, federation metadata, served browser assets, local WebRTC transfer, Pollen mesh transfer between two
-browser peers loaded from one container, and Nostr WebRTC transfer between browser peers loaded from two separate Docker
-containers through a deterministic relay.
+installed `fips`/`fipsctl` binaries, signed-admin capability exposure, a signed admin GUI FIPS peer save against a
+container-local FIPS control mock, Pollen local status, federation metadata, served browser assets, local WebRTC
+transfer, Pollen mesh transfer between two browser peers loaded from one container, and Nostr WebRTC transfer between
+browser peers loaded from two separate Docker containers through a deterministic relay.
 
 To run only the two-container relay proof:
 

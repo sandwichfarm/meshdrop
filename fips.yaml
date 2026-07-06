@@ -4,6 +4,7 @@
 #   docker compose up -d --build
 #
 # This file is mounted into the container at /etc/fips/fips.yaml.
+# The fips and fipsctl binaries are installed inside the Docker image.
 # The FIPS control socket is internal to the container at /run/fips/control.sock.
 
 node:
