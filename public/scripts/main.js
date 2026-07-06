@@ -24,6 +24,7 @@ class PairDrop {
             "scripts/fips-discovery.js",
             "scripts/network.js",
             "scripts/ui.js",
+            "scripts/native-share-inbox.js",
             "scripts/nostr-login-dialog.js",
             "scripts/libs/heic2any.min.js",
             "scripts/libs/no-sleep.min.js",
@@ -204,6 +205,7 @@ class PairDrop {
         this.notifications = new globalThis.Notifications();
         this.networkStatusUI = new globalThis.NetworkStatusUI();
         this.webShareTargetUI = new globalThis.WebShareTargetUI();
+        this.nativeShareInboxUI = new globalThis.NativeShareInboxUI();
         this.webFileHandlersUI = new globalThis.WebFileHandlersUI();
         this.noSleepUI = new globalThis.NoSleepUI();
         this.broadCast = new globalThis.BrowserTabsConnector();
