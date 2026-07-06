@@ -404,6 +404,60 @@ test("file transfer route selection resolves a Nostr pubkey alias to the visible
     assert.equal(requests[0].transfer.id, "webrtc");
 });
 
+test("PeersManager keeps Nostr identity on local transport peers for UI grouping", () => {
+    const {PeersManager} = createHarness();
+    const manager = new PeersManager({send() {}});
+    const pubkey = "b".repeat(64);
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "ip",
+        roomId: "local-room",
+        peer: {
+            id: "local-peer",
+            rtcSupported: true,
+            nostrIdentity: {pubkey},
+            name: {displayName: "NADAR2", deviceName: "Mac Macintosh"}
+        }
+    });
+
+    assert.equal(manager.peers["local-peer"].nostrIdentity.pubkey, pubkey);
+    assert.equal(manager.peers["local-peer"].name.deviceName, "Mac Macintosh");
+    assert.equal(manager._resolvePeerId(pubkey), "local-peer");
+    assert.equal(manager._resolvePeerId(pubkey.toUpperCase()), "local-peer");
+});
+
+test("PeersManager refresh merges Nostr identity into an existing transport peer", () => {
+    const {PeersManager} = createHarness();
+    const manager = new PeersManager({send() {}});
+    const pubkey = "c".repeat(64);
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "ip",
+        roomId: "local-room",
+        peer: {id: "same-peer", rtcSupported: true}
+    });
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "pollen",
+        roomId: "pollen-room",
+        peer: {
+            id: "same-peer",
+            rtcSupported: true,
+            nostrIdentity: {pubkey},
+            name: {displayName: "NADAR2", deviceName: "Mac Macintosh"}
+        }
+    });
+
+    assert.equal(manager.peers["same-peer"]._roomIds.ip, "local-room");
+    assert.equal(manager.peers["same-peer"]._roomIds.pollen, "pollen-room");
+    assert.equal(manager.peers["same-peer"].nostrIdentity.pubkey, pubkey);
+    assert.equal(manager._resolvePeerId(pubkey), "same-peer");
+});
+
 test("peer-left removes a room type even when the websocket remains connected", () => {
     const {PeersManager, fired} = createHarness();
     const manager = new PeersManager({send() {}});

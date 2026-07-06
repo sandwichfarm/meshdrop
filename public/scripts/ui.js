@@ -48,12 +48,12 @@ const PeerAvailabilityProtocol = {
         },
         "nostr": {
             id: "webrtc",
-            label: "Nostr relay",
-            shortLabel: "Relay",
+            label: "Nostr",
+            shortLabel: "Nostr",
             className: "badge-room-nostr",
-            description: "Internet relay discovery with a direct peer data channel when negotiation succeeds",
+            description: "Nostr discovery with a direct peer data channel when negotiation succeeds",
             group: "Network routes",
-            privacy: "P2P after relay discovery",
+            privacy: "P2P after Nostr discovery",
             privacyTone: "direct",
             details: [
                 ["Discovery", "Nostr relay"],
@@ -142,7 +142,20 @@ const PeerAvailabilityProtocol = {
 
     identityKeys(peer, roomType = null) {
         const pubkey = peer?.nostrIdentity?.pubkey || (roomType === "nostr" ? peer?.id : "");
-        return pubkey ? [`nostr:${pubkey}`] : [];
+        return pubkey ? [`nostr:${String(pubkey).toLowerCase()}`] : [];
+    },
+
+    privateTransferAvailable() {
+        return globalThis.BlossomTransferProtocol?.hasWebCrypto?.() !== false;
+    },
+
+    privacyModeAvailable(mode) {
+        return mode !== "private" || this.privateTransferAvailable();
+    },
+
+    defaultPrivacyMode() {
+        const configuredDefault = globalThis.TransferPrivacyProtocol?.defaultMode || "private";
+        return this.privacyModeAvailable(configuredDefault) ? configuredDefault : "unencrypted";
     },
 
     storageOptions() {
@@ -509,6 +522,7 @@ class PeersUI {
     }
 
     _isMoreSpecificPeerName(nextName = {}, currentName = {}) {
+        if (currentName.deviceName === "Nostr peer" && nextName.deviceName !== "Nostr peer") return true;
         if (currentName.deviceName === "Nostr relay peer" && nextName.deviceName !== "Nostr relay peer") return true;
         if (!currentName.deviceName && nextName.deviceName) return true;
         return false;
@@ -517,12 +531,12 @@ class PeersUI {
     _rememberPeerAliases(visiblePeerId, peer) {
         this._peerAliases[peer.id] = visiblePeerId;
         const pubkey = peer.nostrIdentity?.pubkey;
-        if (pubkey) this._peerAliases[pubkey] = visiblePeerId;
+        if (pubkey) this._peerAliases[String(pubkey).toLowerCase()] = visiblePeerId;
         Object.values(peer._peerIdsByRoomType || {}).forEach(peerId => this._peerAliases[peerId] = visiblePeerId);
     }
 
     _visiblePeerId(peerId) {
-        return this._peerAliases[peerId] || peerId;
+        return this._peerAliases[peerId] || this._peerAliases[String(peerId).toLowerCase()] || peerId;
     }
 
     _onNostrIdentityChanged(identity) {
@@ -1718,7 +1732,7 @@ class TransferChoiceDialog extends Dialog {
         this._detail = {
             files: [...detail.files],
             to: detail.to,
-            privacyMode: globalThis.TransferPrivacyProtocol?.defaultMode || "private",
+            privacyMode: PeerAvailabilityProtocol.defaultPrivacyMode(),
             options: PeerAvailabilityProtocol.optionsFor(peer)
         };
 
@@ -1810,7 +1824,9 @@ class TransferChoiceDialog extends Dialog {
             button.className = 'transfer-privacy-option';
             button.dataset.privacyMode = mode.id;
             button.dataset.selected = String(mode.id === this._detail.privacyMode);
+            button.disabled = !PeerAvailabilityProtocol.privacyModeAvailable(mode.id);
             button.setAttribute('aria-checked', String(mode.id === this._detail.privacyMode));
+            button.setAttribute('aria-disabled', String(button.disabled));
             button.setAttribute('role', 'radio');
 
             const label = document.createElement('span');
@@ -1829,6 +1845,7 @@ class TransferChoiceDialog extends Dialog {
     _onPrivacyClick(event) {
         const button = event.target.closest('.transfer-privacy-option');
         if (!button || !this._detail) return;
+        if (button.disabled) return;
 
         this._detail.privacyMode = globalThis.TransferPrivacyProtocol?.normalize?.(button.dataset.privacyMode)
             || button.dataset.privacyMode;

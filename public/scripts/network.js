@@ -1956,10 +1956,11 @@ class PeersManager {
         this.peers[peerId].onServerMessage(message);
     }
 
-    _refreshPeer(peerId, roomType, roomId) {
+    _refreshPeer(peerId, roomType, roomId, peerInfo = null) {
         if (!this._peerExists(peerId)) return false;
 
         const peer = this.peers[peerId];
+        this._applyPeerInfo(peer, peerInfo);
         const currentPrimaryRoomType = SignalingRoomPriority.primary(peer._roomIds);
         const roomTypesDiffer = currentPrimaryRoomType !== roomType;
         const roomIdsDiffer = peer._roomIds[roomType] !== roomId;
@@ -1976,6 +1977,21 @@ class PeersManager {
         peer.refresh();
 
         return true;
+    }
+
+    _applyPeerInfo(peer, peerInfo = null) {
+        if (!peer || !peerInfo) return peer;
+
+        if (peerInfo.nostrIdentity) {
+            peer.nostrIdentity = {
+                ...peer.nostrIdentity,
+                ...peerInfo.nostrIdentity
+            };
+        }
+
+        if (peerInfo.name) peer.name = peerInfo.name;
+        if (peerInfo.rtcSupported !== undefined) peer.rtcSupported = peerInfo.rtcSupported;
+        return peer;
     }
 
     _createOrRefreshPeer(isCaller, peerId, roomType, roomId, rtcSupported, transport = this._server, peerInfo = null) {
@@ -1997,7 +2013,7 @@ class PeersManager {
             const currentRoomType = SignalingRoomPriority.primary(peer._roomIds);
             const connected = peer._isConnected?.() === true;
             const preferNewRoute = SignalingRoomPriority.shouldPrefer(currentRoomType, roomType, connected);
-            this._refreshPeer(peerId, roomType, roomId);
+            this._refreshPeer(peerId, roomType, roomId, policyPeer);
             if (preferNewRoute && peer.switchSignalingRoute) {
                 peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server);
             }
@@ -2006,9 +2022,11 @@ class PeersManager {
 
         if (window.isRtcSupported && rtcSupported) {
             this.peers[peerId] = new RTCPeer(transport, isCaller, peerId, roomType, roomId, this._wsConfig.rtcConfig);
+            this._applyPeerInfo(this.peers[peerId], policyPeer);
         }
         else if (roomType !== 'nostr' && this._wsConfig.wsFallback) {
             this.peers[peerId] = new WSPeer(this._server, isCaller, peerId, roomType, roomId);
+            this._applyPeerInfo(this.peers[peerId], policyPeer);
         }
         else {
             console.warn("Websocket fallback is not activated on this instance.\n" +
@@ -2219,7 +2237,9 @@ class PeersManager {
 
         this._peerAliases[peerId] = peerId;
         if (peerInfo.id) this._peerAliases[peerInfo.id] = peerId;
-        if (peerInfo.nostrIdentity?.pubkey) this._peerAliases[peerInfo.nostrIdentity.pubkey] = peerId;
+        if (peerInfo.nostrIdentity?.pubkey) {
+            this._peerAliases[String(peerInfo.nostrIdentity.pubkey).toLowerCase()] = peerId;
+        }
 
         Object.values(peerInfo._peerIdsByRoomType || {}).forEach(alias => {
             if (alias) this._peerAliases[alias] = peerId;
@@ -2233,7 +2253,7 @@ class PeersManager {
     }
 
     _resolvePeerId(peerId) {
-        return this._peerAliases[peerId] || peerId;
+        return this._peerAliases[peerId] || this._peerAliases[String(peerId).toLowerCase()] || peerId;
     }
 }
 
