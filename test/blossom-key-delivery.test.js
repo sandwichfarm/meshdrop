@@ -11,6 +11,8 @@ function createHarness({nip44 = true, noSubtle = false} = {}) {
     const sent = [];
     const fired = [];
     let uploadCount = 0;
+    let hashtreeUploadFiles = [];
+    let pollenUploadFiles = [];
     let capturedWrapPlaintext = "";
     const senderPubkey = "a".repeat(64);
     const recipientPubkey = "b".repeat(64);
@@ -94,6 +96,32 @@ function createHarness({nip44 = true, noSubtle = false} = {}) {
             };
         }
     };
+    context.meshdropHashtreeTransfer = {
+        async uploadFiles(files) {
+            hashtreeUploadFiles = [...files];
+            return {
+                version: "HTS-01",
+                root: {hash: "2".repeat(64), type: "application/vnd.hashtree.file", size: files[0].size},
+                files: files.map(file => ({
+                    name: file.name,
+                    mime: file.type,
+                    size: file.size,
+                    hash: "3".repeat(64)
+                })),
+                objects: {}
+            };
+        }
+    };
+    context.meshdropPollenTransfer = {
+        async uploadFiles(files) {
+            pollenUploadFiles = [...files];
+            return files.map(file => ({
+                hash: "4".repeat(64),
+                size: file.size,
+                type: file.type || "application/octet-stream"
+            }));
+        }
+    };
 
     vm.runInNewContext(`${networkSource}\nglobalThis.__meshdropTest = {WSPeer};`, context);
 
@@ -104,10 +132,86 @@ function createHarness({nip44 = true, noSubtle = false} = {}) {
         senderPubkey,
         recipientPubkey,
         getUploadCount: () => uploadCount,
+        getHashtreeUploadFiles: () => hashtreeUploadFiles,
+        getPollenUploadFiles: () => pollenUploadFiles,
         getCapturedWrapPlaintext: () => capturedWrapPlaintext,
         server: {send: message => sent.push(JSON.parse(JSON.stringify(message)))}
     };
 }
+
+test("private direct requests encrypt file payload before transfer", async () => {
+    const harness = createHarness();
+    const peer = new harness.WSPeer(harness.server, false, harness.recipientPubkey, "ip", "room");
+
+    await peer.requestFileTransfer(
+        [new File(["secret"], "secret.txt", {type: "text/plain"})],
+        {id: "local", type: "direct", label: "Instance", privacyMode: "private"}
+    );
+
+    const request = harness.sent.find(message => message.type === "request");
+    const rawKey = JSON.parse(harness.getCapturedWrapPlaintext()).key;
+
+    assert.equal(request.payloadPrivacy.mode, "private");
+    assert.equal(request.header[0].size, 6);
+    assert.equal(request.payloadHeaders[0].size > request.header[0].size, true);
+    assert.equal(request.payloadEncryption.keyDelivery.type, "nip44");
+    assert.equal(JSON.stringify(request).includes(rawKey), false);
+});
+
+test("unencrypted direct requests keep raw payload metadata", async () => {
+    const harness = createHarness();
+    const peer = new harness.WSPeer(harness.server, false, harness.recipientPubkey, "ip", "room");
+
+    await peer.requestFileTransfer(
+        [new File(["secret"], "secret.txt", {type: "text/plain"})],
+        {id: "local", type: "direct", label: "Instance", privacyMode: "unencrypted"}
+    );
+
+    const request = harness.sent.find(message => message.type === "request");
+
+    assert.equal(request.payloadPrivacy.mode, "unencrypted");
+    assert.equal(request.payloadEncryption, undefined);
+    assert.equal(request.payloadHeaders, undefined);
+    assert.equal(request.header[0].size, 6);
+});
+
+test("private Hashtree requests upload encrypted payload files", async () => {
+    const harness = createHarness();
+    const peer = new harness.WSPeer(harness.server, false, harness.recipientPubkey, "ip", "room");
+
+    await peer.requestHashtreeFileTransfer(
+        [new File(["secret"], "secret.txt", {type: "text/plain"})],
+        {id: "hashtree", type: "storage", label: "Hashtree", privacyMode: "private"}
+    );
+
+    const request = harness.sent.find(message => message.type === "hashtree-request");
+    const uploaded = harness.getHashtreeUploadFiles()[0];
+
+    assert.equal(request.payloadPrivacy.mode, "private");
+    assert.equal(request.header[0].size, 6);
+    assert.equal(uploaded.size, request.payloadHeaders[0].size);
+    assert.equal(uploaded.size > request.header[0].size, true);
+    assert.equal(request.payloadEncryption.keyDelivery.type, "nip44");
+});
+
+test("private Pollen requests upload encrypted payload files", async () => {
+    const harness = createHarness();
+    const peer = new harness.WSPeer(harness.server, false, harness.recipientPubkey, "ip", "room");
+
+    await peer.requestPollenFileTransfer(
+        [new File(["secret"], "secret.txt", {type: "text/plain"})],
+        {id: "pollen", type: "storage", label: "Pollen", privacyMode: "private"}
+    );
+
+    const request = harness.sent.find(message => message.type === "pollen-request");
+    const uploaded = harness.getPollenUploadFiles()[0];
+
+    assert.equal(request.payloadPrivacy.mode, "private");
+    assert.equal(request.header[0].size, 6);
+    assert.equal(uploaded.size, request.payloadHeaders[0].size);
+    assert.equal(uploaded.size > request.header[0].size, true);
+    assert.equal(request.payloadEncryption.keyDelivery.type, "nip44");
+});
 
 test("untrusted Blossom request wraps key with NIP-44 and omits raw key JSON", async () => {
     const harness = createHarness();

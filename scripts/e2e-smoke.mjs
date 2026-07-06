@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 
+import {getPublicKey} from "nostr-tools";
 import {WebSocketServer} from "ws";
 
 const repoRoot = new URL("..", import.meta.url);
@@ -129,6 +130,10 @@ async function main() {
         await retryScenario(
             "federated-fips-webrtc",
             () => runFederatedFipsWebRtcScenario(browser, relay.port, blossom.port, pollen)
+        );
+        await retryScenario(
+            "federated-pollen-webrtc",
+            () => runFederatedPollenWebRtcScenario(browser, relay.port, blossom.port, pollen)
         );
     }
     finally {
@@ -405,20 +410,31 @@ async function runRouteChoiceScenario(browser, baseUrl) {
                 detail: {to: peer.id, files: [file]}
             }));
 
-            return [...document.querySelectorAll(".transport-choice-option")].map(option => ({
-                id: option.dataset.transportId,
-                label: option.querySelector(".transport-choice-label")?.textContent,
-                privacy: option.querySelector(".transport-choice-privacy")?.textContent,
-                details: [...option.querySelectorAll(".transport-choice-detail")].map(detail => detail.textContent)
-            }));
+            return {
+                privacyModes: [...document.querySelectorAll(".transfer-privacy-option")]
+                    .map(option => [option.dataset.privacyMode, option.dataset.selected]),
+                options: [...document.querySelectorAll(".transport-choice-option")].map(option => ({
+                    id: option.dataset.transportId,
+                    label: option.querySelector(".transport-choice-label")?.textContent,
+                    privacy: option.querySelector(".transport-choice-privacy")?.textContent,
+                    details: [...option.querySelectorAll(".transport-choice-detail")].map(detail => detail.textContent)
+                }))
+            };
         });
 
-        const pollen = options.find(option => option.id === "pollen-mesh");
-        const fips = options.find(option => option.id === "fips");
+        const pollen = options.options.find(option => option.id === "pollen-mesh");
+        const fips = options.options.find(option => option.id === "fips");
+        const local = options.options.find(option => option.id === "local");
         assert(pollen, "Pollen mesh route was not selectable");
         assert(fips, "FIPS mesh route was not selectable");
-        assert(pollen.privacy === "Direct after Pollen discovery", "Pollen mesh privacy copy missing");
-        assert(fips.privacy === "Direct after FIPS discovery", "FIPS mesh privacy copy missing");
+        assert(local, "Instance route was not selectable");
+        assert(local.label === "Instance", "Instance route label missing");
+        assert(local.details.includes("Discoverysame MeshDrop instance"), "Instance route discovery copy missing");
+        assert(local.details.includes("Data pathWebRTC ICE direct"), "Instance route WebRTC copy missing");
+        assert(pollen.privacy === "P2P after Pollen discovery", "Pollen mesh privacy copy missing");
+        assert(fips.privacy === "P2P after FIPS discovery", "FIPS mesh privacy copy missing");
+        assert(options.privacyModes.some(([mode, selected]) => mode === "private" && selected === "true"), "Private mode not selected by default");
+        assert(options.privacyModes.some(([mode]) => mode === "unencrypted"), "Unencrypted mode missing");
         assert(!logs.pageErrors.length, `routes: page errors: ${logs.pageErrors.join("\n")}`);
     }
     finally {
@@ -520,6 +536,10 @@ async function runFederatedFipsWebRtcScenario(browser, relayPort, blossomPort, p
             waitForDirectRoute(pageA, peerId, "fips"),
             waitForDirectRoute(pageB, receiverPeerId, "fips")
         ]);
+        await Promise.all([
+            waitForHostCandidatePair(pageA, peerId, "federated-fips sender"),
+            waitForHostCandidatePair(pageB, receiverPeerId, "federated-fips receiver")
+        ]);
         await sendProofIcon(pageA, peerId, "fips");
 
         const received = await waitForReceivedFiles(pageB, 1, "federated-fips", [pageA, pageB]);
@@ -530,6 +550,92 @@ async function runFederatedFipsWebRtcScenario(browser, relayPort, blossomPort, p
         }, received);
         assert(!logs.pageErrors.length, `federated-fips: page errors: ${logs.pageErrors.join("\n")}`);
         console.log("Proof federated-fips-webrtc: fips delivered meshdrop-proof-icon.svg across two MeshDrop servers");
+    }
+    finally {
+        await Promise.allSettled([contextA.close(), contextB.close()]);
+    }
+}
+
+async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort, pollen) {
+    const portA = await freePort();
+    const portB = await freePort();
+    const fipsA = await startFakeFips({ipv6Addr: "::1", peerName: "Server B"});
+    const fipsB = await startFakeFips({ipv6Addr: "::1", peerName: "Server A"});
+    const secretA = "00000000000000000000000000000000000000000000000000000000000000a1";
+    const secretB = "00000000000000000000000000000000000000000000000000000000000000b2";
+    const appA = startApp(portA, relayPort, blossomPort, fipsA.port, pollen, {
+        args: [],
+        serverId: "pollen-a",
+        federationPollMs: 200,
+        nostrSecretKey: secretA,
+        discoveryNpubs: getPublicKey(hexToBytes(secretB)),
+        pollenNostrBootstrap: "true"
+    });
+    const appB = startApp(portB, relayPort, blossomPort, fipsB.port, pollen, {
+        args: [],
+        serverId: "pollen-b",
+        federationPollMs: 200,
+        nostrSecretKey: secretB,
+        discoveryNpubs: getPublicKey(hexToBytes(secretA)),
+        pollenNostrBootstrap: "true"
+    });
+    helpers.push(appA, appB);
+
+    const contextA = await newContext(browser, "fed-pollen-a");
+    const contextB = await newContext(browser, "fed-pollen-b");
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
+    const logs = watchPages("federated-pollen", [pageA, pageB]);
+
+    try {
+        await Promise.all([
+            waitForHttp(`http://127.0.0.1:${portA}/config`),
+            waitForHttp(`http://127.0.0.1:${portB}/config`)
+        ]);
+        await Promise.all([
+            pageA.goto(`http://127.0.0.1:${portA}`, {waitUntil: "domcontentloaded"}),
+            pageB.goto(`http://127.0.0.1:${portB}`, {waitUntil: "domcontentloaded"})
+        ]);
+        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
+        await Promise.all([disableLocalDiscovery(pageA), disableLocalDiscovery(pageB)]);
+        await Promise.all([
+            pageA.evaluate(() => globalThis.meshdropPollenTransfer.enable()),
+            pageB.evaluate(() => globalThis.meshdropPollenTransfer.enable())
+        ]);
+
+        let peerId;
+        try {
+            peerId = await waitForConnectedPeer(pageA, "pollen");
+        } catch (error) {
+            const [stateA, stateB] = await Promise.all([debugPageState(pageA), debugPageState(pageB)]);
+            throw new Error(`${error.message}\nserverA=${JSON.stringify(stateA)}\nserverB=${JSON.stringify(stateB)}`);
+        }
+        const receiverPeerId = await waitForConnectedPeer(pageB, "pollen");
+        await Promise.all([
+            waitForDirectRoute(pageA, peerId, "pollen"),
+            waitForDirectRoute(pageB, receiverPeerId, "pollen")
+        ]);
+        await Promise.all([
+            waitForHostCandidatePair(pageA, peerId, "federated-pollen sender"),
+            waitForHostCandidatePair(pageB, receiverPeerId, "federated-pollen receiver")
+        ]);
+        await assertRouteChoice(pageA, peerId, {
+            id: "pollen-mesh",
+            label: "Pollen",
+            privacy: "P2P after Pollen discovery",
+            discoveryDetail: "DiscoveryPollen mesh",
+            dataPathDetail: "Data pathWebRTC ICE direct"
+        });
+        await sendProofIcon(pageA, peerId, "pollen-mesh");
+
+        const received = await waitForReceivedFiles(pageB, 1, "federated-pollen", [pageA, pageB]);
+        assertReceived({
+            name: "federated-pollen",
+            fileName: "meshdrop-proof-icon.svg",
+            contents: [PROOF_ICON]
+        }, received);
+        assert(!logs.pageErrors.length, `federated-pollen: page errors: ${logs.pageErrors.join("\n")}`);
+        console.log("Proof federated-pollen-webrtc: pollen-mesh delivered meshdrop-proof-icon.svg across two MeshDrop servers");
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close()]);
@@ -615,6 +721,40 @@ async function waitForDirectRoute(page, peerId, roomType) {
     }
 }
 
+async function waitForHostCandidatePair(page, peerId, role) {
+    try {
+        const handle = await page.waitForFunction(async id => {
+            const peer = globalThis.__meshdropE2E?.peersManager?.peers?.[id];
+            const connection = peer?._conn;
+            if (!connection) return null;
+
+            const stats = await connection.getStats();
+            const reports = [...stats.values()];
+            const transport = reports.find(report => report.type === "transport" && report.selectedCandidatePairId);
+            const selectedPair = transport
+                ? stats.get(transport.selectedCandidatePairId)
+                : reports.find(report => report.type === "candidate-pair" && report.selected);
+            if (!selectedPair || selectedPair.state !== "succeeded") return null;
+
+            const local = stats.get(selectedPair.localCandidateId);
+            const remote = stats.get(selectedPair.remoteCandidateId);
+            if (local?.candidateType !== "host" || remote?.candidateType !== "host") return null;
+
+            return {
+                localType: local.candidateType,
+                remoteType: remote.candidateType,
+                localProtocol: local.protocol || "",
+                remoteProtocol: remote.protocol || ""
+            };
+        }, peerId, {timeout: 20000});
+
+        return handle.jsonValue();
+    } catch (error) {
+        const state = await safeDebugPageState(page);
+        throw new Error(`${role} did not use a host/host ICE candidate pair: ${error.message}\nstate=${JSON.stringify(state)}`);
+    }
+}
+
 async function waitForPeerClass(page, roomType) {
     try {
         await page.waitForFunction(type => document.querySelector(`x-peer.type-${type}`), roomType, {timeout: 20000});
@@ -622,6 +762,30 @@ async function waitForPeerClass(page, roomType) {
         const state = await safeDebugPageState(page);
         throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);
     }
+}
+
+async function assertRouteChoice(page, peerId, expected) {
+    const options = await page.evaluate(({to, expectedId}) => {
+        const file = new File(["route"], "route.txt", {type: "text/plain"});
+        window.dispatchEvent(new CustomEvent("select-files-transport", {
+            detail: {to, files: [file]}
+        }));
+
+        return [...document.querySelectorAll(".transport-choice-option")].map(option => ({
+            id: option.dataset.transportId,
+            label: option.querySelector(".transport-choice-label")?.textContent,
+            privacy: option.querySelector(".transport-choice-privacy")?.textContent,
+            details: [...option.querySelectorAll(".transport-choice-detail")].map(detail => detail.textContent),
+            selected: option.dataset.transportId === expectedId
+        }));
+    }, {to: peerId, expectedId: expected.id});
+
+    const option = options.find(candidate => candidate.id === expected.id);
+    assert(option, `${expected.id} route was not selectable: ${JSON.stringify(options)}`);
+    assert(option.label === expected.label, `${expected.id} label was ${option.label}`);
+    assert(option.privacy === expected.privacy, `${expected.id} privacy was ${option.privacy}`);
+    assert(option.details.includes(expected.discoveryDetail), `${expected.id} discovery details missing`);
+    assert(option.details.includes(expected.dataPathDetail), `${expected.id} WebRTC details missing`);
 }
 
 async function debugPageState(page) {
@@ -734,6 +898,7 @@ function startApp(port, relayPort, blossomPort, fipsPort, pollen, options = {}) 
             PORT: String(port),
             MESHDROP_SERVER_ID: options.serverId || `e2e-${port}`,
             NOSTR_RELAYS: `ws://127.0.0.1:${relayPort}`,
+            MESHDROP_DISCOVERY_NPUBS: options.discoveryNpubs || "",
             MESHDROP_NOSTR_SECRET_KEY: options.nostrSecretKey
                 || "0000000000000000000000000000000000000000000000000000000000000001",
             BLOSSOM_SERVERS: `http://127.0.0.1:${blossomPort}`,
@@ -743,7 +908,7 @@ function startApp(port, relayPort, blossomPort, fipsPort, pollen, options = {}) 
             MESHDROP_FEDERATION_POLL_MS: String(options.federationPollMs || 15000),
             PLN_BIN: pollen.bin,
             PLN_DIR: pollen.dir,
-            POLLEN_NOSTR_BOOTSTRAP: "false",
+            POLLEN_NOSTR_BOOTSTRAP: options.pollenNostrBootstrap || "false",
             RTC_CONFIG: "false"
         },
         stdio: ["ignore", "pipe", "pipe"]
@@ -764,21 +929,99 @@ function startApp(port, relayPort, blossomPort, fipsPort, pollen, options = {}) 
 async function startFakePollenCli() {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-e2e-pln-"));
     const bin = path.join(dir, "pln");
-    await fs.writeFile(bin, `#!/bin/sh
-hash="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-case "$1" in
-  version) echo "v0.0.1-dev.21" ;;
-  status) echo "ok" ;;
-  seed) cat > "$PLN_DIR/blob-$hash"; echo "$hash" ;;
-  fetch) cp "$PLN_DIR/blob-$2" "$3" ;;
-  serve) echo "served $3" ;;
-  connect) echo "forwarding localhost:$3 -> $2 (fake:3000)" ;;
-  *) echo "ok" ;;
-esac
+    await fs.writeFile(bin, `#!/usr/bin/env node
+const childProcess = require("node:child_process");
+const fs = require("node:fs");
+const net = require("node:net");
+const path = require("node:path");
+
+const args = process.argv.slice(2);
+const command = args[0];
+const dir = process.env.PLN_DIR || ".";
+const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+function servicePath(serviceName) {
+  return path.join(dir, \`service-\${Buffer.from(serviceName).toString("hex")}.json\`);
+}
+
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function readService(serviceName) {
+  const file = servicePath(serviceName);
+  for (let i = 0; i < 100; i++) {
+    if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, "utf8"));
+    sleep(50);
+  }
+  throw new Error(\`service not found: \${serviceName}\`);
+}
+
+if (command === "__proxy") {
+  const localPort = Number.parseInt(args[1], 10);
+  const targetPort = Number.parseInt(args[2], 10);
+  const server = net.createServer(socket => {
+    const target = net.connect(targetPort, "127.0.0.1");
+    socket.pipe(target);
+    target.pipe(socket);
+    socket.on("error", () => target.destroy());
+    target.on("error", () => socket.destroy());
+  });
+  server.listen(localPort, "127.0.0.1");
+}
+else if (command === "version") {
+  console.log("v0.0.1-dev.21");
+}
+else if (command === "status") {
+  console.log("ok");
+}
+else if (command === "seed") {
+  fs.mkdirSync(dir, {recursive: true});
+  fs.writeFileSync(path.join(dir, \`blob-\${hash}\`), fs.readFileSync(0));
+  console.log(hash);
+}
+else if (command === "fetch") {
+  fs.copyFileSync(path.join(dir, \`blob-\${args[1]}\`), args[2]);
+}
+else if (command === "serve") {
+  fs.mkdirSync(dir, {recursive: true});
+  fs.writeFileSync(servicePath(args[2]), JSON.stringify({port: Number.parseInt(args[1], 10)}));
+  console.log(\`served \${args[2]}\`);
+}
+else if (command === "connect") {
+  const descriptor = readService(args[1]);
+  const child = childProcess.spawn(process.execPath, [process.argv[1], "__proxy", args[2], String(descriptor.port)], {
+    detached: true,
+    env: process.env,
+    stdio: "ignore"
+  });
+  child.unref();
+  fs.appendFileSync(path.join(dir, "proxy-pids"), \`\${child.pid}\\n\`);
+  sleep(200);
+  console.log(\`forwarding localhost:\${args[2]} -> \${args[1]}\`);
+}
+else {
+  console.log("ok");
+}
 `, {mode: 0o700});
 
     helpers.push({
         async close() {
+            try {
+                const pids = (await fs.readFile(path.join(dir, "proxy-pids"), "utf8"))
+                    .split("\n")
+                    .filter(Boolean)
+                    .map(pid => Number.parseInt(pid, 10));
+                for (const pid of pids) {
+                    try {
+                        process.kill(pid, "SIGTERM");
+                    } catch {
+                        // Proxy may already be gone.
+                    }
+                }
+            } catch {
+                // No proxy was started.
+            }
             await fs.rm(dir, {recursive: true, force: true});
         }
     });
@@ -1051,6 +1294,14 @@ function delay(ms) {
 
 function assert(condition, message) {
     if (!condition) throw new Error(message);
+}
+
+function hexToBytes(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return bytes;
 }
 
 main()

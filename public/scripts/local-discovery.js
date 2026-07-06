@@ -95,12 +95,18 @@ class LocalDiscoveryController {
     _render() {
         if (!this.$button) return;
 
+        const userCount = globalThis.meshdropPeerAvailabilityCounts?.ip;
         this.$button.toggleAttribute("hidden", !this._supported);
         this.$button.classList.toggle("selected", this.isEnabled());
         this.$button.setAttribute("aria-pressed", String(this.isEnabled()));
         this.$button.title = this.isEnabled()
-            ? "Local network discovery enabled"
-            : "Local network discovery disabled";
+            ? "Same MeshDrop instance discovery enabled. WebRTC still chooses the best direct path when peers connect."
+            : "Same MeshDrop instance discovery disabled.";
+        if (this.isEnabled()) {
+            this.$button.setAttribute("data-badge", String(typeof userCount === "number" ? userCount : 0));
+        } else {
+            this.$button.removeAttribute("data-badge");
+        }
         Events.fire("footer-discovery-changed");
     }
 }

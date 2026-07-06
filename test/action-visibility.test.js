@@ -906,3 +906,35 @@ test("FIPS action shows icon connecting state until room join is confirmed", asy
     assert.equal(button.getAttribute("aria-busy"), "false");
     assert.equal(button.getAttribute("data-badge"), "4");
 });
+
+test("Pollen action shows mesh peer count while active", () => {
+    resetUi();
+    const controller = new globalThis.PollenTransferController();
+    const button = buttons.get("pollen-transfer");
+
+    globalThis.meshdropPeerAvailabilityCounts = {pollen: 3};
+    controller._config = {pollen: {enabled: true}};
+    controller._available = true;
+    controller._active = true;
+    controller._render();
+
+    assert.equal(button.hasAttribute("hidden"), false);
+    assert.equal(button.classes.has("selected"), true);
+    assert.equal(button.getAttribute("data-badge"), "3");
+});
+
+test("Local discovery action shows same-instance peer count while enabled", () => {
+    resetUi();
+    const controller = new globalThis.LocalDiscoveryController();
+    const button = buttons.get("local-discovery");
+
+    globalThis.meshdropPeerAvailabilityCounts = {ip: 2};
+    controller._supported = true;
+    controller._enabled = true;
+    controller._render();
+
+    assert.equal(button.hasAttribute("hidden"), false);
+    assert.equal(button.classes.has("selected"), true);
+    assert.equal(button.getAttribute("data-badge"), "2");
+    assert.match(button.title, /Same MeshDrop instance discovery enabled/);
+});

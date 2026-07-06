@@ -14,20 +14,21 @@ const meshdropGetThumbnailAsDataUrl = globalThis.getThumbnailAsDataUrl;
 const meshdropIsUrlValid = globalThis.isUrlValid;
 
 const PeerAvailabilityProtocol = {
-    roomTypeOrder: ["ip", "secret", "pollen", "fips", "nostr", "public-id"],
+    roomTypeOrder: ["ip", "fips", "pollen", "nostr", "secret", "public-id"],
     roomTypeMeta: {
         "ip": {
             id: "local",
-            label: "Local",
-            shortLabel: "LAN",
+            label: "Instance",
+            shortLabel: "Instance",
             className: "badge-room-ip",
-            description: "Same-network peer-to-peer data channel",
-            privacy: "Best privacy",
+            description: "Same MeshDrop instance discovery with a direct peer data channel",
+            group: "Network routes",
+            privacy: "Direct peer path",
             privacyTone: "strong",
             details: [
-                ["Path", "direct to device"],
-                ["Encryption", "WebRTC transport"],
-                ["Server access", "no file bytes"]
+                ["Discovery", "same MeshDrop instance"],
+                ["Data path", "WebRTC ICE direct"],
+                ["Best case", "local network candidate"]
             ]
         },
         "secret": {
@@ -36,26 +37,28 @@ const PeerAvailabilityProtocol = {
             shortLabel: "Pair",
             className: "badge-room-secret",
             description: "Paired-device peer-to-peer data channel",
-            privacy: "Best privacy",
+            group: "Network routes",
+            privacy: "Direct paired path",
             privacyTone: "strong",
             details: [
-                ["Path", "direct to paired device"],
-                ["Encryption", "WebRTC transport"],
-                ["Server access", "no file bytes"]
+                ["Discovery", "paired device"],
+                ["Data path", "WebRTC ICE direct"],
+                ["Best case", "local network candidate"]
             ]
         },
         "nostr": {
             id: "webrtc",
-            label: "WEB-RTC",
-            shortLabel: "RTC",
+            label: "Nostr relay",
+            shortLabel: "Relay",
             className: "badge-room-nostr",
-            description: "Peer-to-peer transfer after Nostr relay discovery",
-            privacy: "Direct after relay discovery",
+            description: "Internet relay discovery with a direct peer data channel when negotiation succeeds",
+            group: "Network routes",
+            privacy: "P2P after relay discovery",
             privacyTone: "direct",
             details: [
-                ["Path", "direct data channel"],
-                ["Encryption", "WebRTC transport"],
-                ["Relays see", "signaling, not file bytes"]
+                ["Discovery", "Nostr relay"],
+                ["Data path", "WebRTC ICE direct"],
+                ["Relays see", "signaling only"]
             ]
         },
         "fips": {
@@ -63,27 +66,29 @@ const PeerAvailabilityProtocol = {
             label: "FIPS",
             shortLabel: "FIPS",
             className: "badge-room-fips",
-            description: "Peer-to-peer transfer after FIPS discovery",
-            privacy: "Direct after FIPS discovery",
+            description: "FIPS network discovery with a direct peer data channel",
+            group: "Network routes",
+            privacy: "P2P after FIPS discovery",
             privacyTone: "direct",
             details: [
-                ["Path", "direct data channel"],
-                ["Encryption", "WebRTC transport"],
-                ["Server access", "no file bytes"]
+                ["Discovery", "FIPS mesh"],
+                ["Data path", "WebRTC ICE direct"],
+                ["Best case", "local network candidate"]
             ]
         },
         "pollen": {
             id: "pollen-mesh",
-            label: "Pollen Mesh",
+            label: "Pollen",
             shortLabel: "Pollen",
             className: "badge-room-pollen",
-            description: "Peer-to-peer transfer after Pollen mesh discovery",
-            privacy: "Direct after Pollen discovery",
+            description: "Pollen network discovery with a direct peer data channel",
+            group: "Network routes",
+            privacy: "P2P after Pollen discovery",
             privacyTone: "direct",
             details: [
-                ["Path", "direct WebRTC data channel"],
-                ["Discovery", "Nostr bootstrap plus Pollen mesh service"],
-                ["Pollen carries", "server signaling, not file bytes"]
+                ["Discovery", "Pollen mesh"],
+                ["Data path", "WebRTC ICE direct"],
+                ["Best case", "local network candidate"]
             ]
         },
         "public-id": {
@@ -92,11 +97,12 @@ const PeerAvailabilityProtocol = {
             shortLabel: "Room",
             className: "badge-room-public-id",
             description: "Peer-to-peer transfer found through room signaling",
+            group: "Network routes",
             privacy: "Direct after room signaling",
             privacyTone: "direct",
             details: [
-                ["Path", "direct data channel"],
-                ["Encryption", "WebRTC transport"],
+                ["Discovery", "public room"],
+                ["Data path", "WebRTC ICE direct"],
                 ["Room server", "signaling only"]
             ]
         }
@@ -123,6 +129,7 @@ const PeerAvailabilityProtocol = {
                 peerId: this.peerIdForRoomType(peer, option.roomType),
                 label: option.label,
                 description: option.description,
+                group: option.group,
                 privacy: option.privacy,
                 privacyTone: option.privacyTone,
                 details: option.details
@@ -144,14 +151,15 @@ const PeerAvailabilityProtocol = {
             options.push({
                 id: "hashtree",
                 type: "storage",
-                label: "Hashtree",
-                description: "Upload a verified content-addressed manifest",
+                label: "Hashtree storage",
+                description: "Server-assisted content-addressed storage route",
+                group: "Storage routes",
                 privacy: "Integrity, not secrecy",
                 privacyTone: "caution",
                 details: [
                     ["Path", "Blossom storage"],
-                    ["Encryption", "none by this route"],
-                    ["Servers store", "readable file chunks"]
+                    ["Private mode", "encrypts before upload"],
+                    ["Unencrypted", "servers see chunks"]
                 ]
             });
         }
@@ -159,8 +167,9 @@ const PeerAvailabilityProtocol = {
             options.push({
                 id: "blossom",
                 type: "storage",
-                label: "Blossom",
-                description: "Upload encrypted raw Blossom objects",
+                label: "Blossom storage",
+                description: "Server-assisted encrypted object storage route",
+                group: "Storage routes",
                 privacy: "Stored ciphertext",
                 privacyTone: "encrypted",
                 details: [
@@ -176,12 +185,13 @@ const PeerAvailabilityProtocol = {
                 type: "storage",
                 label: "Pollen Storage",
                 description: "Seed files into Pollen storage for handoff",
+                group: "Storage routes",
                 privacy: "Storage handoff",
                 privacyTone: "caution",
                 details: [
                     ["Path", "browser to MeshDrop server to Pollen blob"],
-                    ["Encryption", "Pollen mesh transport only"],
-                    ["Server sees", "plaintext upload and fetch"]
+                    ["Private mode", "encrypts before upload"],
+                    ["Unencrypted", "server sees files"]
                 ]
             });
         }
@@ -199,10 +209,33 @@ const PeerAvailabilityProtocol = {
         return [...orderedDirect, ...storage];
     },
 
+    groupOptions(options) {
+        const groups = [];
+        (options || []).forEach(option => {
+            const label = option.group || "Other routes";
+            let group = groups.find(entry => entry.label === label);
+            if (!group) {
+                group = {label, options: []};
+                groups.push(group);
+            }
+            group.options.push(option);
+        });
+        return groups;
+    },
+
     countByRoomType(peers, roomType) {
         return Object.values(peers || {})
             .filter(peer => !!peer?._roomIds?.[roomType])
             .length;
+    },
+
+    networkPostureCounts(peers) {
+        return ["ip", "fips", "pollen", "nostr"]
+            .map(roomType => ({
+                roomType,
+                ...this.roomTypeMeta[roomType],
+                count: this.countByRoomType(peers, roomType)
+            }));
     },
 
     badgeClassName(peer) {
@@ -591,12 +624,14 @@ class PeersUI {
     }
 
     _renderProtocolPeerCounts() {
-        const nostrCount = PeerAvailabilityProtocol.countByRoomType(this.peers, "nostr");
-        const fipsCount = PeerAvailabilityProtocol.countByRoomType(this.peers, "fips");
-
-        globalThis.meshdropPeerAvailabilityCounts = {nostr: nostrCount, fips: fipsCount};
+        globalThis.meshdropPeerAvailabilityCounts = Object.fromEntries(
+            PeerAvailabilityProtocol.networkPostureCounts(this.peers)
+                .map(entry => [entry.roomType, entry.count])
+        );
         globalThis.meshdropNostrMesh?._render?.();
+        globalThis.meshdropLocalDiscovery?._render?.();
         globalThis.meshdropFipsDiscovery?._render?.();
+        globalThis.meshdropPollenTransfer?._render?.();
     }
 
     _onDrop(e) {
@@ -1664,7 +1699,9 @@ class TransferChoiceDialog extends Dialog {
         super('transfer-choice-dialog');
 
         this.$recipient = this.$el.querySelector('.transfer-choice-recipient');
+        this.$privacy = this.$el.querySelector('.transfer-privacy-selector');
         this.$list = this.$el.querySelector('.transfer-choice-list');
+        this.$privacy.addEventListener('click', e => this._onPrivacyClick(e));
         this.$list.addEventListener('click', e => this._onOptionClick(e));
 
         meshdropEvents.on('select-files-transport', e => this._onFilesSelected(e.detail));
@@ -1681,13 +1718,14 @@ class TransferChoiceDialog extends Dialog {
         this._detail = {
             files: [...detail.files],
             to: detail.to,
+            privacyMode: globalThis.TransferPrivacyProtocol?.defaultMode || "private",
             options: PeerAvailabilityProtocol.optionsFor(peer)
         };
 
         if (!this._detail.options.length) {
             meshdropEvents.fire('files-selected', {
                 ...detail,
-                transport: {id: 'direct', type: 'direct', label: 'Direct'}
+                transport: {id: 'direct', type: 'direct', label: 'Direct', privacyMode: this._detail.privacyMode}
             });
             return;
         }
@@ -1699,51 +1737,102 @@ class TransferChoiceDialog extends Dialog {
     _render(peerNode) {
         this.$recipient.textContent = peerNode.ui._displayName();
         this.$recipient.className = `transfer-choice-recipient badge ${peerNode.ui._badgeClassName()}`;
-        this.$list.replaceChildren(...this._detail.options.map((option, index) => {
+        this._renderPrivacySelector();
+        const nodes = [];
+        let optionIndex = 0;
+
+        PeerAvailabilityProtocol.groupOptions(this._detail.options).forEach(group => {
+            const heading = document.createElement('div');
+            heading.className = 'transport-choice-group';
+            heading.textContent = group.label;
+            nodes.push(heading);
+
+            group.options.forEach(option => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'transport-choice-option';
+                button.dataset.transportId = option.id;
+                button.dataset.privacyTone = option.privacyTone || "neutral";
+                if (optionIndex === 0) button.dataset.default = 'true';
+                optionIndex += 1;
+
+                const head = document.createElement('span');
+                head.className = 'transport-choice-head';
+
+                const label = document.createElement('span');
+                label.className = 'transport-choice-label';
+                label.textContent = option.label;
+
+                const privacy = document.createElement('span');
+                privacy.className = 'transport-choice-privacy';
+                privacy.textContent = option.privacy || "Route";
+
+                const description = document.createElement('span');
+                description.className = 'transport-choice-description';
+                description.textContent = option.description;
+
+                const details = document.createElement('span');
+                details.className = 'transport-choice-details';
+                (option.details || []).forEach(([term, value]) => {
+                    const item = document.createElement('span');
+                    item.className = 'transport-choice-detail';
+
+                    const termNode = document.createElement('span');
+                    termNode.className = 'transport-choice-detail-term';
+                    termNode.textContent = term;
+
+                    const valueNode = document.createElement('span');
+                    valueNode.className = 'transport-choice-detail-value';
+                    valueNode.textContent = value;
+
+                    item.append(termNode, valueNode);
+                    details.append(item);
+                });
+
+                head.append(label, privacy);
+                button.append(head, description, details);
+                nodes.push(button);
+            });
+        });
+
+        this.$list.replaceChildren(...nodes);
+    }
+
+    _renderPrivacySelector() {
+        const modes = globalThis.TransferPrivacyProtocol?.modes || [
+            {id: "private", label: "Private", description: "Encrypt before send"},
+            {id: "unencrypted", label: "Unencrypted", description: "Send raw bytes"}
+        ];
+
+        this.$privacy.replaceChildren(...modes.map(mode => {
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'transport-choice-option';
-            button.dataset.transportId = option.id;
-            button.dataset.privacyTone = option.privacyTone || "neutral";
-            if (index === 0) button.dataset.default = 'true';
-
-            const head = document.createElement('span');
-            head.className = 'transport-choice-head';
+            button.className = 'transfer-privacy-option';
+            button.dataset.privacyMode = mode.id;
+            button.dataset.selected = String(mode.id === this._detail.privacyMode);
+            button.setAttribute('aria-checked', String(mode.id === this._detail.privacyMode));
+            button.setAttribute('role', 'radio');
 
             const label = document.createElement('span');
-            label.className = 'transport-choice-label';
-            label.textContent = option.label;
-
-            const privacy = document.createElement('span');
-            privacy.className = 'transport-choice-privacy';
-            privacy.textContent = option.privacy || "Route";
+            label.className = 'transfer-privacy-label';
+            label.textContent = mode.label;
 
             const description = document.createElement('span');
-            description.className = 'transport-choice-description';
-            description.textContent = option.description;
+            description.className = 'transfer-privacy-description';
+            description.textContent = mode.description;
 
-            const details = document.createElement('span');
-            details.className = 'transport-choice-details';
-            (option.details || []).forEach(([term, value]) => {
-                const item = document.createElement('span');
-                item.className = 'transport-choice-detail';
-
-                const termNode = document.createElement('span');
-                termNode.className = 'transport-choice-detail-term';
-                termNode.textContent = term;
-
-                const valueNode = document.createElement('span');
-                valueNode.className = 'transport-choice-detail-value';
-                valueNode.textContent = value;
-
-                item.append(termNode, valueNode);
-                details.append(item);
-            });
-
-            head.append(label, privacy);
-            button.append(head, description, details);
+            button.append(label, description);
             return button;
         }));
+    }
+
+    _onPrivacyClick(event) {
+        const button = event.target.closest('.transfer-privacy-option');
+        if (!button || !this._detail) return;
+
+        this._detail.privacyMode = globalThis.TransferPrivacyProtocol?.normalize?.(button.dataset.privacyMode)
+            || button.dataset.privacyMode;
+        this._renderPrivacySelector();
     }
 
     _onOptionClick(event) {
@@ -1752,11 +1841,19 @@ class TransferChoiceDialog extends Dialog {
 
         const transport = this._detail.options.find(option => option.id === button.dataset.transportId);
         if (!transport) return;
+        const privacyMode = this._detail.privacyMode || "private";
+        if (privacyMode === "unencrypted") {
+            const confirmed = globalThis.confirm?.("Send without client-side file encryption?");
+            if (!confirmed) return;
+        }
 
         meshdropEvents.fire('files-selected', {
             files: this._detail.files,
             to: transport.peerId || this._detail.to,
-            transport
+            transport: {
+                ...transport,
+                privacyMode
+            }
         });
         this.hide();
     }

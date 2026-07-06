@@ -110,18 +110,25 @@
                 <use xlink:href="#local-discovery-icon"></use>
             </svg>
         </div>
-        <div id="nostr-mesh" class="icon-button protocol-toggle"
-             data-i18n-key="header.nostr-mesh-connect" data-i18n-attrs="title" hidden>
-            <svg class="icon">
-                <use xlink:href="#wifi-tethering"></use>
-            </svg>
-        </div>
         <div id="fips-discovery" class="icon-button protocol-toggle"
              data-i18n-key="header.fips-discovery-enable" data-i18n-attrs="title" hidden>
             <svg class="icon">
                 <use xlink:href="#fips-control-icon"></use>
             </svg>
         </div>
+        <div id="pollen-transfer" class="icon-button protocol-toggle"
+             data-i18n-key="header.pollen-transfer-enable" data-i18n-attrs="title" hidden>
+            <svg class="icon">
+                <use xlink:href="#pollen-seed-icon"></use>
+            </svg>
+        </div>
+        <div id="nostr-mesh" class="icon-button protocol-toggle"
+             data-i18n-key="header.nostr-mesh-connect" data-i18n-attrs="title" hidden>
+            <svg class="icon">
+                <use xlink:href="#wifi-tethering"></use>
+            </svg>
+        </div>
+        <div class="header-divider header-divider-network" aria-hidden="true"></div>
         <div id="blossom-transfer" class="icon-button protocol-toggle"
              data-i18n-key="header.blossom-transfer-enable" data-i18n-attrs="title" hidden>
             <svg class="icon">
@@ -134,13 +141,6 @@
                 <use xlink:href="#hashtree-hash-icon"></use>
             </svg>
         </div>
-        <div id="pollen-transfer" class="icon-button protocol-toggle"
-             data-i18n-key="header.pollen-transfer-enable" data-i18n-attrs="title" hidden>
-            <svg class="icon">
-                <use xlink:href="#pollen-seed-icon"></use>
-            </svg>
-        </div>
-        <div class="header-divider header-divider-network" aria-hidden="true"></div>
         <div id="protocol-settings" class="icon-button protocol-toggle" title="Settings" hidden>
             <svg class="icon">
                 <use xlink:href="#settings-gear-icon"></use>
@@ -221,8 +221,9 @@
                 </div>
                 <div class="row center wrap">
                     <span class="badge badge-room-ip" data-i18n-key="footer.on-this-network" data-i18n-attrs="text title"></span>
-                    <span class="badge badge-room-nostr" data-i18n-key="footer.webrtc-discovery" data-i18n-attrs="text title" hidden></span>
                     <span class="badge badge-room-fips" data-i18n-key="footer.fips-discovery" data-i18n-attrs="text title" hidden></span>
+                    <span class="badge badge-room-pollen" data-i18n-key="footer.pollen-discovery" data-i18n-attrs="text title" hidden></span>
+                    <span class="badge badge-room-nostr" data-i18n-key="footer.webrtc-discovery" data-i18n-attrs="text title" hidden></span>
                     <span class="badge badge-room-secret pointer" data-i18n-key="footer.paired-devices" data-i18n-attrs="text title" hidden></span>
                     <span class="badge badge-room-public-id pointer" data-i18n-key="footer.public-room-devices" data-i18n-attrs="title" hidden>in room IAIAI</span>
                     <span class="badge badge-unavailable" data-i18n-key="footer.not-discoverable" data-i18n-attrs="text title" hidden></span>
@@ -627,6 +628,7 @@
                         <span>To</span>
                         <span class="transfer-choice-recipient badge"></span>
                     </div>
+                    <div class="transfer-privacy-selector" role="radiogroup" aria-label="Transfer privacy"></div>
                     <div class="transfer-choice-list column"></div>
                 </div>
                 <div class="row-reverse center btn-row wrap">

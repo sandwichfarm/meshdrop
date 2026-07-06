@@ -252,6 +252,13 @@ class PollenTransferController {
         this.$button.classList.toggle("unavailable", supported && !this._available);
         this.$button.setAttribute("aria-busy", String(this._connecting));
         this.$button.setAttribute("aria-disabled", String(supported && !this._available));
+        const userCount = globalThis.meshdropPeerAvailabilityCounts?.pollen;
+        if (this._active && !this._connecting) {
+            this.$button.setAttribute("data-badge", String(typeof userCount === "number" ? userCount : 0));
+        } else {
+            this.$button.removeAttribute("data-badge");
+        }
+        Events.fire("footer-discovery-changed");
     }
 }
 
