@@ -13,6 +13,7 @@ Done means:
 - AI-slop scan passes for changed code; full-repo baseline failures are reported, not hidden.
 - Work is committed.
 - Work is pushed to remote, unless user explicitly says local-only.
+- The operator can test the exact changed state from a named local path without doing git archaeology or guessing Docker/image/cache state.
 - Final report names commit, branch, push status, exact verification commands, and any remaining risk.
 
 Never say "fixed", "working", "done", "verified", or "root cause found" unless current evidence proves it.
@@ -245,6 +246,19 @@ After push:
 - For PRs, read back PR URL/state/checks with `gh pr view`.
 - Final response must include branch, commit hash, push status, PR URL when relevant, task worktree path, and review/UAT path if one exists.
 
+Operator-testable handoff:
+- If the user's normal checkout is the named test surface, do not finish with only a remote PR/merge. Leave that checkout at the tested commit, unless doing so would overwrite user-owned dirty files.
+- If the operator checkout has unrelated dirty files, preserve them and either:
+  - fast-forward only when Git can do it without touching dirty paths, or
+  - create/update a separate review/UAT worktree at the exact commit and name that path as the test surface.
+- If the operator checkout has dirty files that overlap the handoff paths, stop and report the exact paths. Do not overwrite, stash, reset, or clean them without explicit user instruction.
+- After merging a PR that the user is expected to test locally, fetch and read back whether the operator checkout is at the merge commit. If it is not, final must say `Not testable from operator checkout` and name the exact path/commit gap plus the review/UAT path that is testable.
+- For Docker/Compose-visible changes, make the Compose image/container match the source being reported:
+  - Use `docker compose build` or `docker compose up --build`, not bare `docker build .`, unless the compose file does not use a named image.
+  - Read `docker compose ps --format json` or equivalent to confirm the running container image/tag and project working directory.
+  - Prove served assets from the published port contain the expected change with `curl`/browser DOM/screenshot evidence.
+  - Browser hard refresh or service-worker unregister is not proof when source, image tag, or running container may be stale.
+
 Task end states:
 - Ready for UAT: code is committed, branch is pushed, PR is open/read back, verification is recorded, and the review path or task worktree path is named.
 - Complete: PR is merged, or the user explicitly accepts PR-ready handoff as the endpoint.
@@ -296,6 +310,8 @@ Before final answer, confirm:
 - Changed-code AI-slop gate is clean.
 - Full-repo AI-slop scan either passes or baseline failures are reported.
 - Runtime proof ran when needed.
+- Operator-testable path is named and is actually at the tested commit.
+- For Docker/Compose work, running container/image and served assets match the tested commit.
 - Commit exists.
 - Branch pushed.
 - PR readback done when relevant.
