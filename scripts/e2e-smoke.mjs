@@ -526,7 +526,7 @@ async function runGenericFipsRouteCandidateScenario(browser, relayPort, blossomP
         console.log("Proof generic-fips-route-candidate: FIPS mesh peers stayed route candidates, not MeshDrop HTTP peers");
     }
     finally {
-        await Promise.allSettled([contextA.close(), contextB.close()]);
+        await Promise.allSettled([contextA.close(), contextB.close(), appA.close(), appB.close()]);
     }
 }
 
@@ -604,7 +604,7 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
         console.log("Proof federated-pollen-webrtc: pollen-mesh delivered meshdrop-proof-icon.svg across two MeshDrop servers");
     }
     finally {
-        await Promise.allSettled([contextA.close(), contextB.close()]);
+        await Promise.allSettled([contextA.close(), contextB.close(), appA.close(), appB.close()]);
     }
 }
 

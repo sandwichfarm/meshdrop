@@ -30,6 +30,7 @@ Follow-up correction for the runtime model:
 - Runtime: live compose rebuilt to `meshdrop:local` image `sha256:d3d26201e8794647524003637cba3914e0444d18e6db2db789cdd33647588a7b`; `/fips/status` reports available with connected peers; `/pollen/status` reports available; logs show unknown Pollen clusters are skipped and repeated FIPS Nostr failures are backoff-suppressed.
 - CI follow-up: GitHub job logs for run `28826300435` showed `Target artifact transfer smoke` timing out on stale shared-room Nostr peers from a prior target artifact and `Browser transfer smoke` exiting on an unhandled fake FIPS socket `ECONNRESET`. The smoke helpers now select an actually connected peer when stale same-room presence exists, and the fake FIPS control socket ignores normal client reset during shutdown.
 - CI follow-up proof: `npm run test:target-artifacts`, `npm run test:e2e`, and `npm run test:spa-artifact` all pass after the harness fix.
+- CI follow-up correction: run `28826735681` then exposed a Browser transfer smoke hydration timeout caused by old federated scenario app processes still polling while the next federated scenario started. The federated E2E scenarios now close their app processes in their own `finally` blocks, and `npm run test:e2e` passes after that cleanup.
 
 ## Remaining Risk
 
