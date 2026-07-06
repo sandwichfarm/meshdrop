@@ -350,6 +350,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
 	assert.match(targetStatus, /Android WebView sent `meshdrop-android-webview-proof\.txt`/);
 	assert.match(targetStatus, /Android received an `ACTION_SEND` stream for `meshdrop-android-share-proof\.txt`/);
 	assert.match(targetStatus, /Android native loopback served FIPS status and Pollen status\/upload\/download from the installed WebView with `rustCore=false`/);
+	assert.match(targetStatus, /generated Android source can package explicit per-ABI `fips`, `fipsctl`, and `pln` tool assets/);
+	assert.match(targetStatus, /delegate native backend calls to `fipsctl`\/`pln` when those Android binaries are present/);
 	assert.match(targetStatus, /node --test test\/android-physical-device-uat\.test\.js` proves the physical-device harness/);
 	assert.match(targetStatus, /`npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`/);
 	assert.match(targetStatus, /Native Android Rust FIPS core integration; native Android Pollen WASM\/pln integration/);

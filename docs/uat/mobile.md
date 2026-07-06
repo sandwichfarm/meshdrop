@@ -51,6 +51,9 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
     `npm run test:android-share-file` passes.
 16. Confirm Android APK artifacts do not list native file picker UI UAT as remaining proof after
     `npm run test:android-picker-ui` passes.
+17. Confirm Android native-source/APK builds may include per-ABI native core tools only when explicit absolute paths are
+    supplied through `MESHDROP_ANDROID_FIPS_<ABI>`, `MESHDROP_ANDROID_FIPSCTL_<ABI>`, and `MESHDROP_ANDROID_PLN_<ABI>`,
+    where `<ABI>` is `ARM64_V8A`, `ARMEABI_V7A`, or `X86_64`.
 
 ## Native Source Acceptance
 
@@ -186,6 +189,9 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 7. Confirm the proof uploads and downloads `android-native-pollen-proof` from inside the installed WebView.
 8. Do not treat this as Pollen WASM/pln proof until the Android backend uses that substrate instead of the in-app
    native object store.
+9. If Android-native `fipsctl` or `pln` binaries are supplied during packaging, confirm the installed APK extracts them
+   from `meshdrop-native/<abi>/`, makes them executable in app-private storage, and the proof output reports
+   `android-native-fipsctl` or `android-native-pln` instead of the fallback object-store path.
 
 ## Android Share/File Input Acceptance
 
@@ -278,6 +284,8 @@ available.
 - These artifacts do not prove app-store packages, Play Store upload signing, AABs, or IPAs.
 - The Android debug APK artifact alone does not prove install UAT; `npm run test:android-apk-install` provides the
   emulator install proof.
+- The Android native backend can package explicit per-ABI `fips`, `fipsctl`, and `pln` tool assets, but the default
+  smoke artifact does not include Android Rust FIPS or Android pln binaries.
 - Android WebView transfer proof alone does not prove physical Android device install UAT; the current physical-device
   claim is backed by `npm run test:android-physical-device` passing on Google Pixel 7 Pro `28031FDH300BS5`.
 - The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.

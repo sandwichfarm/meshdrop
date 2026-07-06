@@ -124,6 +124,7 @@ Closed during this audit branch:
 | 2026-07-06 | `260706-ios-share-inbox-web-consume` | complete | Web app consumes native share-inbox files into share mode; focused 3/3; `npm test` 231/231; changed-code slop clean; device share-transfer UAT remains open |
 | 2026-07-06 | `260706-external-uat-finishline-verifier` | complete | Consolidated external UAT verifier added; focused 5/5; expected `npm run test:external-uat -- v0.1.5` blocker output; `npm test` 235/235; changed-code slop clean; full-repo slop baseline still failing outside touched files |
 | 2026-07-06 | `260706-android-native-fips-pollen-backend` | complete | Installed Android APK loopback serves FIPS status and Pollen upload/download; WebView capability/transfer smokes pass; Rust FIPS core and Pollen WASM/pln remain explicit gaps |
+| 2026-07-06 | `260706-android-native-core-tool-hooks` | complete | Android native-source/APK can package per-ABI `fips`, `fipsctl`, and `pln` tools and delegate backend calls when present; default smoke still lacks Android Rust FIPS and Android pln binaries |
 
 ## Active Quick Task
 

@@ -1,12 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export async function writeNativeSource(stageDir, target, manifest) {
+export async function writeNativeSource(stageDir, target, manifest, env = process.env) {
     if (target === "ios") {
         await writeIosNativeSource(stageDir, manifest);
         return;
     }
-    await writeAndroidNativeSource(stageDir, manifest);
+    await writeAndroidNativeSource(stageDir, manifest, env);
 }
 
 async function writeIosNativeSource(stageDir, manifest) {
@@ -36,16 +36,45 @@ async function writeIosNativeSource(stageDir, manifest) {
     await fs.writeFile(path.join(shareExtensionDir, "MeshDropShareExtension.entitlements"), iosShareExtensionEntitlements());
 }
 
-async function writeAndroidNativeSource(stageDir, manifest) {
+async function writeAndroidNativeSource(stageDir, manifest, env) {
     const nativeRoot = path.join(stageDir, "native", "android");
     const appSrc = path.join(nativeRoot, "app", "src", "main");
     const assetDir = path.join(appSrc, "assets", "meshdrop");
 
     await fs.cp(path.join(stageDir, "app"), assetDir, {recursive: true});
+    await copyAndroidNativeTools(appSrc, env);
     await fs.writeFile(path.join(nativeRoot, "README.md"), androidReadme());
     await writeAndroidGradleFiles(nativeRoot, manifest);
     await writeAndroidManifestFiles(appSrc);
     await writeAndroidActivity(appSrc, manifest);
+}
+
+const androidNativeToolAbis = [
+    {abi: "arm64-v8a", env: "ARM64_V8A"},
+    {abi: "armeabi-v7a", env: "ARMEABI_V7A"},
+    {abi: "x86_64", env: "X86_64"}
+];
+
+const androidNativeTools = [
+    {tool: "fips", env: "FIPS"},
+    {tool: "fipsctl", env: "FIPSCTL"},
+    {tool: "pln", env: "PLN"}
+];
+
+async function copyAndroidNativeTools(appSrc, env) {
+    for (const {abi, env: abiEnv} of androidNativeToolAbis) {
+        for (const {tool, env: toolEnv} of androidNativeTools) {
+            const source = env[`MESHDROP_ANDROID_${toolEnv}_${abiEnv}`];
+            if (!source) continue;
+            if (!path.isAbsolute(source)) {
+                throw new Error(`MESHDROP_ANDROID_${toolEnv}_${abiEnv} must be an absolute path`);
+            }
+            await fs.access(source);
+            const toolDir = path.join(appSrc, "assets", "meshdrop-native", abi);
+            await fs.mkdir(toolDir, {recursive: true});
+            await fs.copyFile(source, path.join(toolDir, tool));
+        }
+    }
 }
 
 function androidReadme() {
@@ -869,9 +898,11 @@ const androidActivityHeaderPrefix = [
     "package farm.sandwich.meshdrop;",
     "",
     "import android.app.Activity;",
+    "import android.content.Context;",
     "import android.content.Intent;",
     "import android.content.pm.ApplicationInfo;",
     "import android.net.Uri;",
+    "import android.os.Build;",
     "import android.os.Bundle;",
     "import android.provider.OpenableColumns;",
     "import android.database.Cursor;",
@@ -893,6 +924,7 @@ const androidActivityHeaderPrefix = [
     "import java.nio.charset.StandardCharsets;",
     "import java.security.MessageDigest;",
     "import java.util.ArrayList;",
+    "import java.util.Arrays;",
     "import java.util.HashMap;",
     "import java.util.List;",
     "import java.util.Locale;",
@@ -1002,7 +1034,7 @@ function androidActivityLifecycleEvents() {
         "    }",
         "",
         "    private void startNativeBackend() {",
-        "        nativeBackend = new MeshDropNativeBackend(new File(getFilesDir(), \"meshdrop-pollen\"));",
+        "        nativeBackend = new MeshDropNativeBackend(this, new File(getFilesDir(), \"meshdrop-pollen\"));",
         "        try {",
         "            nativeBackend.start();",
         "            nativeBackendBaseUrl = nativeBackend.baseUrl();",
@@ -1221,19 +1253,25 @@ function androidNativeShareBridge() {
 }
 
 const androidNativeBackendClassStart = [
-		"    private static final class MeshDropNativeBackend {",
-		"        private final File storeDir;",
-        "        private ServerSocket serverSocket;",
-        "        private Thread thread;",
-        "        private volatile boolean running;",
-        "",
-        "        MeshDropNativeBackend(File storeDir) {",
-        "            this.storeDir = storeDir;",
-        "        }",
-        "",
-        "        void start() throws Exception {",
-        "            if (!storeDir.exists() && !storeDir.mkdirs()) throw new IllegalStateException(\"Cannot create Pollen store\");",
-        "            serverSocket = new ServerSocket(0, 50, java.net.InetAddress.getByName(\"127.0.0.1\"));",
+    "    private static final class MeshDropNativeBackend {",
+    "        private final Context context;",
+    "        private final File storeDir;",
+    "        private final File binDir;",
+    "        private final Map<String, File> nativeTools = new HashMap<>();",
+    "        private ServerSocket serverSocket;",
+    "        private Thread thread;",
+    "        private volatile boolean running;",
+    "",
+    "        MeshDropNativeBackend(Context context, File storeDir) {",
+    "            this.context = context.getApplicationContext();",
+    "            this.storeDir = storeDir;",
+    "            this.binDir = new File(context.getFilesDir(), \"meshdrop-native-bin\");",
+    "        }",
+    "",
+    "        void start() throws Exception {",
+    "            if (!storeDir.exists() && !storeDir.mkdirs()) throw new IllegalStateException(\"Cannot create Pollen store\");",
+    "            prepareNativeTools();",
+    "            serverSocket = new ServerSocket(0, 50, java.net.InetAddress.getByName(\"127.0.0.1\"));",
         "            running = true;",
         "            thread = new Thread(this::serve, \"meshdrop-native-backend\");",
         "            thread.setDaemon(true);",
@@ -1257,9 +1295,34 @@ const androidNativeBackendClassStart = [
 		"                } catch (Exception error) {",
 		"                    if (running) error.printStackTrace();",
 		"                }",
-		"            }",
-		"        }",
-		""
+    "            }",
+    "        }",
+    "",
+    "        private void prepareNativeTools() throws Exception {",
+    "            nativeTools.clear();",
+    "            if (!binDir.exists() && !binDir.mkdirs()) throw new IllegalStateException(\"Cannot create native tool dir\");",
+    "            for (String abi : Build.SUPPORTED_ABIS) {",
+    "                installNativeTool(abi, \"fips\");",
+    "                installNativeTool(abi, \"fipsctl\");",
+    "                installNativeTool(abi, \"pln\");",
+    "            }",
+    "        }",
+    "",
+    "        private void installNativeTool(String abi, String tool) {",
+    "            if (nativeTools.containsKey(tool)) return;",
+    "            String assetPath = \"meshdrop-native/\" + abi + \"/\" + tool;",
+    "            File outputFile = new File(binDir, tool);",
+    "            try (InputStream input = context.getAssets().open(assetPath); FileOutputStream output = new FileOutputStream(outputFile)) {",
+    "                copyStream(input, output);",
+    "                outputFile.setExecutable(true, true);",
+    "                nativeTools.put(tool, outputFile);",
+    "            } catch (Exception ignored) {}",
+    "        }",
+    "",
+    "        private boolean hasTool(String tool) {",
+    "            return nativeTools.containsKey(tool);",
+    "        }",
+    ""
 ];
 
 const androidNativeBackendRoutes = [
@@ -1284,43 +1347,101 @@ const androidNativeBackendRoutes = [
         "            }",
         "        }",
         "",
-        "        private String pollenStatusJson() {",
-        "            String[] files = storeDir.list((dir, name) -> name.endsWith(\".bin\"));",
-        "            int count = files == null ? 0 : files.length;",
-        "            return \"{\\\"enabled\\\":true,\\\"available\\\":true,\\\"version\\\":\\\"android-native-pollen-store\\\",\\\"backend\\\":\\\"android-native\\\",\\\"objects\\\":\" + count + \"}\";",
-        "        }",
-        "",
-		"        private String fipsStatusJson() {",
+    "        private String pollenStatusJson() {",
+    "            if (hasTool(\"pln\")) return plnStatusJson();",
+    "            String[] files = storeDir.list((dir, name) -> name.endsWith(\".bin\"));",
+    "            int count = files == null ? 0 : files.length;",
+    "            return \"{\\\"enabled\\\":true,\\\"available\\\":true,\\\"version\\\":\\\"android-native-pollen-store\\\",\\\"backend\\\":\\\"android-native\\\",\\\"substrate\\\":\\\"android-object-store\\\",\\\"pln\\\":false,\\\"objects\\\":\" + count + \"}\";",
+    "        }",
+    "",
+    "        private String fipsStatusJson() {",
+		"            if (hasTool(\"fipsctl\")) return fipsctlStatusJson();",
 		"            return \"{\\\"enabled\\\":true,\\\"available\\\":true,\\\"npub\\\":\\\"android-native\\\",\\\"ipv6Addr\\\":\\\"\\\",\\\"peerCount\\\":0,\\\"meshSize\\\":1,\\\"room\\\":\\\"npub-network:android-native\\\",\\\"backend\\\":\\\"android-native\\\",\\\"rustCore\\\":false,\\\"error\\\":\\\"rust-fips-core-not-linked\\\"}\";",
-		"        }",
+    "        }",
+    "",
+    "        private String plnStatusJson() {",
+    "            try {",
+    "                NativeCommandResult version = runTool(\"pln\", Arrays.asList(\"--dir\", storeDir.getAbsolutePath(), \"version\", \"--short\"), null);",
+    "                NativeCommandResult status = runTool(\"pln\", Arrays.asList(\"--dir\", storeDir.getAbsolutePath(), \"status\"), null);",
+    "                boolean available = version.code == 0 && status.code == 0;",
+    "                String error = available ? \"\" : firstNonEmpty(status.stderr, status.error, version.stderr, version.error);",
+    "                return \"{\\\"enabled\\\":true,\\\"available\\\":\" + available + \",\\\"version\\\":\" + jsonQuote(version.stdout.trim()) + \",\\\"backend\\\":\\\"android-native-pln\\\",\\\"substrate\\\":\\\"pln\\\",\\\"pln\\\":true,\\\"wasmRuntime\\\":true,\\\"error\\\":\" + jsonQuote(error) + \"}\";",
+    "            } catch (Exception error) {",
+    "                return \"{\\\"enabled\\\":true,\\\"available\\\":false,\\\"backend\\\":\\\"android-native-pln\\\",\\\"substrate\\\":\\\"pln\\\",\\\"pln\\\":true,\\\"wasmRuntime\\\":true,\\\"error\\\":\" + jsonQuote(error.getMessage()) + \"}\";",
+    "            }",
+    "        }",
+    "",
+    "        private String fipsctlStatusJson() {",
+    "            try {",
+    "                NativeCommandResult status = runTool(\"fipsctl\", Arrays.asList(\"--socket\", fipsControlSocket(), \"show\", \"status\"), null);",
+    "                NativeCommandResult peers = runTool(\"fipsctl\", Arrays.asList(\"--socket\", fipsControlSocket(), \"show\", \"peers\"), null);",
+    "                if (status.code != 0) throw new IllegalStateException(firstNonEmpty(status.stderr, status.error, \"fipsctl status failed\"));",
+    "                String statusJson = status.stdout.trim();",
+    "                String peersJson = peers.code == 0 ? peers.stdout.trim() : \"[]\";",
+    "                return \"{\\\"enabled\\\":true,\\\"available\\\":true,\\\"backend\\\":\\\"android-native-fipsctl\\\",\\\"rustCore\\\":true,\\\"controlSocket\\\":\" + jsonQuote(fipsControlSocket()) + \",\\\"status\\\":\" + validJsonOrString(statusJson) + \",\\\"peers\\\":\" + validJsonOrString(peersJson) + \"}\";",
+    "            } catch (Exception error) {",
+    "                return \"{\\\"enabled\\\":true,\\\"available\\\":false,\\\"backend\\\":\\\"android-native-fipsctl\\\",\\\"rustCore\\\":true,\\\"error\\\":\" + jsonQuote(error.getMessage()) + \"}\";",
+    "            }",
+    "        }",
 		""
 ];
 
 const androidNativeBackendStorage = [
-		"        private String storePollenObject(byte[] body, String contentType) throws Exception {",
-		"            String hash = sha256Hex(body);",
-		"            File objectFile = objectFile(hash);",
+    "        private String storePollenObject(byte[] body, String contentType) throws Exception {",
+    "            if (hasTool(\"pln\")) return storePlnObject(body, contentType);",
+    "            String hash = sha256Hex(body);",
+    "            File objectFile = objectFile(hash);",
         "            try (FileOutputStream output = new FileOutputStream(objectFile)) {",
         "                output.write(body);",
         "            }",
         "            String type = contentType.isEmpty() ? \"application/octet-stream\" : contentType;",
         "            return \"{\\\"hash\\\":\" + jsonQuote(hash) + \",\\\"size\\\":\" + body.length + \",\\\"type\\\":\" + jsonQuote(type) + \",\\\"backend\\\":\\\"android-native\\\"}\";",
-        "        }",
-        "",
-        "        private void writePollenObject(OutputStream output, String hash) throws Exception {",
+    "        }",
+    "",
+    "        private void writePollenObject(OutputStream output, String hash) throws Exception {",
         "            if (!hash.matches(\"[0-9a-fA-F]{64}\")) {",
         "                writeJson(output, 400, \"{\\\"error\\\":\\\"invalid hash\\\"}\");",
         "                return;",
-        "            }",
-        "            File objectFile = objectFile(hash.toLowerCase(Locale.ROOT));",
+    "            }",
+    "            if (hasTool(\"pln\")) {",
+    "                writePlnObject(output, hash.toLowerCase(Locale.ROOT));",
+    "                return;",
+    "            }",
+    "            File objectFile = objectFile(hash.toLowerCase(Locale.ROOT));",
         "            if (!objectFile.isFile()) {",
         "                writeJson(output, 404, \"{\\\"error\\\":\\\"not found\\\"}\");",
         "                return;",
         "            }",
-        "            writeResponse(output, 200, \"application/octet-stream\", readFile(objectFile));",
-        "        }",
-        "",
-        "        private File objectFile(String hash) {",
+    "            writeResponse(output, 200, \"application/octet-stream\", readFile(objectFile));",
+    "        }",
+    "",
+    "        private String storePlnObject(byte[] body, String contentType) throws Exception {",
+    "            NativeCommandResult result = runTool(\"pln\", Arrays.asList(\"--dir\", storeDir.getAbsolutePath(), \"seed\", \"-\"), body);",
+    "            if (result.code != 0) throw new IllegalStateException(firstNonEmpty(result.stderr, result.error, \"Pollen pln upload failed\"));",
+    "            String hash = parsePollenHash(result.stdout);",
+    "            String type = contentType.isEmpty() ? \"application/octet-stream\" : contentType;",
+    "            return \"{\\\"hash\\\":\" + jsonQuote(hash) + \",\\\"size\\\":\" + body.length + \",\\\"type\\\":\" + jsonQuote(type) + \",\\\"backend\\\":\\\"android-native-pln\\\",\\\"substrate\\\":\\\"pln\\\"}\";",
+    "        }",
+    "",
+    "        private void writePlnObject(OutputStream output, String hash) throws Exception {",
+    "            File tempFile = new File(storeDir, hash + \".download\");",
+    "            try {",
+    "                NativeCommandResult result = runTool(\"pln\", Arrays.asList(\"--dir\", storeDir.getAbsolutePath(), \"fetch\", hash, tempFile.getAbsolutePath()), null);",
+    "                if (result.code != 0) throw new IllegalStateException(firstNonEmpty(result.stderr, result.error, \"Pollen pln download failed\"));",
+    "                writeResponse(output, 200, \"application/octet-stream\", readFile(tempFile));",
+    "            } finally {",
+    "                tempFile.delete();",
+    "            }",
+    "        }",
+    "",
+    "        private String parsePollenHash(String stdout) {",
+    "            for (String token : stdout.trim().split(\"\\\\s+\")) {",
+    "                if (token.matches(\"[0-9a-fA-F]{64}\")) return token.toLowerCase(Locale.ROOT);",
+    "            }",
+    "            throw new IllegalStateException(\"Pollen pln upload did not return a blob hash\");",
+    "        }",
+    "",
+    "        private File objectFile(String hash) {",
         "            return new File(storeDir, hash + \".bin\");",
         "        }",
         "",
@@ -1344,7 +1465,7 @@ const androidNativeBackendStorage = [
         "            writeResponse(output, status, \"application/json\", json.getBytes(StandardCharsets.UTF_8));",
         "        }",
         "",
-        "        private static void writeResponse(OutputStream output, int status, String contentType, byte[] body) throws Exception {",
+    "        private static void writeResponse(OutputStream output, int status, String contentType, byte[] body) throws Exception {",
         "            String statusText = status == 200 ? \"OK\" : status == 204 ? \"No Content\" : status == 400 ? \"Bad Request\" : status == 404 ? \"Not Found\" : \"Error\";",
         "            String headers = \"HTTP/1.1 \" + status + \" \" + statusText + \"\\r\\n\"",
         "                + \"Content-Type: \" + contentType + \"\\r\\n\"",
@@ -1354,16 +1475,80 @@ const androidNativeBackendStorage = [
         "                + \"Access-Control-Allow-Headers: Content-Type\\r\\n\"",
         "                + \"Connection: close\\r\\n\\r\\n\";",
         "            output.write(headers.getBytes(StandardCharsets.UTF_8));",
-        "            output.write(body);",
-        "            output.flush();",
-        "        }",
-        "",
-        "        private static String jsonQuote(String value) {",
-		"            String safe = value == null ? \"\" : value;",
-		"            return \"\\\"\" + safe.replace(\"\\\\\", \"\\\\\\\\\").replace(\"\\\"\", \"\\\\\\\"\").replace(\"\\n\", \"\\\\n\").replace(\"\\r\", \"\\\\r\") + \"\\\"\";",
-		"        }",
-		"    }",
-		""
+    "            output.write(body);",
+    "            output.flush();",
+    "        }",
+    "",
+    "        private NativeCommandResult runTool(String tool, List<String> args, byte[] stdin) throws Exception {",
+    "            File executable = nativeTools.get(tool);",
+    "            if (executable == null) throw new IllegalStateException(tool + \" is not packaged\");",
+    "            List<String> command = new ArrayList<>();",
+    "            command.add(executable.getAbsolutePath());",
+    "            command.addAll(args);",
+    "            Process process = new ProcessBuilder(command).redirectErrorStream(false).start();",
+    "            if (stdin != null) {",
+    "                try (OutputStream input = process.getOutputStream()) {",
+    "                    input.write(stdin);",
+    "                }",
+    "            } else {",
+    "                process.getOutputStream().close();",
+    "            }",
+    "            byte[] stdout = readAll(process.getInputStream());",
+    "            byte[] stderr = readAll(process.getErrorStream());",
+    "            int code = process.waitFor();",
+    "            return new NativeCommandResult(code, new String(stdout, StandardCharsets.UTF_8), new String(stderr, StandardCharsets.UTF_8).trim(), \"\");",
+    "        }",
+    "",
+    "        private String fipsControlSocket() {",
+    "            return new File(context.getFilesDir(), \"fips/control.sock\").getAbsolutePath();",
+    "        }",
+    "",
+    "        private static void copyStream(InputStream input, OutputStream output) throws Exception {",
+    "            byte[] buffer = new byte[8192];",
+    "            int read;",
+    "            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);",
+    "        }",
+    "",
+    "        private static byte[] readAll(InputStream input) throws Exception {",
+    "            try (InputStream source = input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {",
+    "                copyStream(source, output);",
+    "                return output.toByteArray();",
+    "            }",
+    "        }",
+    "",
+    "        private static String firstNonEmpty(String... values) {",
+    "            for (String value : values) {",
+    "                if (value != null && !value.trim().isEmpty()) return value.trim();",
+    "            }",
+    "            return \"\";",
+    "        }",
+    "",
+    "        private static String validJsonOrString(String value) {",
+    "            String trimmed = value == null ? \"\" : value.trim();",
+    "            if ((trimmed.startsWith(\"{\") && trimmed.endsWith(\"}\")) || (trimmed.startsWith(\"[\") && trimmed.endsWith(\"]\"))) return trimmed;",
+    "            return jsonQuote(trimmed);",
+    "        }",
+    "",
+    "        private static String jsonQuote(String value) {",
+    "            String safe = value == null ? \"\" : value;",
+    "            return \"\\\"\" + safe.replace(\"\\\\\", \"\\\\\\\\\").replace(\"\\\"\", \"\\\\\\\"\").replace(\"\\n\", \"\\\\n\").replace(\"\\r\", \"\\\\r\") + \"\\\"\";",
+    "        }",
+    "    }",
+    "",
+    "    private static final class NativeCommandResult {",
+    "        final int code;",
+    "        final String stdout;",
+    "        final String stderr;",
+    "        final String error;",
+    "",
+    "        NativeCommandResult(int code, String stdout, String stderr, String error) {",
+    "            this.code = code;",
+    "            this.stdout = stdout;",
+    "            this.stderr = stderr;",
+    "            this.error = error;",
+    "        }",
+    "    }",
+    ""
 ];
 
 const androidNativeBackendRequest = [

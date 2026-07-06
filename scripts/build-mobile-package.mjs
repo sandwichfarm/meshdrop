@@ -116,7 +116,7 @@ async function buildMobileArtifact(options = {}) {
     await fs.copyFile(path.join(repoRoot, "docs", "uat", "mobile.md"), path.join(stageDir, "UAT-MOBILE.md"));
     await stampServiceWorker(appDir, target, version, options.env || process.env);
     if (nativeSource) {
-        await writeNativeSource(stageDir, target, manifest);
+        await writeNativeSource(stageDir, target, manifest, options.env || process.env);
     }
     if (androidApk) {
         await buildAndroidDebugApk(stageDir, options.env || process.env);
