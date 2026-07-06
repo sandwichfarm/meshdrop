@@ -179,6 +179,10 @@ for (const target of ["ios", "android"]) {
                 assert.match(wrapperSource, /runOpenPanelWith/);
                 assert.match(wrapperSource, /UIDocumentPickerViewController/);
                 assert.match(wrapperSource, /documentPickerWasCancelled/);
+                assert.match(wrapperSource, /WKScriptMessageHandler/);
+                assert.match(wrapperSource, /MeshDropShareInbox\.bootstrapScript\(\)/);
+                assert.match(wrapperSource, /configuration\.userContentController\.add\(self, name: "meshdropShareInbox"\)/);
+                assert.match(wrapperSource, /MeshDropShareInbox\.fileResponseScript/);
 
                 const shareInboxSource = await readTarEntry(
                     result.artifactPath,
@@ -244,6 +248,13 @@ for (const target of ["ios", "android"]) {
                 assert.match(appEntitlements, /group\.farm\.sandwich\.meshdrop/);
                 assert.match(shareEntitlements, /com\.apple\.security\.application-groups/);
                 assert.match(shareEntitlements, /group\.farm\.sandwich\.meshdrop/);
+                assert.match(shareInboxSource, /static func bootstrapScript\(\) -> String/);
+                assert.match(shareInboxSource, /globalThis\.__meshdropSharedFiles/);
+                assert.match(shareInboxSource, /globalThis\.meshdropShareInbox/);
+                assert.match(shareInboxSource, /window\.dispatchEvent\(new CustomEvent\("meshdrop:shared-files"/);
+                assert.match(shareInboxSource, /static func fileResponseScript\(requestId: String, fileName: String\)/);
+                assert.match(shareInboxSource, /base64EncodedString\(\)/);
+                assert.match(shareInboxSource, /pathEscapesInbox/);
             }
             else {
                 const androidManifest = await readTarEntry(

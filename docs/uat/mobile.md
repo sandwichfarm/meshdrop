@@ -66,11 +66,14 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 8. Confirm the iOS project references matching App Group entitlement files for the containing app and share extension.
 9. Confirm the iOS share extension and containing app source use the same App Group identifier and stage files through
    `share-inbox.json`.
-10. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
-11. Confirm the Android native-source artifact contains
+10. Confirm the iOS containing app injects `globalThis.__meshdropSharedFiles` and exposes
+   `globalThis.meshdropShareInbox.list()` and `globalThis.meshdropShareInbox.read(name)` from the App Group
+   `share-inbox.json` manifest.
+11. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
+12. Confirm the Android native-source artifact contains
    `native/android/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`.
-12. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
-13. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
+13. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
+14. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
 
 ## Android APK Acceptance
 
@@ -110,7 +113,11 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 5. Confirm the smoke prints `Proof ios-signed-device-install`.
 6. Confirm the proof says App Group entitlements were inspected and the signed app installed and launched through
    `devicectl`.
-7. Do not treat this as App Store/TestFlight proof, device file-picker UAT, share-sheet UAT, or native transfer UAT.
+7. With the app launched after installing the share extension, share a small file into MeshDrop from Files or Photos.
+8. In Web Inspector or an equivalent signed-device debug surface, confirm `globalThis.__meshdropSharedFiles` lists the
+   staged file and `await globalThis.meshdropShareInbox.read("<staged-name>")` returns base64 content for it.
+9. Do not treat this as App Store/TestFlight proof, device file-picker UAT, share-sheet transfer UAT, or native transfer
+   UAT until the shared file is sent to another MeshDrop peer.
 
 ## Android Release APK Acceptance
 
@@ -240,7 +247,8 @@ install/launch proof, native Android picker UI file selection, Android WebView r
 Bluetooth API negotiation with transfer disabled, Android WebView-to-Chromium Nostr WebRTC transfer through a local fake
 relay, Android `ACTION_SEND` file share delivery through the same WebRTC send path, and real Nostr WebRTC transfers
 between two browser peers served from the generated iOS and Android source artifacts. The iOS native-source artifact
-records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API and no native bridge available.
+records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API and no Bluetooth native bridge
+available.
 
 ## Not Proven
 
@@ -257,9 +265,9 @@ records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API
   physical iOS device before claiming signed install or App Group provisioning proof.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
 - The iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18.4+ open-panel hook,
-  and the iOS native-source artifact includes Xcode project, entitlement, and share extension source scaffolds, but
-  does not prove iOS device picker UAT, App Group entitlement provisioning, share-sheet device UAT, or native iOS
-  share-initiated transfer.
+  and the iOS native-source artifact includes Xcode project, entitlement, share extension source scaffolds, and an App
+  Group share-inbox bridge exposed as `globalThis.meshdropShareInbox`, but does not prove iOS device picker UAT, App
+  Group entitlement provisioning on a signed device, share-sheet device UAT, or native iOS share-initiated transfer.
 - The iOS native-source artifact proves Bluetooth capability negotiation only as unsupported. It does not prove Bluetooth
   transfer support.
 - These artifacts do not prove Bluetooth transport support.
