@@ -10,28 +10,28 @@ test("relay discovery tooltips do not describe relay signaling as the payload tr
     assert.match(locale.footer["webrtc-discovery_title"], /File bytes still use WebRTC/);
 });
 
-test("header protocol toggles are visibly grouped by role", async () => {
+test("header protocol toggles are grouped without visible text labels", async () => {
     const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 
     const networkStart = html.indexOf('data-protocol-group="network"');
     const storageStart = html.indexOf('data-protocol-group="storage"');
+    const settingsStart = html.indexOf('id="protocol-settings"');
     assert.notEqual(networkStart, -1);
     assert.notEqual(storageStart, -1);
+    assert.notEqual(settingsStart, -1);
     assert(networkStart < storageStart);
 
     const network = html.slice(networkStart, storageStart);
-    assert.match(network, /protocol-toggle-group-label">Network</);
+    assert.match(network, /aria-label="Network postures"/);
     assert(network.indexOf('id="local-discovery"') < network.indexOf('id="fips-discovery"'));
     assert(network.indexOf('id="fips-discovery"') < network.indexOf('id="pollen-transfer"'));
-    assert(network.indexOf('id="pollen-transfer"') < network.indexOf('id="nostr-mesh"'));
-    assert.match(network, /protocol-toggle-label">Instance</);
-    assert.match(network, /protocol-toggle-label">FIPS</);
-    assert.match(network, /protocol-toggle-label">Pollen</);
-    assert.match(network, /protocol-toggle-label">Relay</);
+    assert.equal(network.includes('id="nostr-mesh"'), false);
+    assert.equal(network.includes("protocol-toggle-label"), false);
 
-    const storage = html.slice(storageStart);
-    assert.match(storage, /protocol-toggle-group-label">Storage</);
+    const storage = html.slice(storageStart, settingsStart);
+    assert.match(storage, /aria-label="Storage routes"/);
     assert(storage.indexOf('id="blossom-transfer"') < storage.indexOf('id="hashtree-transfer"'));
-    assert.match(storage, /protocol-toggle-label">Blossom</);
-    assert.match(storage, /protocol-toggle-label">Hashtree</);
+    assert.equal(storage.includes("protocol-toggle-label"), false);
+    assert.equal(html.includes("protocol-toggle-group-label"), false);
+    assert.match(html, /id="nostr-mesh"[^>]+hidden aria-hidden="true"/);
 });

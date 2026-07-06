@@ -100,6 +100,7 @@ await import("../public/scripts/nostr-android-signer.js");
 await import("../public/scripts/nostr-identity.js");
 await import("../public/scripts/local-discovery.js");
 await import("../public/scripts/nostr-mesh.js");
+await import("../public/scripts/nostr-mesh-autostart.js");
 await import("../public/scripts/blossom-transfer.js");
 await import("../public/scripts/hashtree-transfer.js");
 await import("../public/scripts/pollen-transfer.js");
@@ -120,6 +121,7 @@ function resetUi() {
     delete globalThis.meshdropHashtreeTransfer;
     delete globalThis.meshdropPollenTransfer;
     delete globalThis.meshdropFipsDiscovery;
+    delete globalThis.meshdropPeerAvailabilityCounts;
     globalThis.window.isRtcSupported = true;
     [
         "nostr-identity",
@@ -531,6 +533,56 @@ test("Nostr mesh selection is restored after refresh", async () => {
     }
 });
 
+test("Hidden Nostr relay discovery autostarts after identity is available", async () => {
+    resetUi();
+    const pubkey = "a".repeat(64);
+    installSigner(pubkey);
+    installStoredIdentity(pubkey);
+    const sockets = installOpenWebSocket();
+    buttons.get("nostr-mesh").setAttribute("aria-hidden", "true");
+
+    new globalThis.NostrIdentityController();
+    const controller = new globalThis.NostrMeshConnection();
+    new globalThis.NostrMeshAutostartController();
+
+    try {
+        globalThis.Events.fire("config", {nostrMesh: {relays: ["wss://relay.test"]}});
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        assert.equal(controller._active, true);
+        assert.equal(sockets.length, 1);
+    } finally {
+        controller.disconnect(false, false);
+    }
+});
+
+test("Hidden Nostr relay autostart republishes startup presence for late subscribers", () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    const delays = [];
+    const published = [];
+    const autostart = Object.create(globalThis.NostrMeshAutostartController.prototype);
+
+    globalThis.setTimeout = (callback, delay) => {
+        delays.push(delay);
+        callback();
+        return delays.length;
+    };
+
+    try {
+        autostart._publishStartupPresence({
+            _active: true,
+            _publishPresence: type => published.push(type)
+        });
+
+        assert.deepEqual(delays, [500, 1500, 3500]);
+        assert.deepEqual(published, ["connect", "connect", "connect"]);
+    } finally {
+        globalThis.setTimeout = originalSetTimeout;
+    }
+});
+
 test("Blossom, Hashtree, and Pollen transfer selections are restored after refresh", async () => {
     resetUi();
     storedValues.set("meshdrop_blossom_transfer_enabled", "true");
@@ -921,6 +973,20 @@ test("Pollen action shows mesh peer count while active", () => {
     assert.equal(button.hasAttribute("hidden"), false);
     assert.equal(button.classes.has("selected"), true);
     assert.equal(button.getAttribute("data-badge"), "3");
+});
+
+test("Pollen action shows zero badge while visible without known peers", () => {
+    resetUi();
+    const controller = new globalThis.PollenTransferController();
+    const button = buttons.get("pollen-transfer");
+
+    controller._config = {pollen: {enabled: true}};
+    controller._available = true;
+    controller._render();
+
+    assert.equal(button.hasAttribute("hidden"), false);
+    assert.equal(button.classes.has("selected"), false);
+    assert.equal(button.getAttribute("data-badge"), "0");
 });
 
 test("Local discovery action shows same-instance peer count while enabled", () => {

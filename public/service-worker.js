@@ -15,6 +15,7 @@ const relativePathsToCache = [
     'scripts/ui-main.js',
     'scripts/util.js',
     'scripts/nostr-relays.js',
+    'scripts/nostr-mesh-autostart.js',
     'scripts/worker/canvas-worker.js',
     'scripts/libs/noble-ciphers/LICENSE',
     'scripts/libs/noble-ciphers/_polyval.js',
