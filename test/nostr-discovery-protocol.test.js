@@ -86,7 +86,7 @@ test("follow policy only allows pubkeys in the loaded contact list", () => {
     assert.equal(globalThis.NostrFollowPolicy.allowsPubkey(followed, {...identity, followListStatus: "loading"}), false);
 });
 
-test("follow policy gates Nostr relay peers without hiding local peers", () => {
+test("follow policy allows shared Nostr room peers without hiding local peers", () => {
     const followed = "f".repeat(64);
     const stranger = "0".repeat(64);
     const identity = {
@@ -96,7 +96,7 @@ test("follow policy gates Nostr relay peers without hiding local peers", () => {
     };
 
     assert.equal(globalThis.NostrFollowPolicy.allowsPeer({id: followed}, "nostr", identity), true);
-    assert.equal(globalThis.NostrFollowPolicy.allowsPeer({id: stranger}, "nostr", identity), false);
+    assert.equal(globalThis.NostrFollowPolicy.allowsPeer({id: stranger}, "nostr", identity), true);
     assert.equal(globalThis.NostrFollowPolicy.allowsPeer({id: "local-peer"}, "ip", identity), true);
     assert.equal(
         globalThis.NostrFollowPolicy.allowsPeer({id: "local-peer", nostrIdentity: {pubkey: stranger}}, "ip", identity),
@@ -104,7 +104,7 @@ test("follow policy gates Nostr relay peers without hiding local peers", () => {
     );
     assert.equal(
         globalThis.NostrFollowPolicy.allowsPeer({id: stranger, _roomIds: {nostr: "mesh:room"}}, null, identity),
-        false
+        true
     );
     assert.equal(
         globalThis.NostrFollowPolicy.allowsPeer({

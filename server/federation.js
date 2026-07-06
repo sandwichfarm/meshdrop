@@ -33,7 +33,6 @@ export default class MeshFederation {
             getLocalBaseUrl: () => this.localFipsBaseUrl,
             discoverPeer: peer => this._discoverFipsPeer(peer),
             removePeer: (peer, disconnect) => this._removeFipsPeer(peer, disconnect),
-            discoverHttpServer: server => this._discoverHttpServer(server),
             removeRemoteServer: (server, disconnect) => this._removeRemoteServer(server, disconnect),
             remoteServers: this.remoteServers
         });

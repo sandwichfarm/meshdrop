@@ -10,7 +10,6 @@ export class FederationFipsTransport {
         getLocalBaseUrl = () => "",
         discoverPeer = noop,
         removePeer = noop,
-        discoverHttpServer = noop,
         removeRemoteServer = noop,
         remoteServers
     }) {
@@ -21,7 +20,6 @@ export class FederationFipsTransport {
         this.getLocalBaseUrl = getLocalBaseUrl;
         this.discoverPeer = discoverPeer;
         this.removePeer = removePeer;
-        this.discoverHttpServer = discoverHttpServer;
         this.removeRemoteServer = removeRemoteServer;
         this.remoteServers = remoteServers;
         this.peerEvents = null;
@@ -90,18 +88,12 @@ export class FederationFipsTransport {
         if (!peer?.ipv6Addr) return;
 
         this.trace(
-            "fips discover",
+            "fips route candidate",
             peer.displayName || peer.npub || "peer",
             peer.ipv6Addr,
             peer.transportType || "unknown-transport",
             peer.transportAddr || "unknown-address"
         );
-        await this.discoverHttpServer({
-            serverId: `fips:${peer.ipv6Addr}`,
-            transport: "fips",
-            peer,
-            baseUrl: `http://[${peer.ipv6Addr}]:${this.config.fips.port}${this.config.basePath}`
-        });
     }
 
     removePeerAddress(peer, disconnect = true) {

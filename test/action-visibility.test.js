@@ -588,6 +588,31 @@ test("Hidden Nostr relay discovery autostart honors relay-network disable flag",
     }
 });
 
+test("Nostr discovery autostart honors an explicit off preference", async () => {
+    resetUi();
+    const pubkey = "a".repeat(64);
+    installSigner(pubkey);
+    installStoredIdentity(pubkey);
+    const sockets = installOpenWebSocket();
+    storedValues.set("meshdrop_nostr_mesh_enabled", "false");
+
+    new globalThis.NostrIdentityController();
+    const controller = new globalThis.NostrMeshConnection();
+    new globalThis.NostrMeshAutostartController();
+
+    try {
+        globalThis.Events.fire("config", {nostrMesh: {relays: ["wss://relay.test"]}});
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        assert.equal(controller._active, false);
+        assert.equal(sockets.length, 0);
+    } finally {
+        controller.disconnect(false, false);
+    }
+});
+
 test("Hidden Nostr relay autostart republishes startup presence for late subscribers", () => {
     const originalSetTimeout = globalThis.setTimeout;
     const delays = [];

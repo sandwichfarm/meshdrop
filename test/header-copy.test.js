@@ -2,11 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 
-test("relay discovery tooltips do not describe relay signaling as the payload transport", async () => {
+test("Nostr discovery tooltips do not describe relay signaling as the payload transport", async () => {
     const locale = JSON.parse(await readFile(new URL("../public/lang/en.json", import.meta.url), "utf8"));
 
-    assert.equal(locale.header["nostr-mesh-connect_title"], "Discover peers through Nostr relay signaling");
-    assert.equal(locale.header["nostr-mesh-disconnect_title"], "Stop Nostr relay peer discovery");
+    assert.equal(locale.header["nostr-mesh-connect_title"], "Discover peers through Nostr WebRTC signaling");
+    assert.equal(locale.header["nostr-mesh-disconnect_title"], "Stop Nostr peer discovery");
+    assert.equal(locale.footer["webrtc-discovery"], "Nostr");
     assert.match(locale.footer["webrtc-discovery_title"], /File bytes still use WebRTC/);
 });
 
@@ -25,7 +26,8 @@ test("header protocol toggles are grouped without visible text labels", async ()
     assert.match(network, /aria-label="Network postures"/);
     assert(network.indexOf('id="local-discovery"') < network.indexOf('id="fips-discovery"'));
     assert(network.indexOf('id="fips-discovery"') < network.indexOf('id="pollen-transfer"'));
-    assert.equal(network.includes('id="nostr-mesh"'), false);
+    assert(network.indexOf('id="pollen-transfer"') < network.indexOf('id="nostr-mesh"'));
+    assert.match(network, /id="nostr-mesh"[\s\S]+xlink:href="#wifi-tethering"/);
     assert.equal(network.includes("protocol-toggle-label"), false);
 
     const storage = html.slice(storageStart, settingsStart);
@@ -33,5 +35,4 @@ test("header protocol toggles are grouped without visible text labels", async ()
     assert(storage.indexOf('id="blossom-transfer"') < storage.indexOf('id="hashtree-transfer"'));
     assert.equal(storage.includes("protocol-toggle-label"), false);
     assert.equal(html.includes("protocol-toggle-group-label"), false);
-    assert.match(html, /id="nostr-mesh"[^>]+hidden aria-hidden="true"/);
 });

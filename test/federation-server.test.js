@@ -802,6 +802,48 @@ test("federation listens to FIPS peer discovery events", async () => {
     assert.deepEqual(removed, ["fd00::2"]);
 });
 
+test("federation treats generic FIPS peers as route candidates, not MeshDrop HTTP servers", async () => {
+    const traces = [];
+    const fetches = [];
+    const originalFetch = globalThis.fetch;
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        FIPS_DISCOVERY: "true"
+    }), {
+        fipsClient: {
+            async status() {
+                return {
+                    available: true,
+                    ipv6Addr: "fd00::1",
+                    peers: [{
+                        displayName: "router-a",
+                        ipv6Addr: "fd00::2",
+                        transportType: "udp",
+                        transportAddr: "10.0.0.2:2121"
+                    }]
+                };
+            }
+        }
+    });
+    federation.config.trace = true;
+    federation._trace = (...parts) => traces.push(parts);
+    globalThis.fetch = async url => {
+        fetches.push(String(url));
+        throw new Error("unexpected fetch");
+    };
+
+    try {
+        await federation.discoverFipsPeers();
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+
+    assert.deepEqual(fetches, []);
+    assert(traces.some(parts => parts[0] === "fips route candidate" && parts.includes("fd00::2")));
+    assert.equal(federation.remoteServers.size, 0);
+});
+
 test("federation removes remote peers when a FIPS peer disappears", () => {
     const handled = [];
     const federation = new MeshFederation(createFederationConfig({

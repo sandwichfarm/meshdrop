@@ -10,6 +10,10 @@ const NostrMeshProtocol = {
         return storage?.getItem?.(this.storageKey) === "true";
     },
 
+    hasEnabledPreference(storage = globalThis.localStorage) {
+        return storage?.getItem?.(this.storageKey) !== null;
+    },
+
     writeEnabled(enabled, storage = globalThis.localStorage) {
         storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
     },
@@ -21,17 +25,8 @@ const NostrMeshProtocol = {
             && globalThis.RuntimeCapabilities.transportSupported(config, "webrtc", true);
     },
 
-    networkId(identity) {
-        return identity?.pubkey ? `nostr:${identity.pubkey}` : "nostr";
-    },
-
-    recipientTags(identity) {
-        const self = identity?.pubkey || "";
-        const pubkeyRegex = NostrDiscoveryProtocol?.pubkeyRegex || /^[0-9a-f]{64}$/i;
-        return [...new Set(identity?.followPubkeys || [])]
-            .map(pubkey => String(pubkey || "").toLowerCase())
-            .filter(pubkey => pubkey !== self && pubkeyRegex.test(pubkey))
-            .map(pubkey => ["p", pubkey]);
+    networkId(_identity, config = null) {
+        return config?.nostrMesh?.room || this.defaultRoomPrefix;
     },
 
     relayUrlsFromConfig(config) {
@@ -183,7 +178,7 @@ class NostrMeshConnection {
             const hydratedIdentity = await identityController.ensureFollowListLoaded();
             this._identityController = identityController;
             this._identity = hydratedIdentity || identity;
-            this._room = NostrMeshProtocol.networkId(this._identity);
+            this._room = NostrMeshProtocol.networkId(this._identity, this._config);
             this._relayUrls = NostrMeshProtocol.relayUrlsFromConfig(this._config);
             this._active = true;
             this._connectRelays();
@@ -316,7 +311,7 @@ class NostrMeshConnection {
         socket.send(JSON.stringify([
             "REQ",
             this._subscriptionId,
-            {kinds: [NostrMeshProtocol.kind], since, "#p": [this._identity.pubkey]}
+            {kinds: [NostrMeshProtocol.kind], since, "#r": [this._room]}
         ]));
     }
 
@@ -326,7 +321,7 @@ class NostrMeshConnection {
             created_at: Math.floor(Date.now() / 1000),
             tags: [
                 ["type", type],
-                ...NostrMeshProtocol.recipientTags(this._identity),
+                ["r", this._room],
                 ["name", this._identity.displayName || `npub ${this._identity.pubkey.slice(0, 8)}`]
             ],
             content: ""
@@ -343,6 +338,7 @@ class NostrMeshConnection {
                 created_at: Math.floor(Date.now() / 1000),
                 tags: [
                     ["type", type],
+                    ["r", this._room],
                     ["p", recipient],
                     ["name", this._identity.displayName || `npub ${this._identity.pubkey.slice(0, 8)}`]
                 ],
@@ -429,10 +425,10 @@ class NostrMeshConnection {
 
         const type = NostrMeshProtocol.eventType(event);
         if (!type) return false;
-        if (!NostrFollowPolicy.allowsPubkey(event.pubkey, this._identity)) return false;
+        if (!NostrMeshProtocol.room(event) || NostrMeshProtocol.room(event) !== this._room) return false;
 
         if (type === "connect" || type === "disconnect") {
-            return NostrMeshProtocol.isAddressedTo(event, this._identity?.pubkey);
+            return true;
         }
 
         return NostrMeshProtocol.isAddressedTo(event, this._identity?.pubkey);
