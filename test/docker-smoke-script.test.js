@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const dockerSmoke = fs.readFileSync(new URL("../scripts/docker-smoke.mjs", import.meta.url), "utf8");
+const dockerfile = fs.readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+const dockerCompose = fs.readFileSync(new URL("../docker-compose.yml", import.meta.url), "utf8");
+const startWithFips = fs.readFileSync(new URL("../scripts/start-with-fips.sh", import.meta.url), "utf8");
 const dockerTransfer = fs.readFileSync(
     new URL("../scripts/docker-browser-transfer-smoke.mjs", import.meta.url),
     "utf8"
@@ -59,4 +62,29 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(ciWorkflow, /docker_public_relay_urls:/);
     assert.match(ciWorkflow, /docker-public-relay-uat:/);
     assert.match(ciWorkflow, /MESHDROP_DOCKER_PUBLIC_RELAY_URLS: \$\{\{ inputs\.docker_public_relay_urls \}\}/);
+});
+
+test("Docker packages FIPS binaries instead of mounting host tools", () => {
+    assert.match(dockerfile, /ARG FIPS_VERSION=v0\.4\.0/);
+    assert.match(dockerfile, /checksums-linux\.txt/);
+    assert.match(dockerfile, /unsupported fips arch/);
+    assert.match(dockerfile, /fips-\$\{version\}-linux-\$\{fips_arch\}\.tar\.gz/);
+    assert.match(dockerfile, /\/usr\/local\/bin\/fips/);
+    assert.match(dockerfile, /\/usr\/local\/bin\/fipsctl/);
+    assert.match(dockerfile, /fips --version/);
+    assert.match(dockerfile, /fipsctl --version/);
+
+    assert.doesNotMatch(dockerCompose, /\/usr\/bin\/fips/);
+    assert.doesNotMatch(dockerCompose, /\/usr\/bin\/fipsctl/);
+    assert.doesNotMatch(dockerCompose, /FIPS_CONTROL_SOCKET/);
+    assert.match(dockerCompose, /\.\/fips\.yaml:\/etc\/fips\/fips\.yaml:ro/);
+    assert.match(dockerCompose, /\/dev\/net\/tun:\/dev\/net\/tun/);
+    assert.match(dockerCompose, /NET_ADMIN/);
+
+    assert.match(startWithFips, /command -v fipsctl/);
+    assert.match(startWithFips, /Starting FIPS daemon with/);
+    assert.match(startWithFips, /FIPS daemon not started: fips or fipsctl binary or config file is missing/);
+
+    assert.match(dockerSmoke, /assertFipsBinariesInstalled/);
+    assert.match(dockerSmoke, /assertFipsStartupLogs/);
 });

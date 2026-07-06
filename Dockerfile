@@ -11,6 +11,7 @@ RUN apt-get update \
 ARG TARGETARCH
 ARG MESHDROP_TARGET=standalone
 ARG PLN_VERSION=v0.0.1-dev.21
+ARG FIPS_VERSION=v0.4.0
 RUN set -eux; \
     arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
     case "$arch" in amd64|arm64) ;; *) echo "unsupported pln arch: $arch" >&2; exit 1 ;; esac; \
@@ -25,6 +26,28 @@ RUN set -eux; \
     chmod 0755 /usr/local/bin/pln; \
     rm -rf "${tmp_dir}"; \
     pln version
+
+RUN set -eux; \
+    arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
+    case "$arch" in \
+        amd64) fips_arch="x86_64" ;; \
+        arm64) fips_arch="aarch64" ;; \
+        *) echo "unsupported fips arch: $arch" >&2; exit 1 ;; \
+    esac; \
+    version="${FIPS_VERSION#v}"; \
+    asset="fips-${version}-linux-${fips_arch}.tar.gz"; \
+    extract_dir="fips-${version}-linux-${fips_arch}"; \
+    base_url="https://github.com/jmcorgan/fips/releases/download/${FIPS_VERSION}"; \
+    tmp_dir="$(mktemp -d)"; \
+    curl -fsSL "${base_url}/checksums-linux.txt" -o "${tmp_dir}/checksums-linux.txt"; \
+    curl -fsSL "${base_url}/${asset}" -o "${tmp_dir}/${asset}"; \
+    grep " ${asset}$" "${tmp_dir}/checksums-linux.txt" | (cd "${tmp_dir}" && sha256sum -c -); \
+    tar -xzf "${tmp_dir}/${asset}" -C "${tmp_dir}" "${extract_dir}/fips" "${extract_dir}/fipsctl"; \
+    install -m 0755 "${tmp_dir}/${extract_dir}/fips" /usr/local/bin/fips; \
+    install -m 0755 "${tmp_dir}/${extract_dir}/fipsctl" /usr/local/bin/fipsctl; \
+    rm -rf "${tmp_dir}"; \
+    fips --version; \
+    fipsctl --version
 
 WORKDIR /home/node/app
 
