@@ -68,6 +68,14 @@ export function signedIosBuildArgs({projectPath, derivedDataPath, config}) {
     return args;
 }
 
+export function devicectlInstallArgs(config, appPath) {
+    return ["devicectl", "device", "install", "app", "--device", config.deviceId, appPath];
+}
+
+export function devicectlLaunchArgs(config) {
+    return ["devicectl", "device", "process", "launch", "--device", config.deviceId, config.bundleId];
+}
+
 export async function runIosSignedDeviceUat(env = process.env, platform = process.platform) {
     const config = parseIosSignedDeviceEnv(env, platform);
     await assertToolchain(config);
@@ -93,11 +101,12 @@ export async function runIosSignedDeviceUat(env = process.env, platform = proces
         await fs.access(path.join(shareExtensionPath, "Info.plist"));
         await assertSignedEntitlements(appPath);
         await assertSignedEntitlements(shareExtensionPath);
-        await run("xcrun", ["devicectl", "device", "install", "app", "--device", config.deviceId, appPath], {env});
+        await run("xcrun", devicectlInstallArgs(config, appPath), {env});
+        await run("xcrun", devicectlLaunchArgs(config), {env});
 
         console.log(
             `Proof ios-signed-device-install: signed ${config.bundleId} ${config.version} ` +
-            `for ${config.deviceId}; App Group entitlements inspected; installed through devicectl`
+            `for ${config.deviceId}; App Group entitlements inspected; installed and launched through devicectl`
         );
     }
     finally {

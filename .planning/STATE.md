@@ -119,6 +119,7 @@ Closed during this audit branch:
 | 2026-07-06 | `260706-android-fips-pollen-options` | complete | Android APK manifest/static config exposes FIPS and Pollen; AVD WebView proof shows both visible; focused 37/37; `npm test` 223/223; e2e; changed-code slop clean |
 | 2026-07-06 | `260706-v15-release-readback` | complete | `v0.1.5` release assets, GHCR target images, authenticated readback, and Docker smoke passed; anonymous GHCR still returns `unauthorized` |
 | 2026-07-06 | `260706-ios-signed-device-uat-harness` | complete | Signed iOS device-install harness added; focused tests prove macOS/device/signing guardrails; real macOS hardware pass remains open |
+| 2026-07-06 | `260706-ios-signed-device-launch-proof` | complete | Signed iOS device harness now installs and launches through `devicectl`; focused tests and runbook guards pass; real macOS hardware pass remains open |
 
 ## Active Quick Task
 

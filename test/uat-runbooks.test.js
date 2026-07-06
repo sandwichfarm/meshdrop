@@ -172,6 +172,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /MESHDROP_IOS_DEVELOPMENT_TEAM/);
     assert.match(mobile, /MESHDROP_IOS_DEVICE_UDID/);
     assert.match(mobile, /Proof ios-signed-device-install/);
+    assert.match(mobile, /installed and launched through\s+`devicectl`/);
     assert.match(mobile, /signed\/device-install harness/);
     assert.match(mobile, /matching App Group entitlement files/);
     assert.match(mobile, /iOS native-source artifact includes a share extension source scaffold/);
@@ -275,7 +276,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke and deployed-node UAT harness exist; real Umbrel node pass open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Passing `MESHDROP_UMBREL_UAT_URL=<url> npm run test:umbrel-deployed` after Umbrel UI install/);
-    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, unsigned device app proof, signed-device install harness, share extension source scaffold, and Bluetooth negotiation proof exist; signed\/device pass open \|/);
+    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, unsigned device app proof, signed-device install-and-launch harness, share extension source scaffold, and Bluetooth negotiation proof exist; signed\/device pass open \|/);
     assert.match(
         targetStatus,
         /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, native picker UI proof, and physical-device hardware UAT passed \|/
@@ -287,7 +288,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /`npm run test:ios-xcode-build` proves the generated `MeshDrop` Xcode scheme builds for iOS Simulator without code signing/);
     assert.match(targetStatus, /`npm run test:ios-simulator-app` proves an unsigned `MeshDrop\.app` Simulator package can be built and inspected/);
     assert.match(targetStatus, /`npm run test:ios-device-app` proves an unsigned generic `iphoneos` `MeshDrop\.app` can be built and inspected/);
-    assert.match(targetStatus, /signed-device harness rejects non-macOS\/no-device runs and requires signing\/device inputs/);
+    assert.match(targetStatus, /signed-device harness rejects non-macOS\/no-device runs, requires signing\/device inputs, and uses `devicectl` to install and launch the signed app/);
     assert.match(targetStatus, /includes `MeshDropShareExtension\/ShareViewController\.swift`/);
     assert.match(targetStatus, /Passing `MESHDROP_IOS_DEVELOPMENT_TEAM=<team-id> MESHDROP_IOS_DEVICE_UDID=<device-udid> npm run test:ios-signed-device`/);
     assert.match(targetStatus, /`npm run build:android`; `npm run build:android:native-source`; `npm run build:android:apk`/);
@@ -299,7 +300,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /`MESHDROP_ANDROID_AVD=Medium_Phone_API_36\.1 npm run test:android-share-file`/);
     assert.match(targetStatus, /`npm run build:ios:native-source`/);
     assert.match(targetStatus, /`npm run build:android:native-source`/);
-    assert.match(targetStatus, /signed install and App Group entitlement proof/);
+    assert.match(targetStatus, /signed install, launch, and App Group entitlement proof/);
     assert.doesNotMatch(targetStatus, /Bluetooth negotiation, and native mobile transfer UAT/);
     assert.match(targetStatus, /Gradle-built debug APK artifact/);
     assert.match(targetStatus, /UAT-signed release APK verified by `apksigner`/);
