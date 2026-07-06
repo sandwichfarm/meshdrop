@@ -6,7 +6,7 @@ const meshdropLocalization = globalThis.Localization;
 const meshdropNostrDiscoveryProtocol = globalThis.NostrDiscoveryProtocol;
 const meshdropPersistentStorage = globalThis.PersistentStorage;
 const meshdropProtocolServerPreferences = globalThis.ProtocolServerPreferences;
-const meshdropRelaySettingsPreferences = globalThis.RelaySettingsPreferences;
+const meshdropRelaySettingsPreferences = () => globalThis.RelaySettingsPreferences || globalThis.meshdropRelaySettingsPreferences;
 const meshdropChangeFavicon = globalThis.changeFavicon;
 const meshdropDecodeBase64Files = globalThis.decodeBase64Files;
 const meshdropDecodeBase64Text = globalThis.decodeBase64Text;
@@ -1657,18 +1657,33 @@ class ProtocolSettingsDialog extends Dialog {
     }
 
     _renderRelays() {
-        if (!globalThis.meshdropRelaySettingsPreferences) return;
+        const preferences = meshdropRelaySettingsPreferences();
+        if (!preferences) {
+            this.$relayStatus.textContent = 'Relay settings are unavailable.';
+            return;
+        }
 
-        const settings = meshdropRelaySettingsPreferences.normalize(meshdropRelaySettingsPreferences.read());
+        const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
+        const settings = preferences.displaySettings
+            ? preferences.displaySettings(identity)
+            : preferences.normalize(preferences.read());
         this.$relayBootstrap.value = settings.bootstrapRelays.join('\n');
         this.$relayWebRtc.value = settings.webRtcRelays.join('\n');
         this.$relayInbox.value = settings.inboxRelays.join('\n');
         this.$relayOutbox.value = settings.outboxRelays.join('\n');
-        this.$relayStatus.textContent = 'Configure relays used for identity bootstrap, WebRTC announcements, and your NIP-65 relay list.';
+        this.$relayStatus.textContent = identity?.relays
+            ? 'Configure relays used for identity bootstrap, WebRTC announcements, and your NIP-65 relay list.'
+            : 'Configure relays used for identity bootstrap, WebRTC announcements, and your NIP-65 relay list. Sign in with Nostr to load your current list.';
     }
 
     async _saveRelays() {
-        const settings = meshdropRelaySettingsPreferences.write({
+        const preferences = meshdropRelaySettingsPreferences();
+        if (!preferences) {
+            this.$relayStatus.textContent = 'Relay settings are unavailable.';
+            return;
+        }
+
+        const settings = preferences.write({
             bootstrapRelays: this._textareaLines(this.$relayBootstrap),
             webRtcRelays: this._textareaLines(this.$relayWebRtc),
             inboxRelays: this._textareaLines(this.$relayInbox),
@@ -1686,7 +1701,7 @@ class ProtocolSettingsDialog extends Dialog {
             const event = await identityController.signEvent({
                 kind: meshdropNostrDiscoveryProtocol.relayListKind,
                 created_at: Math.floor(Date.now() / 1000),
-                tags: meshdropRelaySettingsPreferences.relayListTags(settings.inboxRelays, settings.outboxRelays),
+                tags: preferences.relayListTags(settings.inboxRelays, settings.outboxRelays),
                 content: ''
             });
             const relays = [

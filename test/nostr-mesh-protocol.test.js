@@ -80,6 +80,25 @@ test("relay settings override bootstrap and WebRTC relay lists", () => {
     );
 });
 
+test("relay settings expose UI alias and default to discovered NIP-65 relays", () => {
+    localStorage.clear();
+
+    assert.equal(globalThis.meshdropRelaySettingsPreferences, globalThis.RelaySettingsPreferences);
+    assert.equal(globalThis.RelaySettingsPreferences.hasStoredSettings(), false);
+
+    const settings = globalThis.RelaySettingsPreferences.displaySettings({
+        relays: {
+            read: ["wss://read-nip65.example"],
+            write: ["wss://write-nip65.example"]
+        }
+    });
+
+    assert.deepEqual(settings.bootstrapRelays, ["wss://purplepag.es", "wss://nos.lol"]);
+    assert.deepEqual(settings.webRtcRelays, ["wss://bucket.coracle.social"]);
+    assert.deepEqual(settings.inboxRelays, ["wss://read-nip65.example"]);
+    assert.deepEqual(settings.outboxRelays, ["wss://write-nip65.example"]);
+});
+
 test("Nostr mesh protocol maps PairDrop RTC signals to draft event types", () => {
     assert.equal(
         globalThis.NostrMeshProtocol.signalType({sdp: {type: "offer", sdp: "v=0"}}),
