@@ -88,12 +88,14 @@ for (const target of ["ios", "android"]) {
         const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `meshdrop-${target}-native-source-test-`));
 
         try {
+            const nativeToolEnv = target === "android" ? await fakeAndroidNativeTools(tempDir) : {};
             const result = await buildMobileNativeSourcePackage({
                 target,
                 version: "0.0.0 test",
                 outDir: tempDir,
                 env: {
-                    MESH_DROP_BUILD_ID: "unit-native-source"
+                    MESH_DROP_BUILD_ID: "unit-native-source",
+                    ...nativeToolEnv
                 }
             });
             const entries = await listTarEntries(result.artifactPath);
@@ -128,6 +130,11 @@ for (const target of ["ios", "android"]) {
                 assert(entries.includes(`${nativeRoot}/app/src/main/res/xml/network_security_config.xml`));
                 assert(entries.includes(`${nativeRoot}/app/src/main/assets/meshdrop/index.html`));
                 assert(entries.includes(`${nativeRoot}/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`));
+                assert(entries.includes(`${nativeRoot}/app/src/main/jniLibs/x86_64/libmeshdrop_fips.so`));
+                assert(entries.includes(`${nativeRoot}/app/src/main/jniLibs/x86_64/libmeshdrop_fipsctl.so`));
+                assert(entries.includes(`${nativeRoot}/app/src/main/jniLibs/x86_64/libmeshdrop_pln.so`));
+                const gradleSource = await readTarEntry(result.artifactPath, `${nativeRoot}/app/build.gradle`);
+                assert.match(gradleSource, /useLegacyPackaging true/);
             }
 
             const manifest = JSON.parse(await readTarEntry(result.artifactPath, `${prefix}/meshdrop-target.json`));
@@ -271,6 +278,25 @@ for (const target of ["ios", "android"]) {
                 assert.match(wrapperSource, /onShowFileChooser/);
                 assert.match(wrapperSource, /meshdropAndroidNativeShare/);
                 assert.match(wrapperSource, /meshdropAndroidBridge/);
+                assert.match(wrapperSource, /MeshDropNativeBackend/);
+                assert.match(wrapperSource, /prepareNativeTools/);
+                assert.match(wrapperSource, /nativeLibraryDir/);
+                assert.match(wrapperSource, /libmeshdrop_/);
+                assert.match(wrapperSource, /startLongRunningTool\("pln"/);
+                assert.match(wrapperSource, /"up", "--port", "0"/);
+                assert.match(wrapperSource, /startLongRunningTool\("fips"/);
+                assert.match(wrapperSource, /writeFipsConfig/);
+                assert.match(wrapperSource, /runTool\("pln"/);
+                assert.match(wrapperSource, /runTool\("fipsctl"/);
+                assert.match(wrapperSource, /android-native-pln/);
+                assert.match(wrapperSource, /android-native-fipsctl/);
+                assert.match(wrapperSource, /ServerSocket\(0, 50, java\.net\.InetAddress\.getByName\("127\.0\.0\.1"\)\)/);
+                assert.match(wrapperSource, /__meshdropAndroidNativeBackend/);
+                assert.match(wrapperSource, /\/pollen\/status/);
+                assert.match(wrapperSource, /\/pollen\/upload/);
+                assert.match(wrapperSource, /\/pollen\/download\//);
+                assert.match(wrapperSource, /\/fips\/status/);
+                assert.match(wrapperSource, /rust-fips-core-not-linked/);
                 assert.match(wrapperSource, /isNostrSignerInstalled/);
                 assert.match(wrapperSource, /requestNostrSigner/);
                 assert.match(wrapperSource, /android-nostr-signer-result/);
@@ -305,6 +331,24 @@ for (const target of ["ios", "android"]) {
             await fs.rm(tempDir, {recursive: true, force: true});
         }
     });
+}
+
+async function fakeAndroidNativeTools(tempDir) {
+    const toolDir = path.join(tempDir, "android-native-tools");
+    await fs.mkdir(toolDir, {recursive: true});
+    const tools = {
+        FIPS: path.join(toolDir, "fips"),
+        FIPSCTL: path.join(toolDir, "fipsctl"),
+        PLN: path.join(toolDir, "pln")
+    };
+    for (const toolPath of Object.values(tools)) {
+        await fs.writeFile(toolPath, "#!/system/bin/sh\nexit 0\n");
+    }
+    return {
+        MESHDROP_ANDROID_FIPS_X86_64: tools.FIPS,
+        MESHDROP_ANDROID_FIPSCTL_X86_64: tools.FIPSCTL,
+        MESHDROP_ANDROID_PLN_X86_64: tools.PLN
+    };
 }
 
 test("mobile package builder requires an explicit supported target", () => {

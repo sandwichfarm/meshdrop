@@ -40,6 +40,13 @@ const FipsDiscoveryProtocol = {
             meshSize: Number(status.meshSize || 0),
             room: normalizeFipsDiscoveryRoom(status.room)
         };
+    },
+
+    endpoint(path) {
+        const baseUrl = globalThis.__meshdropAndroidNativeBackend?.baseUrl;
+        if (!baseUrl) return path;
+
+        return `${baseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
     }
 };
 
@@ -135,7 +142,7 @@ class FipsDiscoveryController {
     }
 
     async fetchStatus() {
-        const response = await fetch(FipsDiscoveryProtocol.statusPath);
+        const response = await fetch(FipsDiscoveryProtocol.endpoint(FipsDiscoveryProtocol.statusPath));
         if (!response.ok) throw new Error(`FIPS status failed with ${response.status}`);
 
         const status = FipsDiscoveryProtocol.summarizeStatus(await response.json());

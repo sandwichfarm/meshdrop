@@ -321,9 +321,9 @@ test("static config exposes Android APK FIPS and Pollen transport options", asyn
             {status: 0, body: ""}
         ]
     });
-    context.__meshdropTargetManifest = {
-        target: "android",
-        nativeShellBuilt: true,
+	context.__meshdropTargetManifest = {
+		target: "android",
+		nativeShellBuilt: true,
         runtime: {
             target: "android",
             platform: "mobile",
@@ -338,11 +338,17 @@ test("static config exposes Android APK FIPS and Pollen transport options", asyn
             hashtree: true,
             pollen: true,
             fips: true,
-            bluetooth: false
-        }
-    };
+			bluetooth: false
+		}
+	};
+	context.__meshdropAndroidNativeBackend = {
+		alive: true,
+		baseUrl: "http://127.0.0.1:43210",
+		fipsRustCore: false,
+		pollenStore: "android-native"
+	};
 
-    new context.__meshdropTest.ServerConnection();
+	new context.__meshdropTest.ServerConnection();
     await flushPromises();
     await flushPromises();
 

@@ -40,7 +40,9 @@ try {
     assert.equal(manifest.transports.nostr, true);
     assert.equal(manifest.transports.bluetooth, false);
     assert.deepEqual(manifest.remainingProof, [
-        "physical Android device install UAT"
+        "physical Android device install UAT",
+        "native Android Rust FIPS core integration",
+        "native Android Pollen WASM/pln integration"
     ]);
     assert(!manifest.remainingProof.includes("Android native file picker UI UAT"));
     assert(!manifest.remainingProof.includes("Bluetooth transport negotiation"));
@@ -60,6 +62,8 @@ try {
     assert(proof.signature.outputLines.some(line => line.includes("certificate SHA-256 digest:")));
     assert.deepEqual(proof.notProven, [
         "physical Android device install UAT",
+        "native Android Rust FIPS core integration",
+        "native Android Pollen WASM/pln integration",
         "Play Store upload signing",
         "Android App Bundle package"
     ]);

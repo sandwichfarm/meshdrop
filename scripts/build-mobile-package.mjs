@@ -116,7 +116,7 @@ async function buildMobileArtifact(options = {}) {
     await fs.copyFile(path.join(repoRoot, "docs", "uat", "mobile.md"), path.join(stageDir, "UAT-MOBILE.md"));
     await stampServiceWorker(appDir, target, version, options.env || process.env);
     if (nativeSource) {
-        await writeNativeSource(stageDir, target, manifest);
+        await writeNativeSource(stageDir, target, manifest, options.env || process.env);
     }
     if (androidApk) {
         await buildAndroidDebugApk(stageDir, options.env || process.env);
@@ -241,9 +241,13 @@ function capabilitiesFor(target, nativeSource) {
 
 function remainingProofFor(target, nativeSource, androidApk, androidPackage) {
     if (androidPackage) {
+        const nativeBackendProof = [
+            "native Android Rust FIPS core integration",
+            "native Android Pollen WASM/pln integration"
+        ];
         return androidApk
-            ? ["physical Android device install UAT", "signed Android release APK or AAB package"]
-            : ["physical Android device install UAT"];
+            ? ["physical Android device install UAT", "signed Android release APK or AAB package", ...nativeBackendProof]
+            : ["physical Android device install UAT", ...nativeBackendProof];
     }
     const remaining = [
         "native mobile app package build",

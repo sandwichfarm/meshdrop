@@ -38,7 +38,9 @@ export async function buildAndroidDebugApk(stageDir, env) {
         releaseSigned: false,
         notProven: [
             "physical Android device install UAT",
-            "signed Android release APK or AAB package"
+            "signed Android release APK or AAB package",
+            "native Android Rust FIPS core integration",
+            "native Android Pollen WASM/pln integration"
         ]
     }, null, 2)}\n`);
 }
@@ -113,6 +115,8 @@ async function stageReleaseApk(stageDir, nativeRoot, sdkRoot) {
         signature,
         notProven: [
             "physical Android device install UAT",
+            "native Android Rust FIPS core integration",
+            "native Android Pollen WASM/pln integration",
             "Play Store upload signing",
             "Android App Bundle package"
         ]

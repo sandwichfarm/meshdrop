@@ -36,18 +36,24 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 6. For native-source artifacts, confirm `nativeShellSourceBuilt` is `true` and `nativeSource.sourceRoot` is present.
 7. For Android APK artifacts, confirm `nativeShellBuilt` is `true`, `nativeShellSourceBuilt` is `true`, and
    `nativePackage.packageType` is `debug-apk` or `release-apk`.
-8. Confirm backend-only transports are not claimed: `localDiscovery`, `pollen`, and `fips` are `false`.
-9. Confirm `bluetooth` is `false` until a real mobile Bluetooth transport is implemented and tested.
-10. For iOS native-source artifacts, confirm `capabilities.transports.bluetooth` reports `supported` and
+8. Confirm backend-only transports are not claimed in source/native-source artifacts: `localDiscovery`, `pollen`, and
+   `fips` are `false`.
+9. Confirm Android APK artifacts report `pollen` and `fips` as `true` only when native backend proof exists or when
+   remaining proof entries name the native binaries still required for the claimed substrate.
+10. Confirm `bluetooth` is `false` until a real mobile Bluetooth transport is implemented and tested.
+11. For iOS native-source artifacts, confirm `capabilities.transports.bluetooth` reports `supported` and
     `transferSupported` as `false`, with `apiAvailable` and `nativeBridgeAvailable` also `false`.
-11. Confirm browser-backed source artifacts report `webrtc`, `nostr`, `blossom`, and `hashtree` as `true`.
-12. Confirm native-source artifacts do not claim unproven native transfer paths: `webrtc` and `nostr` are `false`.
-13. Confirm Android APK artifacts report `webrtc` and `nostr` as `true` only after `npm run test:android-webview-transfer`
+12. Confirm browser-backed source artifacts report `webrtc`, `nostr`, `blossom`, and `hashtree` as `true`.
+13. Confirm native-source artifacts do not claim unproven native transfer paths: `webrtc` and `nostr` are `false`.
+14. Confirm Android APK artifacts report `webrtc` and `nostr` as `true` only after `npm run test:android-webview-transfer`
     passes for the installed debug APK path.
-14. Confirm Android APK artifacts do not list Android share-sheet `ACTION_SEND` as remaining proof after
+15. Confirm Android APK artifacts do not list Android share-sheet `ACTION_SEND` as remaining proof after
     `npm run test:android-share-file` passes.
-15. Confirm Android APK artifacts do not list native file picker UI UAT as remaining proof after
+16. Confirm Android APK artifacts do not list native file picker UI UAT as remaining proof after
     `npm run test:android-picker-ui` passes.
+17. Confirm Android native-source/APK builds may include per-ABI native core tools only when explicit absolute paths are
+    supplied through `MESHDROP_ANDROID_FIPS_<ABI>`, `MESHDROP_ANDROID_FIPSCTL_<ABI>`, and `MESHDROP_ANDROID_PLN_<ABI>`,
+    where `<ABI>` is `ARM64_V8A`, `ARMEABI_V7A`, or `X86_64`.
 
 ## Native Source Acceptance
 
@@ -169,6 +175,34 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 6. Confirm the proof says `meshdrop-android-webview-proof.txt` was delivered to a Chromium peer through a local fake
    relay.
 
+## Android Native FIPS/Pollen Backend Acceptance
+
+1. Start an Android emulator or attach an Android device.
+2. Run `npm run test:android-fips-pollen`.
+3. If no device is already attached, set `MESHDROP_ANDROID_AVD=<avd-name>` to launch a local AVD in headless read-only
+   mode for the smoke.
+4. Confirm the smoke prints `Proof android-fips-pollen`.
+5. Confirm the proof reports an installed APK serving `GET /fips/status`, `GET /pollen/status`, `POST /pollen/upload`,
+   and `GET /pollen/download/:hash` through a `127.0.0.1` Android-native backend.
+6. Without packaged Android FIPS binaries, confirm the proof says FIPS status came from `android-native` and
+   `rustCore=false`; treat that as fallback status only.
+7. Confirm the proof uploads and downloads `android-native-pollen-proof` from inside the installed WebView.
+8. Do not treat this as Pollen WASM/pln proof until the Android backend uses that substrate instead of the in-app
+   native object store.
+9. If Android-native `fipsctl` or `pln` binaries are supplied during packaging, confirm the installed APK packages them
+   as `jniLibs/<abi>/libmeshdrop_<tool>.so`, executes them from the app native library directory, and proof output reports
+   `android-native-fipsctl` or `android-native-pln` instead of the fallback object-store path.
+10. When `pln` is supplied, confirm the installed APK starts `pln up --port 0` from app-private state before Pollen
+    status, upload, or download claims are recorded.
+11. Current emulator proof for Android `pln` uses an x86_64 binary built from `/home/sandwich/Develop/pollen` with
+    NDK 27.2.12479018 and runs:
+    `MESHDROP_ANDROID_PLN_X86_64=/tmp/meshdrop-pln-android-x86_64 npm run test:android-fips-pollen`.
+12. Current emulator proof for Android Rust FIPS uses x86_64 `fips` and `fipsctl` binaries built from
+    `/home/sandwich/Develop/fips-android-core-20260706` with NDK 27.2.12479018 and runs:
+    `MESHDROP_ANDROID_FIPS_X86_64=/home/sandwich/Develop/fips-android-core-20260706/target/x86_64-linux-android/release/fips MESHDROP_ANDROID_FIPSCTL_X86_64=/home/sandwich/Develop/fips-android-core-20260706/target/x86_64-linux-android/release/fipsctl MESHDROP_ANDROID_PLN_X86_64=/tmp/meshdrop-pln-android-x86_64 npm run test:android-fips-pollen`.
+13. Confirm the FIPS proof reports `android-native-fipsctl` with `rustCore=true` before claiming Android Rust FIPS
+    status integration.
+
 ## Android Share/File Input Acceptance
 
 1. Start an Android emulator or attach an Android device.
@@ -236,6 +270,7 @@ npm run test:android-apk
 npm run test:android-release-apk
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-apk-install
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-picker-ui
+MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-fips-pollen
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-capabilities
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-webview-transfer
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-share-file
@@ -259,6 +294,10 @@ available.
 - These artifacts do not prove app-store packages, Play Store upload signing, AABs, or IPAs.
 - The Android debug APK artifact alone does not prove install UAT; `npm run test:android-apk-install` provides the
   emulator install proof.
+- The Android native backend can package explicit per-ABI `fips`, `fipsctl`, and `pln` tool binaries. The default smoke
+  artifact still does not include Android Rust FIPS or Android pln binaries; Android Rust FIPS proof requires
+  `MESHDROP_ANDROID_FIPS_<ABI>` and `MESHDROP_ANDROID_FIPSCTL_<ABI>` to point at real Android binaries, and the Android
+  `pln` proof requires `MESHDROP_ANDROID_PLN_<ABI>` to point at a real Android `pln` binary.
 - Android WebView transfer proof alone does not prove physical Android device install UAT; the current physical-device
   claim is backed by `npm run test:android-physical-device` passing on Google Pixel 7 Pro `28031FDH300BS5`.
 - The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.

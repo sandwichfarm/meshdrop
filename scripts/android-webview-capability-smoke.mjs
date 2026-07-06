@@ -40,6 +40,9 @@ try {
         assert.equal(state.manifestTarget, "android");
         assert.equal(state.nativeShellBuilt, true);
         assert.equal(state.runtimeTarget, "android");
+        assert.equal(state.nativeBackendAlive, true);
+        assert.match(state.nativeBackendBaseUrl, /^http:\/\/127\.0\.0\.1:\d+$/);
+        assert.equal(state.staticRuntimeHasBackend, false);
         assert.equal(state.claimsNativeWebRtc, true);
         assert.equal(state.rtcPeerConnection, "function");
         assert.equal(state.webSocket, "function");
@@ -62,6 +65,7 @@ try {
             `Proof android-webview-capabilities: ${androidMainActivity} exposed ` +
             `RTCPeerConnection=${state.rtcPeerConnection}, WebSocket=${state.webSocket}, ` +
             `RTCDataChannel label=${state.dataChannelLabel}, manifest target=${state.manifestTarget}, ` +
+            `native backend=${state.nativeBackendBaseUrl}, ` +
             `native transfer claim=${state.claimsNativeWebRtc}, ` +
             `FIPS visible=${!state.fipsHidden}, Pollen visible=${!state.pollenHidden}, ` +
             `Bluetooth API=${state.webBluetoothApi}, Bluetooth transfer=${state.runtimeBluetooth.transferSupported} ` +
@@ -186,6 +190,8 @@ async function waitForRuntimeState(cdp) {
         if (
             state.readyState !== "loading" &&
             state.manifestTarget === "android" &&
+            state.nativeBackendAlive === true &&
+            state.staticRuntimeHasBackend === false &&
             state.runtimeCapabilities === "object" &&
             state.fipsSupported === true &&
             state.pollenSupported === true &&
@@ -227,6 +233,9 @@ async function evaluateRuntimeState(cdp) {
                 manifestTarget: manifest.target || "",
                 nativeShellBuilt: manifest.nativeShellBuilt === true,
                 runtimeTarget: manifest.runtime && manifest.runtime.target || "",
+                nativeBackendAlive: globalThis.__meshdropAndroidNativeBackend?.alive === true,
+                nativeBackendBaseUrl: globalThis.__meshdropAndroidNativeBackend?.baseUrl || "",
+                staticRuntimeHasBackend: staticConfig?.capabilities?.runtime?.hasBackend,
                 claimsNativeWebRtc: manifest.transports && manifest.transports.webrtc === true,
                 runtimeCapabilities,
                 rtcPeerConnection: typeof RTCPeerConnection,
