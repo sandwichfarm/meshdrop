@@ -110,7 +110,7 @@ function iosViewControllerSource(manifestJson) {
         "import UniformTypeIdentifiers",
         "import WebKit",
         "",
-        "final class MeshDropViewController: UIViewController, WKUIDelegate, UIDocumentPickerDelegate {",
+        "final class MeshDropViewController: UIViewController, WKUIDelegate, UIDocumentPickerDelegate, WKScriptMessageHandler {",
         "    private let targetManifest = #\"\"\"",
         ...manifestJson.split("\n").map(line => `    ${line}`),
         "    \"\"\"#",
@@ -123,6 +123,12 @@ function iosViewControllerSource(manifestJson) {
         "        let source = \"globalThis.__meshdropTargetManifest = \\(targetManifest);\"",
         "        let script = WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: false)",
         "        configuration.userContentController.addUserScript(script)",
+        "        configuration.userContentController.addUserScript(WKUserScript(",
+        "            source: MeshDropShareInbox.bootstrapScript(),",
+        "            injectionTime: .atDocumentStart,",
+        "            forMainFrameOnly: false",
+        "        ))",
+        "        configuration.userContentController.add(self, name: \"meshdropShareInbox\")",
         "        webView = WKWebView(frame: view.bounds, configuration: configuration)",
         "        webView.uiDelegate = self",
         "        webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]",
@@ -131,6 +137,17 @@ function iosViewControllerSource(manifestJson) {
         "            fatalError(\"MeshDrop app/index.html is missing from the app bundle\")",
         "        }",
         "        webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())",
+        "    }",
+        "",
+        "    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {",
+        "        guard message.name == \"meshdropShareInbox\",",
+        "            let body = message.body as? [String: Any],",
+        "            let requestId = body[\"id\"] as? String,",
+        "            let fileName = body[\"name\"] as? String",
+        "        else { return }",
+        "",
+        "        let responseScript = MeshDropShareInbox.fileResponseScript(requestId: requestId, fileName: fileName)",
+        "        webView.evaluateJavaScript(responseScript, completionHandler: nil)",
         "    }",
         "",
         "    @available(iOS 18.4, *)",
@@ -161,12 +178,38 @@ function iosShareInboxSource() {
     return [
         "import Foundation",
         "",
+        ...iosShareInboxModelsSource(),
+        ...iosShareInboxCoreSource(),
+        ""
+    ].join("\n");
+}
+
+function iosShareInboxModelsSource() {
+    return [
         "struct MeshDropSharedFile: Codable {",
         "    let name: String",
         "    let path: String",
         "    let receivedAt: String",
         "}",
         "",
+        "private struct MeshDropSharedFileResponse: Codable {",
+        "    let id: String",
+        "    let name: String?",
+        "    let base64: String?",
+        "    let error: String?",
+        "}",
+        "",
+        "private enum MeshDropShareInboxError: Error {",
+        "    case missingInbox",
+        "    case missingManifestEntry",
+        "    case pathEscapesInbox",
+        "}",
+        ""
+    ];
+}
+
+function iosShareInboxCoreSource() {
+    return [
         "enum MeshDropShareInbox {",
         "    static let appGroupIdentifier = \"group.farm.sandwich.meshdrop\"",
         "    static let inboxDirectoryName = \"SharedFiles\"",
@@ -185,9 +228,118 @@ function iosShareInboxSource() {
         "        let data = try Data(contentsOf: manifest)",
         "        return try JSONDecoder().decode([MeshDropSharedFile].self, from: data)",
         "    }",
-        "}",
-        ""
-    ].join("\n");
+        "",
+        ...iosShareInboxBootstrapSource(),
+        ...iosShareInboxFileResponseSource(),
+        ...iosShareInboxFileReadSource(),
+        ...iosShareInboxJsonSource(),
+        "}"
+    ];
+}
+
+function iosShareInboxBootstrapSource() {
+    return [
+        "    static func bootstrapScript() -> String {",
+        "        let files = (try? readManifest()) ?? []",
+        "        let json = jsonString(files, fallback: \"[]\")",
+        "        return \"\"\"",
+        "        (() => {",
+        "            const files = \\(json);",
+        "            globalThis.__meshdropSharedFiles = files;",
+        "            globalThis.meshdropShareInbox = {",
+        "                list() {",
+        "                    return Promise.resolve(files);",
+        "                },",
+        "                read(name) {",
+        "                    return new Promise((resolve, reject) => {",
+        "                        const handler = globalThis.webkit?.messageHandlers?.meshdropShareInbox;",
+        "                        if (!handler) {",
+        "                            reject(new Error(\"meshdropShareInbox bridge is unavailable\"));",
+        "                            return;",
+        "                        }",
+        "                        const id = globalThis.crypto?.randomUUID",
+        "                            ? globalThis.crypto.randomUUID()",
+        "                            : `${Date.now()}-${Math.random()}`;",
+        "                        const listener = event => {",
+        "                            if (!event.detail || event.detail.id !== id) { return; }",
+        "                            window.removeEventListener(\"meshdrop:share-inbox-file\", listener);",
+        "                            if (event.detail.error) {",
+        "                                reject(new Error(event.detail.error));",
+        "                                return;",
+        "                            }",
+        "                            resolve(event.detail);",
+        "                        };",
+        "                        window.addEventListener(\"meshdrop:share-inbox-file\", listener);",
+        "                        handler.postMessage({ id, name });",
+        "                    });",
+        "                }",
+        "            };",
+        "            window.dispatchEvent(new CustomEvent(\"meshdrop:shared-files\", { detail: files }));",
+        "        })();",
+        "        \"\"\"",
+        "    }",
+        "",
+    ];
+}
+
+function iosShareInboxFileResponseSource() {
+    return [
+        "    static func fileResponseScript(requestId: String, fileName: String) -> String {",
+        "        let response: MeshDropSharedFileResponse",
+        "        do {",
+        "            let (entry, data) = try readSharedFile(named: fileName)",
+        "            response = MeshDropSharedFileResponse(",
+        "                id: requestId,",
+        "                name: entry.name,",
+        "                base64: data.base64EncodedString(),",
+        "                error: nil",
+        "            )",
+        "        } catch {",
+        "            response = MeshDropSharedFileResponse(",
+        "                id: requestId,",
+        "                name: fileName,",
+        "                base64: nil,",
+        "                error: String(describing: error)",
+        "            )",
+        "        }",
+        "",
+        "        let json = jsonString(response, fallback: \"{}\")",
+        "        return \"window.dispatchEvent(new CustomEvent(\\\"meshdrop:share-inbox-file\\\", { detail: \\(json) }));\"",
+        "    }",
+        "",
+    ];
+}
+
+function iosShareInboxFileReadSource() {
+    return [
+        "    private static func readSharedFile(named fileName: String) throws -> (MeshDropSharedFile, Data) {",
+        "        guard let inbox = inboxURL() else { throw MeshDropShareInboxError.missingInbox }",
+        "        let requestedPath = URL(fileURLWithPath: fileName).lastPathComponent",
+        "        guard let entry = try readManifest().first(where: { $0.path == requestedPath }) else {",
+        "            throw MeshDropShareInboxError.missingManifestEntry",
+        "        }",
+        "        let fileURL = inbox.appendingPathComponent(entry.path, isDirectory: false)",
+        "        let inboxPath = inbox.standardizedFileURL.path + \"/\"",
+        "        guard fileURL.standardizedFileURL.path.hasPrefix(inboxPath) else {",
+        "            throw MeshDropShareInboxError.pathEscapesInbox",
+        "        }",
+        "        return (entry, try Data(contentsOf: fileURL))",
+        "    }",
+        "",
+    ];
+}
+
+function iosShareInboxJsonSource() {
+    return [
+        "    private static func jsonString<T: Encodable>(_ value: T, fallback: String) -> String {",
+        "        guard let data = try? JSONEncoder().encode(value),",
+        "            let json = String(data: data, encoding: .utf8)",
+        "        else {",
+        "            return fallback",
+        "        }",
+        "        return json",
+        "    }",
+    ];
 }
 
 function iosShareExtensionSource() {
