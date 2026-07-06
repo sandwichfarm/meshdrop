@@ -4,12 +4,27 @@ import assert from "node:assert/strict";
 globalThis.__meshdropDisableNostrRelayNetwork = true;
 
 await import("../public/scripts/nostr-relays.js");
+await import("../public/scripts/nostr-relay-globals.js");
 
 const protocol = globalThis.NostrDiscoveryProtocol;
 
 test("Nostr discovery uses requested bootstrap and WebRTC relays", () => {
     assert.deepEqual(protocol.bootstrapRelays, ["wss://purplepag.es", "wss://nos.lol"]);
     assert.deepEqual(protocol.rtcAnnouncementRelays, ["wss://bucket.coracle.social"]);
+});
+
+test("relay settings expose browser dialog globals with non-empty client defaults", () => {
+    assert.equal(globalThis.meshdropRelaySettingsPreferences, globalThis.RelaySettingsPreferences);
+    assert.equal(globalThis.meshdropNostrDiscoveryProtocol, globalThis.NostrDiscoveryProtocol);
+
+    const settings = globalThis.meshdropRelaySettingsPreferences.normalize(
+        globalThis.meshdropRelaySettingsPreferences.read()
+    );
+
+    assert.deepEqual(settings.bootstrapRelays, ["wss://purplepag.es", "wss://nos.lol"]);
+    assert.deepEqual(settings.webRtcRelays, ["wss://bucket.coracle.social"]);
+    assert.deepEqual(settings.inboxRelays, ["wss://purplepag.es", "wss://nos.lol"]);
+    assert.deepEqual(settings.outboxRelays, ["wss://purplepag.es", "wss://nos.lol"]);
 });
 
 test("NIP-65 relay list parses read and write relay markers", () => {

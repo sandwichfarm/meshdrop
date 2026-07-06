@@ -13,6 +13,7 @@ class PairDrop {
             "scripts/browser-tabs-connector.js",
             "scripts/util.js",
             "scripts/nostr-relays.js",
+            "scripts/nostr-relay-globals.js",
             "scripts/nostr-pubkey.js",
             "scripts/nostr-android-signer.js",
             "scripts/nostr-identity.js",

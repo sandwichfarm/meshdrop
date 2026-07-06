@@ -1,0 +1,3 @@
+globalThis.meshdropNostrDiscoveryProtocol = globalThis.NostrDiscoveryProtocol;
+globalThis.meshdropRelaySettingsPreferences = globalThis.RelaySettingsPreferences;
+globalThis.meshdropProtocolServerPreferences = globalThis.ProtocolServerPreferences;
