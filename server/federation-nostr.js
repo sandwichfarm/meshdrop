@@ -49,8 +49,20 @@ export class FederationNostrDiscovery {
             const socket = new WebSocket(relay);
             socket.onopen = () => {
                 const filters = this.discoveryFilters();
+                this.trace(
+                    "trusted npub set loaded",
+                    `mode=${this.config.nostr.discoveryMode || "wot"}`,
+                    `count=${this.config.nostr.recipientPubkeys.length}`,
+                    `sample=${this.config.nostr.recipientPubkeys.slice(0, 3).map(pubkey => pubkey.slice(0, 8)).join(",") || "none"}`
+                );
                 this.trace("nostr relay open", relay, `filters=${filters.length}`);
-                socket.send(JSON.stringify(["REQ", `meshdrop-fed-${this.config.serverId}`, ...filters]));
+                this.trace("nostr discovery subscription filters", JSON.stringify(filters.map(filter => this._filterSummary(filter))));
+                if (filters.length) {
+                    socket.send(JSON.stringify(["REQ", `meshdrop-fed-${this.config.serverId}`, ...filters]));
+                }
+                else {
+                    this.trace("nostr discovery subscription skipped", "trusted-set-empty");
+                }
                 this.announceFips(socket).catch(noop);
                 this.announcePollen(socket).catch(noop);
             };
@@ -65,14 +77,24 @@ export class FederationNostrDiscovery {
     }
 
     discoveryFilters() {
-        const filters = [{
-            kinds: [FEDERATION_KIND],
-            "#d": [this.config.nostr.networkId]
-        }];
-        if (this.config.nostr.pubkey) {
+        const filters = [];
+        const trusted = this.config.nostr.recipientPubkeys || [];
+        for (let index = 0; index < trusted.length; index += 50) {
+            filters.push({
+                kinds: [FEDERATION_KIND],
+                authors: trusted.slice(index, index + 50)
+            });
+        }
+        if (this.config.nostr.pubkey && trusted.length) {
             filters.push({
                 kinds: [FEDERATION_KIND],
                 "#p": [this.config.nostr.pubkey]
+            });
+        }
+        if (this._usesPublicNetwork()) {
+            filters.push({
+                kinds: [FEDERATION_KIND],
+                "#d": [this.config.nostr.networkId]
             });
         }
         return filters;
@@ -80,6 +102,10 @@ export class FederationNostrDiscovery {
 
     async announcePollen(socket = null) {
         if (!this.config.nostr.enabled || !this.config.pollen.enabled) return;
+        if (!this._canAdvertise()) {
+            this.trace("pollen nostr announce skipped", "no-trusted-or-public-discovery");
+            return;
+        }
 
         const identity = await this.getPollenIdentity();
         if (identity.needsInvite) {
@@ -94,6 +120,7 @@ export class FederationNostrDiscovery {
                 ...this._baseDiscoveryTags("pollen-federation", POLLEN_FEDERATION_PROTOCOL),
                 ["service", this.config.pollen.serviceName],
                 ["room", this.config.pollen.room],
+                ["capability", "meshdrop-pollen-service"],
                 ...this._pollenIdentityTags(identity)
             ],
             content: ""
@@ -105,6 +132,10 @@ export class FederationNostrDiscovery {
     async announceFips(socket = null) {
         const baseUrl = this.getFipsBaseUrl();
         if (!this.config.nostr.enabled || !this.config.fips.enabled || !baseUrl) return;
+        if (!this._canAdvertise()) {
+            this.trace("fips nostr announce skipped", "no-trusted-or-public-discovery");
+            return;
+        }
 
         const event = finalizeEvent({
             kind: FEDERATION_KIND,
@@ -112,6 +143,7 @@ export class FederationNostrDiscovery {
             tags: [
                 ...this._baseDiscoveryTags("fips-federation", FIPS_FEDERATION_PROTOCOL),
                 ["base", baseUrl],
+                ["capability", "meshdrop-http"],
                 ["room", this.config.fips.room]
             ],
             content: ""
@@ -130,12 +162,24 @@ export class FederationNostrDiscovery {
 
         if (message[0] !== "EVENT") return;
         const event = message[2];
-        if (!event?.id || this.seenEvents.has(event.id)) return;
+        if (!event?.id) return;
+        if (this.seenEvents.has(event.id)) {
+            this.trace("nostr discovery event", "accepted=false", "reason=duplicate", `pubkey=${event.pubkey?.slice(0, 8) || "unknown"}`);
+            return;
+        }
         this.seenEvents.add(event.id);
 
-        if (event.pubkey === getPublicKey(this.config.nostr.secretKey)) return;
+        const decision = this._eventDecision(event);
+        this.trace(
+            "nostr discovery event",
+            `accepted=${decision.accepted}`,
+            `reason=${decision.reason}`,
+            `type=${this._tag(event, "type") || "unknown"}`,
+            `pubkey=${event.pubkey?.slice(0, 8) || "unknown"}`
+        );
+        if (!decision.accepted) return;
+
         const type = this._tag(event, "type");
-        if (!this._isEventForThisNetwork(event)) return;
         if (type === "pollen-join-request") {
             await this._handlePollenJoinRequest(event);
             return;
@@ -219,7 +263,7 @@ export class FederationNostrDiscovery {
             tags: [
                 ["type", "pollen-invite"],
                 ["protocol", POLLEN_FEDERATION_PROTOCOL],
-                ["d", this.config.nostr.networkId],
+                ...this._publicNetworkTags(),
                 ["p", event.pubkey],
                 ["server", this.config.serverId],
                 ...this._pollenIdentityTags(identity)
@@ -250,14 +294,14 @@ export class FederationNostrDiscovery {
         const message = JSON.stringify(["EVENT", event]);
         if (socket) {
             if (socket.readyState === WebSocket.OPEN) socket.send(message);
-            this.trace(label, "socket", target, this.config.nostr.networkId);
+            this.trace(label, "socket", target, this._eventScopeLabel());
             return;
         }
 
         for (const relaySocket of this.relaySockets.values()) {
             if (relaySocket.readyState === WebSocket.OPEN) relaySocket.send(message);
         }
-        this.trace(label, `openRelays=${this._openRelayCount()}`, target, this.config.nostr.networkId);
+        this.trace(label, `openRelays=${this._openRelayCount()}`, target, this._eventScopeLabel());
     }
 
     _openRelayCount() {
@@ -276,6 +320,10 @@ export class FederationNostrDiscovery {
 
     _announcePollenJoinRequest(identity, socket) {
         if (!identity.nodeId) return;
+        if (!this._canAdvertise()) {
+            this.trace("pollen join request skipped", "no-trusted-or-public-discovery");
+            return;
+        }
         const event = finalizeEvent({
             kind: FEDERATION_KIND,
             created_at: Math.floor(Date.now() / 1000),
@@ -290,10 +338,7 @@ export class FederationNostrDiscovery {
     }
 
     _isEventForThisNetwork(event) {
-        const eventNetwork = this._tag(event, "d") || this._tag(event, "network");
-        if (eventNetwork && eventNetwork !== this.config.nostr.networkId) return false;
-        return eventNetwork === this.config.nostr.networkId
-            || this._hasTag(event, "p", this.config.nostr.pubkey);
+        return this._eventDecision(event).accepted;
     }
 
     _isKnownRecipient(pubkey) {
@@ -304,11 +349,20 @@ export class FederationNostrDiscovery {
         return [
             ["type", type],
             ["protocol", protocol],
-            ["d", this.config.nostr.networkId],
             ...this.config.nostr.recipientPubkeys.map(pubkey => ["p", pubkey]),
-            ["network", this.config.nostr.networkId],
+            ...this._publicNetworkTags(),
             ["server", this.config.serverId]
-        ];
+        ].filter(Boolean);
+    }
+
+    _publicNetworkTags() {
+        return this._usesPublicNetwork()
+            ? [["d", this.config.nostr.networkId], ["network", this.config.nostr.networkId]]
+            : [];
+    }
+
+    _eventScopeLabel() {
+        return this._usesPublicNetwork() ? this.config.nostr.networkId : "wot";
     }
 
     _pollenIdentityTags(identity = {}) {
@@ -332,5 +386,62 @@ export class FederationNostrDiscovery {
 
     _hasTag(event, name, value) {
         return (event.tags || []).some(tag => tag[0] === name && tag[1] === value);
+    }
+
+    _eventDecision(event) {
+        if (!event || event.kind !== FEDERATION_KIND) return {accepted: false, reason: "wrong-kind"};
+        if (event.pubkey === getPublicKey(this.config.nostr.secretKey)) return {accepted: false, reason: "self"};
+
+        const type = this._tag(event, "type");
+        if (!type) return {accepted: false, reason: "missing-type"};
+
+        const protocol = this._tag(event, "protocol");
+        const validProtocol = type.startsWith("fips-")
+            ? protocol === FIPS_FEDERATION_PROTOCOL
+            : protocol === POLLEN_FEDERATION_PROTOCOL;
+        if (!validProtocol) return {accepted: false, reason: "protocol-mismatch"};
+        if (!this._tag(event, "server")) return {accepted: false, reason: "missing-server"};
+        if (type === "fips-federation" && !(this._tag(event, "base") || this._tag(event, "url"))) {
+            return {accepted: false, reason: "missing-base"};
+        }
+        if (type === "pollen-federation" && !this._tag(event, "service")) {
+            return {accepted: false, reason: "missing-service"};
+        }
+
+        const trusted = this._isKnownRecipient(event.pubkey);
+        const publicNetwork = this._isPublicNetworkEvent(event);
+        if (!trusted && !publicNetwork) return {accepted: false, reason: "untrusted-author"};
+
+        const eventNetwork = this._tag(event, "d") || this._tag(event, "network");
+        if (eventNetwork && this.config.nostr.networkId && eventNetwork !== this.config.nostr.networkId) {
+            return {accepted: false, reason: "network-mismatch"};
+        }
+
+        if (type === "pollen-invite" || type === "pollen-join-request") {
+            if (!this._hasTag(event, "p", this.config.nostr.pubkey)) return {accepted: false, reason: "not-addressed"};
+        }
+
+        return {accepted: true, reason: trusted ? "trusted-author" : "explicit-public-network"};
+    }
+
+    _usesPublicNetwork() {
+        return this.config.nostr.discoveryMode === "public" && !!this.config.nostr.networkId;
+    }
+
+    _canAdvertise() {
+        return this.config.nostr.recipientPubkeys.length > 0 || this._usesPublicNetwork();
+    }
+
+    _isPublicNetworkEvent(event) {
+        return this._usesPublicNetwork() && (this._tag(event, "d") || this._tag(event, "network")) === this.config.nostr.networkId;
+    }
+
+    _filterSummary(filter) {
+        return {
+            kinds: filter.kinds,
+            authors: filter.authors?.length || 0,
+            p: filter["#p"]?.map(pubkey => pubkey.slice(0, 8)),
+            d: filter["#d"]
+        };
     }
 }

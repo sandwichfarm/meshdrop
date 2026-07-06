@@ -13,12 +13,12 @@ globalThis.localStorage = {
 await import("../public/scripts/nostr-relays.js");
 await import("../public/scripts/nostr-mesh.js");
 
-test("Nostr mesh protocol uses NIP-100 draft kind and a shared Nostr room", () => {
+test("Nostr mesh protocol uses NIP-100 draft kind and no static room by default", () => {
     assert.equal(globalThis.NostrMeshProtocol.kind, 25050);
     assert.equal(globalThis.NostrMeshProtocol.presenceHeartbeatMs, 25000);
     assert.equal(
         globalThis.NostrMeshProtocol.networkId({pubkey: "a".repeat(64)}),
-        "meshdrop"
+        ""
     );
     assert.equal(
         globalThis.NostrMeshProtocol.networkId({pubkey: "a".repeat(64)}, {nostrMesh: {room: "meshdrop-lab"}}),
@@ -26,10 +26,39 @@ test("Nostr mesh protocol uses NIP-100 draft kind and a shared Nostr room", () =
     );
 });
 
-test("Nostr mesh presence announces the shared room instead of requiring followed npubs", async () => {
+test("Nostr mesh subscriptions use trusted authors unless an explicit room is configured", () => {
+    const trusted = "2".repeat(64);
+
+    assert.deepEqual(
+        globalThis.NostrMeshProtocol.subscriptionFilters({
+            pubkey: "1".repeat(64),
+            followListStatus: "found",
+            followPubkeys: [trusted, "not-a-pubkey"]
+        }, {}, 10),
+        [{
+            kinds: [25050],
+            since: 10,
+            authors: [trusted]
+        }]
+    );
+    assert.deepEqual(
+        globalThis.NostrMeshProtocol.subscriptionFilters({pubkey: "1".repeat(64), followPubkeys: []}, {}, 10),
+        []
+    );
+    assert.deepEqual(
+        globalThis.NostrMeshProtocol.subscriptionFilters(
+            {pubkey: "1".repeat(64), followPubkeys: [trusted]},
+            {nostrMesh: {room: "debug-room"}},
+            10
+        ),
+        [{kinds: [25050], since: 10, "#r": ["debug-room"]}]
+    );
+});
+
+test("Nostr mesh presence advertises MeshDrop WebRTC capability without a default room", async () => {
     const signedEvents = [];
     const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
-    mesh._room = "meshdrop";
+    mesh._room = "";
     mesh._identity = {
         pubkey: "1".repeat(64),
         displayName: "Alice",
@@ -42,7 +71,10 @@ test("Nostr mesh presence announces the shared room instead of requiring followe
     await mesh._publishPresence("connect");
 
     assert.deepEqual(signedEvents[0].tags.filter(tag => tag[0] === "p"), []);
-    assert(signedEvents[0].tags.some(tag => tag[0] === "r" && tag[1] === "meshdrop"));
+    assert.equal(signedEvents[0].tags.some(tag => tag[0] === "r"), false);
+    assert(signedEvents[0].tags.some(tag => tag[0] === "client" && tag[1] === "meshdrop"));
+    assert(signedEvents[0].tags.some(tag => tag[0] === "capability" && tag[1] === "meshdrop"));
+    assert(signedEvents[0].tags.some(tag => tag[0] === "capability" && tag[1] === "webrtc"));
 });
 
 test("Nostr mesh protocol uses bucket relay by default and trims configured relays", () => {
@@ -129,12 +161,13 @@ test("Nostr mesh protocol parses incoming draft event tags", () => {
     assert.equal(globalThis.NostrMeshProtocol.peerFromEvent(event).name.displayName, "Alice");
 });
 
-test("Nostr mesh handles public-room presence without a follow relationship", () => {
+test("Nostr mesh accepts trusted WOT presence and rejects untrusted events", () => {
     const followed = "a".repeat(64);
     const stranger = "b".repeat(64);
     const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
     mesh._seenEvents = new Set();
-    mesh._room = "meshdrop";
+    mesh._room = "";
+    mesh._trustedPubkeys = new Set([followed]);
     mesh._identity = {
         pubkey: "c".repeat(64),
         followListStatus: "found",
@@ -147,12 +180,19 @@ test("Nostr mesh handles public-room presence without a follow relationship", ()
         pubkey,
         tags: [
             ["type", "connect"],
-            ["r", "meshdrop"]
+            ["client", "meshdrop"],
+            ["capability", "meshdrop"],
+            ["capability", "webrtc"]
         ]
     });
 
     assert.equal(mesh._shouldHandleEvent(event(followed)), true);
-    assert.equal(mesh._shouldHandleEvent(event(stranger)), true);
+    assert.equal(mesh._shouldHandleEvent(event(stranger)), false);
+    assert.equal(mesh._eventDecision(event(stranger)).reason, "untrusted-author");
+    assert.equal(mesh._shouldHandleEvent({
+        ...event(followed),
+        tags: [["type", "connect"]]
+    }), false);
 });
 
 test("Nostr mesh ignores presence from a different Nostr room", () => {
@@ -160,6 +200,7 @@ test("Nostr mesh ignores presence from a different Nostr room", () => {
     const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
     mesh._seenEvents = new Set();
     mesh._room = "meshdrop";
+    mesh._trustedPubkeys = new Set([followed]);
     mesh._identity = {
         pubkey: "c".repeat(64),
         followListStatus: "found",
@@ -172,7 +213,10 @@ test("Nostr mesh ignores presence from a different Nostr room", () => {
         pubkey: followed,
         tags: [
             ["type", "connect"],
-            ["r", "other-room"]
+            ["r", "other-room"],
+            ["client", "meshdrop"],
+            ["capability", "meshdrop"],
+            ["capability", "webrtc"]
         ]
     }), false);
 });

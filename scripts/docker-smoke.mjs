@@ -93,7 +93,7 @@ async function assertContainerConfig(baseUrl) {
     const config = await getJson(`${baseUrl}/config`);
     assert(Array.isArray(config.nostrMesh?.relays), "Nostr mesh relays were not exposed");
     assert(config.fips?.enabled === true, "FIPS config was not enabled in container");
-    assert((config.fips?.room || "").startsWith("npub-network:"), "FIPS config did not use npub network discovery");
+    assert((config.fips?.room || "") === "", "FIPS config should not expose a static discovery room by default");
     assert(config.admin?.enabled === true, "Admin config was not enabled in container");
     assert(config.admin?.pubkey === smokeAdminPubkey, "Admin pubkey was not exposed in container config");
     assert(config.capabilities?.runtime?.target === "standalone", "Runtime target capability was not exposed");
@@ -102,7 +102,7 @@ async function assertContainerConfig(baseUrl) {
     assert(config.capabilities?.transports?.pollen?.supported === true, "Pollen capability was not exposed");
     assert(config.capabilities?.serverSettings?.actions?.fipsPeers === true, "Signed FIPS settings missing");
     assert(config.pollen?.enabled === true, "Pollen config was not enabled in container");
-    assert((config.pollen?.room || "").startsWith("npub-network:"), "Pollen config did not use npub network discovery");
+    assert((config.pollen?.room || "") === "", "Pollen config should not expose a static discovery room by default");
     assert(Array.isArray(config.blossom?.servers), "Blossom config was not exposed");
 }
 

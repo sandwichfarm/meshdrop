@@ -24,11 +24,9 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerTransfer, /select-files-transport/);
     assert.match(dockerTransfer, /MESHDROP_DOCKER_TRANSFER_PROOF_PREFIX \|\| "docker"/);
     assert.match(dockerTransfer, /`\$\{proofPrefix\}-local-webrtc`/);
-    assert.match(dockerTransfer, /`\$\{proofPrefix\}-pollen-webrtc`/);
     assert.match(dockerTransfer, /meshdrop-\$\{options\.name\}-proof\.txt/);
     assert.match(dockerTransfer, /scenario=\$\{options\.name\}/);
     assert.match(dockerTransfer, /transport=\$\{options\.transportId\}/);
-    assert.match(dockerTransfer, /meshdropPollenTransfer\.enable/);
     assert.match(dockerTransfer, /const transferTimeoutMs = 45000/);
     assert.match(dockerTransfer, /\{timeout: transferTimeoutMs\}/);
     assert.match(dockerTransfer, /setDefaultTimeout\(pageReadyTimeoutMs\)/);

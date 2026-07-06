@@ -1,13 +1,15 @@
 /* eslint-disable no-undef */
 
+const meshdropNetworkHasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+
 const SignalingRoomPriority = {
     priority: {
         "ip": 0,
-        "fips": 1,
-        "pollen": 2,
-        "secret": 3,
-        "public-id": 4,
-        "nostr": 5
+        "nostr": 1,
+        "fips": 2,
+        "pollen": 3,
+        "secret": 4,
+        "public-id": 5
     },
 
     primary(roomIds = {}) {
@@ -1101,7 +1103,7 @@ class Peer {
     }
 
     _allowsNostrPeer() {
-        if (!this._roomIds.nostr) return true;
+        if (!meshdropNetworkHasOwn(this._roomIds, "nostr")) return true;
 
         const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
         return globalThis.NostrFollowPolicy?.allowsPubkey(this._peerId, identity) !== false;
@@ -2010,23 +2012,37 @@ class PeersManager {
 
         if (this._peerExists(peerId)) {
             const peer = this.peers[peerId];
+            this._rememberPeerRoute(peer, isCaller, roomType, transport || this._server);
             const currentRoomType = SignalingRoomPriority.primary(peer._roomIds);
             const connected = peer._isConnected?.() === true;
             const preferNewRoute = SignalingRoomPriority.shouldPrefer(currentRoomType, roomType, connected);
+            this._traceRoute(
+                "route candidate",
+                `peer=${peerId}`,
+                `current=${currentRoomType || "none"}`,
+                `candidate=${roomType}`,
+                `connected=${connected}`,
+                `selected=${preferNewRoute}`
+            );
             this._refreshPeer(peerId, roomType, roomId, policyPeer);
             if (preferNewRoute && peer.switchSignalingRoute) {
+                this._traceRoute("selected route", `peer=${peerId}`, `route=${roomType}`, "reason=priority");
                 peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server);
             }
             return;
         }
 
         if (window.isRtcSupported && rtcSupported) {
+            this._traceRoute("selected route", `peer=${peerId}`, `route=${roomType}`, "reason=initial");
             this.peers[peerId] = new RTCPeer(transport, isCaller, peerId, roomType, roomId, this._wsConfig.rtcConfig);
             this._applyPeerInfo(this.peers[peerId], policyPeer);
+            this._rememberPeerRoute(this.peers[peerId], isCaller, roomType, transport || this._server);
         }
         else if (roomType !== 'nostr' && this._wsConfig.wsFallback) {
+            this._traceRoute("selected route", `peer=${peerId}`, `route=${roomType}`, "reason=websocket-fallback");
             this.peers[peerId] = new WSPeer(this._server, isCaller, peerId, roomType, roomId);
             this._applyPeerInfo(this.peers[peerId], policyPeer);
+            this._rememberPeerRoute(this.peers[peerId], isCaller, roomType, this._server);
         }
         else {
             console.warn("Websocket fallback is not activated on this instance.\n" +
@@ -2123,6 +2139,8 @@ class PeersManager {
 
     _onPeerDisconnected(peerId) {
         const peer = this.peers[peerId];
+        if (peer && !peer._intentionalDisconnect && this._tryFallbackRoute(peerId, peer)) return;
+
         delete this.peers[peerId];
         this._forgetPeerAliases(peerId);
         if (!peer || !peer._conn) return;
@@ -2131,6 +2149,34 @@ class PeersManager {
         peer._conn.close();
         peer._busy = false;
         peer._roomIds = {};
+    }
+
+    _tryFallbackRoute(peerId, peer) {
+        if (!peer?.switchSignalingRoute) return false;
+
+        const failedRoomType = SignalingRoomPriority.primary(peer._roomIds);
+        if (!failedRoomType || peer._getRoomTypes().length <= 1) return false;
+
+        const failedRoomId = peer._roomIds[failedRoomType];
+        peer._removeRoomType(failedRoomType);
+        delete peer._transportsByRoomType?.[failedRoomType];
+        delete peer._isCallerByRoomType?.[failedRoomType];
+
+        const nextRoomType = SignalingRoomPriority.primary(peer._roomIds);
+        if (!nextRoomType) return false;
+
+        const nextRoomId = peer._roomIds[nextRoomType];
+        const nextTransport = peer._transportsByRoomType?.[nextRoomType] || this._server;
+        const nextIsCaller = peer._isCallerByRoomType?.[nextRoomType] ?? peer._isCaller;
+        this._traceRoute(
+            "route failed",
+            `peer=${peerId}`,
+            `route=${failedRoomType}`,
+            `room=${failedRoomId || "unknown"}`
+        );
+        this._traceRoute("selected route", `peer=${peerId}`, `route=${nextRoomType}`, "reason=fallback");
+        peer.switchSignalingRoute(nextIsCaller, nextRoomType, nextRoomId, nextTransport);
+        return true;
     }
 
     _onRoomSecretsDeleted(roomSecrets) {
@@ -2158,7 +2204,7 @@ class PeersManager {
     }
 
     _disconnectOrRemoveRoomTypeByRoomType(roomType) {
-        const peerIds = Object.keys(this.peers).filter(peerId => this.peers[peerId]._roomIds?.[roomType]);
+        const peerIds = Object.keys(this.peers).filter(peerId => meshdropNetworkHasOwn(this.peers[peerId]._roomIds, roomType));
         for (const peerId of peerIds) {
             this._disconnectOrRemoveRoomTypeByPeerId(peerId, roomType);
         }
@@ -2246,6 +2292,19 @@ class PeersManager {
         });
     }
 
+    _rememberPeerRoute(peer, isCaller, roomType, transport) {
+        if (!peer || !roomType) return;
+
+        peer._transportsByRoomType = {
+            ...peer._transportsByRoomType,
+            [roomType]: transport || this._server
+        };
+        peer._isCallerByRoomType = {
+            ...peer._isCallerByRoomType,
+            [roomType]: !!isCaller
+        };
+    }
+
     _forgetPeerAliases(peerId) {
         Object.keys(this._peerAliases).forEach(alias => {
             if (this._peerAliases[alias] === peerId) delete this._peerAliases[alias];
@@ -2254,6 +2313,11 @@ class PeersManager {
 
     _resolvePeerId(peerId) {
         return this._peerAliases[peerId] || this._peerAliases[String(peerId).toLowerCase()] || peerId;
+    }
+
+    _traceRoute(...parts) {
+        if (console.info) console.info("[meshdrop:routes]", ...parts);
+        else console.log("[meshdrop:routes]", ...parts);
     }
 }
 

@@ -422,7 +422,7 @@ const NostrFollowPolicy = {
         const nostrOnly = !roomType && roomTypes.length === 1 && roomTypes[0] === "nostr";
         if (roomType !== "nostr" && !nostrOnly) return true;
 
-        return !!(peer?.nostrIdentity?.pubkey || peer?.id);
+        return this.allowsPubkey(peer?.nostrIdentity?.pubkey || peer?.id, _identity);
     }
 };
 

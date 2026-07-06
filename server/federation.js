@@ -183,7 +183,7 @@ export default class MeshFederation {
     }
 
     async _poll() {
-        await this.discoverFipsPeers().catch(error => writeStderr("FIPS federation discovery failed", errorMessage(error)));
+        await this.discoverFipsPeers().catch(error => writeStderr("FIPS route candidate refresh failed", errorMessage(error)));
         await this._announceFipsNostr().catch(error => writeStderr("FIPS Nostr announcement failed", errorMessage(error)));
         if (this.config.pollen.enabled) {
             await this._ensurePollenService().catch(error => writeStderr("Pollen federation service failed", errorMessage(error)));

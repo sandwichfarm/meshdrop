@@ -17,12 +17,14 @@ test("signaling room priority prefers local discovery over pending Nostr signali
     );
 });
 
-test("signaling room priority prefers mesh Pollen over relay Nostr while still preferring local", () => {
+test("signaling room priority prefers direct Nostr before FIPS and Pollen", () => {
     const priority = globalThis.SignalingRoomPriority;
 
-    assert.equal(priority.shouldPrefer("nostr", "pollen", false), true);
-    assert.equal(priority.shouldPrefer("pollen", "ip", false), true);
-    assert.equal(priority.shouldPrefer("pollen", "nostr", false), false);
+    assert.equal(priority.shouldPrefer("fips", "nostr", false), true);
+    assert.equal(priority.shouldPrefer("pollen", "fips", false), true);
+    assert.equal(priority.shouldPrefer("nostr", "fips", false), false);
+    assert.equal(priority.shouldPrefer("fips", "pollen", false), false);
+    assert.equal(priority.shouldPrefer("nostr", "ip", false), true);
 });
 
 test("server identity key ignores profile-only Nostr identity hydration changes", () => {

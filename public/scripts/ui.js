@@ -12,9 +12,10 @@ const meshdropDecodeBase64Files = globalThis.decodeBase64Files;
 const meshdropDecodeBase64Text = globalThis.decodeBase64Text;
 const meshdropGetThumbnailAsDataUrl = globalThis.getThumbnailAsDataUrl;
 const meshdropIsUrlValid = globalThis.isUrlValid;
+const meshdropUiHasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 
 const PeerAvailabilityProtocol = {
-    roomTypeOrder: ["ip", "fips", "pollen", "nostr", "secret", "public-id"],
+    roomTypeOrder: ["ip", "nostr", "fips", "pollen", "secret", "public-id"],
     roomTypeMeta: {
         "ip": {
             id: "local",
@@ -56,9 +57,9 @@ const PeerAvailabilityProtocol = {
             privacy: "P2P after Nostr discovery",
             privacyTone: "direct",
             details: [
-                ["Discovery", "Nostr relay"],
+                ["Discovery", "Nostr WOT"],
                 ["Data path", "WebRTC ICE direct"],
-                ["Relays see", "signaling only"]
+                ["Nostr events", "signaling only"]
             ]
         },
         "fips": {
@@ -66,12 +67,12 @@ const PeerAvailabilityProtocol = {
             label: "FIPS",
             shortLabel: "FIPS",
             className: "badge-room-fips",
-            description: "FIPS network discovery with a direct peer data channel",
+            description: "FIPS route substrate for trusted Nostr-discovered peers",
             group: "Network routes",
-            privacy: "P2P after FIPS discovery",
+            privacy: "P2P over FIPS route",
             privacyTone: "direct",
             details: [
-                ["Discovery", "FIPS mesh"],
+                ["Route", "FIPS substrate"],
                 ["Data path", "WebRTC ICE direct"],
                 ["Best case", "local network candidate"]
             ]
@@ -81,12 +82,12 @@ const PeerAvailabilityProtocol = {
             label: "Pollen",
             shortLabel: "Pollen",
             className: "badge-room-pollen",
-            description: "Pollen network discovery with a direct peer data channel",
+            description: "Pollen route substrate for trusted Nostr-discovered peers",
             group: "Network routes",
-            privacy: "P2P after Pollen discovery",
+            privacy: "P2P over Pollen route",
             privacyTone: "direct",
             details: [
-                ["Discovery", "Pollen mesh"],
+                ["Route", "Pollen substrate"],
                 ["Data path", "WebRTC ICE direct"],
                 ["Best case", "local network candidate"]
             ]
@@ -110,7 +111,7 @@ const PeerAvailabilityProtocol = {
 
     roomTypes(peer) {
         const roomIds = peer?._roomIds || {};
-        return this.roomTypeOrder.filter(roomType => roomIds[roomType]);
+        return this.roomTypeOrder.filter(roomType => meshdropUiHasOwn(roomIds, roomType));
     },
 
     availability(peer) {
@@ -238,12 +239,12 @@ const PeerAvailabilityProtocol = {
 
     countByRoomType(peers, roomType) {
         return Object.values(peers || {})
-            .filter(peer => !!peer?._roomIds?.[roomType])
+            .filter(peer => meshdropUiHasOwn(peer?._roomIds, roomType))
             .length;
     },
 
     networkPostureCounts(peers) {
-        return ["ip", "fips", "pollen", "nostr"]
+        return ["ip", "nostr", "fips", "pollen"]
             .map(roomType => ({
                 roomType,
                 ...this.roomTypeMeta[roomType],

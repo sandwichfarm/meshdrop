@@ -8,7 +8,7 @@ export function isNpubDiscoveryNetworkId(value) {
 }
 
 export function normalizeNpubDiscoveryNetworkId(value) {
-    return isNpubDiscoveryNetworkId(value) ? String(value) : DEFAULT_NPUB_DISCOVERY_NETWORK_ID;
+    return isNpubDiscoveryNetworkId(value) ? String(value) : "";
 }
 
 export function parseNostrPubkey(value) {
@@ -45,7 +45,7 @@ export function pubkeyFromSecret(secretKey) {
     }
 }
 
-export function createNpubDiscoveryNetwork({localPubkey = "", peerPubkeys = []} = {}) {
+export function createNpubDiscoveryNetwork({localPubkey = "", peerPubkeys = [], publicNetworkId = ""} = {}) {
     const normalizedLocal = parseNostrPubkey(localPubkey);
     const peers = [...new Set(peerPubkeys.map(parseNostrPubkey).filter(Boolean))];
     const recipientPubkeys = peers.filter(pubkey => pubkey !== normalizedLocal);
@@ -55,11 +55,13 @@ export function createNpubDiscoveryNetwork({localPubkey = "", peerPubkeys = []} 
     const digest = memberPubkeys.length
         ? crypto.createHash("sha256").update(memberPubkeys.join("\n")).digest("hex").slice(0, 32)
         : "";
+    const publicId = normalizeNpubDiscoveryNetworkId(publicNetworkId);
 
     return {
-        id: digest ? `npub-network:${digest}` : DEFAULT_NPUB_DISCOVERY_NETWORK_ID,
+        id: digest ? `npub-network:${digest}` : publicId,
         localPubkey: normalizedLocal,
         recipientPubkeys,
-        memberPubkeys
+        memberPubkeys,
+        discoveryMode: digest ? "wot" : (publicId ? "public" : "wot")
     };
 }

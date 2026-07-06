@@ -2,9 +2,10 @@
 
 `draft` `optional`
 
-This NIP defines how MeshDrop servers discover FIPS and Pollen federation endpoints over Nostr. The discovery event is
-ephemeral and carries only transport rendezvous metadata. MeshDrop peers still fetch `/.well-known/meshdrop-federation`
-before trusting or relaying any peer state.
+This NIP defines how MeshDrop servers advertise explicit FIPS and Pollen federation endpoints over Nostr. Nostr identity and
+the local web-of-trust are the discovery layer; FIPS and Pollen are route substrates. The discovery event is ephemeral and
+carries only signed transport rendezvous metadata. MeshDrop peers fetch `/.well-known/meshdrop-federation` only after a
+trusted Nostr author explicitly advertises a MeshDrop HTTP endpoint or Pollen service.
 
 The provisional event kind is `20385`.
 
@@ -21,17 +22,18 @@ rejected because events existed on `relay.primal.net` and `nos.lol`.
   "tags": [
     ["type", "<fips-federation | pollen-federation | pollen-join-request | pollen-invite>"],
     ["protocol", "<protocol id>"],
-    ["d", "<npub-network id>"],
-    ["network", "<npub-network id>"],
+    ["d", "<optional npub-network id for explicit public/debug discovery>"],
+    ["network", "<optional npub-network id for explicit public/debug discovery>"],
     ["server", "<meshdrop server id>"],
-    ["room", "<npub-network id>"],
+    ["room", "<optional route room/debug id>"],
     ["p", "<optional target pubkey>"]
   ]
 }
 ```
 
-`d` is the primary indexed network selector. `network` duplicates the value for clients that do not index parameterized tags.
-`p` tags are optional and allow targeted discovery for configured contacts.
+`d` is only used for an explicit public/lobby/debug discovery scope. `network` duplicates that value for clients that do not
+index parameterized tags. The default discovery path is author trust: clients subscribe to events authored by trusted npubs
+from the local follow list / configured trust set. `p` tags allow targeted discovery and Pollen bootstrap messages.
 
 ## FIPS discovery
 
@@ -46,7 +48,8 @@ FIPS discovery events MUST use:
 ```
 
 Receivers fetch `/.well-known/meshdrop-federation` from `base`. A FIPS peer address alone is not proof that the remote node
-runs MeshDrop; failed HTTP probes MUST be traceable but non-fatal.
+runs MeshDrop, and receivers MUST NOT probe generic FIPS peers on port 3000. HTTP federation is attempted only for an
+accepted signed Nostr event with an explicit `base` tag.
 
 ## Pollen discovery
 
@@ -78,7 +81,7 @@ Join requests MUST use:
 [
   ["type", "pollen-join-request"],
   ["protocol", "meshdrop-pollen-nostr-discovery"],
-  ["d", "<npub-network id>"],
+  ["d", "<optional npub-network id for explicit public/debug discovery>"],
   ["p", "<configured peer pubkey>"],
   ["server", "<meshdrop server id>"],
   ["pln-node", "<joining pollen node id>"]
@@ -91,7 +94,7 @@ Peers MUST answer join requests only from configured discovery pubkeys. Invite r
 [
   ["type", "pollen-invite"],
   ["protocol", "meshdrop-pollen-nostr-discovery"],
-  ["d", "<npub-network id>"],
+  ["d", "<optional npub-network id for explicit public/debug discovery>"],
   ["p", "<joining nostr pubkey>"],
   ["server", "<meshdrop server id>"],
   ["pln-node", "<inviting pollen node id>"],
@@ -115,32 +118,32 @@ Receivers MUST NOT destructively purge an existing Pollen cluster to join a diff
 
 ## Subscription
 
-MeshDrop clients SHOULD subscribe with both network-wide and targeted filters:
+MeshDrop clients SHOULD subscribe to their trusted author set and local-addressed events:
 
 ```json
 [
   "REQ",
   "meshdrop-fed-<server-id>",
-  {"kinds":[20385],"#d":["<npub-network id>"]},
+  {"kinds":[20385],"authors":["<trusted pubkey>", "..."]},
   {"kinds":[20385],"#p":["<local pubkey>"]}
 ]
 ```
 
-The `d` filter is the open same-network discovery path. The `p` filter preserves targeted discovery when operators configure
-known npubs.
+When an operator explicitly enables public/lobby/debug discovery, clients MAY also subscribe with
+`{"kinds":[20385],"#d":["npub-network:<id>"]}`. That filter MUST NOT be the default.
 
 ## Default network
 
-When `MESHDROP_DISCOVERY_NPUBS` is empty, MeshDrop uses `npub-network:unconfigured`. That lets default MeshDrop servers see
-public FIPS/Pollen announcements through a shared relay, but it MUST NOT be used for automatic Pollen invite issuance because
-any relay listener could request admission. Operators who want automatic Pollen cluster bootstrap SHOULD configure
-`MESHDROP_DISCOVERY_NPUBS` consistently on all participating instances.
+When `MESHDROP_DISCOVERY_NPUBS` is empty, MeshDrop does not synthesize a shared discovery room. `npub-network:unconfigured`
+is reserved for explicit public/lobby/debug mode, for example when `MESHDROP_PUBLIC_DISCOVERY=true` is configured. It MUST
+NOT be used as the default MeshDrop discovery model or for automatic Pollen invite issuance.
 
 ## Receiver behavior
 
 Receivers MUST ignore:
 
 - events signed by their own server key;
+- events from untrusted authors, unless an explicit public/lobby/debug discovery scope is enabled;
 - events whose `d` or `network` tag names another network;
 - events without a `server` tag;
 - FIPS events without a `base` tag;

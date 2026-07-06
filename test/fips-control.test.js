@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import net from "node:net";
 import {generateSecretKey, getPublicKey, nip19, utils} from "nostr-tools";
 
-import {DEFAULT_NPUB_DISCOVERY_NETWORK_ID} from "../server/npub-network.js";
 import FipsControlClient, {createFipsConfig, DEFAULT_FIPS_CONTROL_SOCKET} from "../server/fips-control.js";
 
 async function withFipsControlServer(handler, testBody) {
@@ -33,7 +32,7 @@ test("FIPS config uses the in-container control socket by default", () => {
     const config = createFipsConfig({});
 
     assert.equal(config.enabled, true);
-    assert.equal(config.room, DEFAULT_NPUB_DISCOVERY_NETWORK_ID);
+    assert.equal(config.room, "");
     assert.equal(config.timeoutMs, 1000);
     assert.equal(config.controlSocket, DEFAULT_FIPS_CONTROL_SOCKET);
 });
@@ -42,7 +41,7 @@ test("FIPS config can be disabled explicitly", () => {
     const config = createFipsConfig({FIPS_DISCOVERY: "false"});
 
     assert.equal(config.enabled, false);
-    assert.equal(config.room, DEFAULT_NPUB_DISCOVERY_NETWORK_ID);
+    assert.equal(config.room, "");
 });
 
 test("FIPS config derives its federation room from the configured npub network", () => {
@@ -235,7 +234,7 @@ test("FIPS control client reports unavailable daemon without throwing", async ()
 
     assert.equal(status.enabled, true);
     assert.equal(status.available, false);
-    assert.equal(status.room, DEFAULT_NPUB_DISCOVERY_NETWORK_ID);
+    assert.equal(status.room, "");
     assert.match(status.error, /ECONNREFUSED|connect/);
 });
 
