@@ -12,6 +12,7 @@ import {
 import {connectAndroidWebView, evaluate} from "./android-webview-devtools.mjs";
 
 const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-android-fips-pollen-smoke-"));
+const expectAndroidFips = Object.keys(process.env).some(key => key.startsWith("MESHDROP_ANDROID_FIPS"));
 const expectAndroidPln = Object.keys(process.env).some(key => key.startsWith("MESHDROP_ANDROID_PLN_"));
 let device = null;
 let webview = null;
@@ -37,9 +38,13 @@ try {
     assert.equal(state.pollenHidden, false);
     assert.equal(state.fipsStatus.enabled, true);
     assert.equal(state.fipsStatus.available, true);
-    assert.equal(state.fipsStatus.backend, "android-native");
-    assert.equal(state.fipsStatus.rustCore, false);
-    assert.equal(state.fipsStatus.error, "rust-fips-core-not-linked");
+    assert.equal(state.fipsStatus.backend, expectAndroidFips ? "android-native-fipsctl" : "android-native");
+    assert.equal(state.fipsStatus.rustCore, expectAndroidFips);
+    if (expectAndroidFips) {
+        assert.match(state.fipsStatus.controlSocket, /fips\/control\.sock$/);
+    } else {
+        assert.equal(state.fipsStatus.error, "rust-fips-core-not-linked");
+    }
     assert.equal(state.pollenStatus.enabled, true);
     assert.equal(state.pollenStatus.available, true);
     assert.equal(state.pollenStatus.backend, expectAndroidPln ? "android-native-pln" : "android-native");

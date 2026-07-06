@@ -126,6 +126,7 @@ Closed during this audit branch:
 | 2026-07-06 | `260706-android-native-fips-pollen-backend` | complete | Installed Android APK loopback serves FIPS status and Pollen upload/download; WebView capability/transfer smokes pass; Rust FIPS core and Pollen WASM/pln remain explicit gaps |
 | 2026-07-06 | `260706-android-native-core-tool-hooks` | complete | Android native-source/APK can package per-ABI `fips`, `fipsctl`, and `pln` tools and delegate backend calls when present; default smoke still lacks Android Rust FIPS and Android pln binaries |
 | 2026-07-06 | `260706-android-pln-proof-and-fips-launch` | complete | Installed Android APK starts packaged `pln up --port 0` and WebView Pollen upload/download passes through `android-native-pln`; FIPS launch plumbing added, but Android Rust FIPS build remains blocked upstream |
+| 2026-07-06 | `260706-android-rust-fips-core-proof` | complete | Release-built Android `fips`/`fipsctl` package into installed APK; `npm run test:android-fips-pollen` reports `android-native-fipsctl` with `rustCore=true`; changed-code slop clean; full-repo slop baseline remains failing outside touched files |
 
 ## Active Quick Task
 

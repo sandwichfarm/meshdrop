@@ -38,8 +38,8 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
    `nativePackage.packageType` is `debug-apk` or `release-apk`.
 8. Confirm backend-only transports are not claimed in source/native-source artifacts: `localDiscovery`, `pollen`, and
    `fips` are `false`.
-9. Confirm Android APK artifacts report `pollen` and `fips` as `true` only with remaining proof entries for native
-   Android Rust FIPS core integration and native Android Pollen WASM/pln integration.
+9. Confirm Android APK artifacts report `pollen` and `fips` as `true` only when native backend proof exists or when
+   remaining proof entries name the native binaries still required for the claimed substrate.
 10. Confirm `bluetooth` is `false` until a real mobile Bluetooth transport is implemented and tested.
 11. For iOS native-source artifacts, confirm `capabilities.transports.bluetooth` reports `supported` and
     `transferSupported` as `false`, with `apiAvailable` and `nativeBridgeAvailable` also `false`.
@@ -184,8 +184,8 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 4. Confirm the smoke prints `Proof android-fips-pollen`.
 5. Confirm the proof reports an installed APK serving `GET /fips/status`, `GET /pollen/status`, `POST /pollen/upload`,
    and `GET /pollen/download/:hash` through a `127.0.0.1` Android-native backend.
-6. Confirm the proof says FIPS status came from `android-native` and `rustCore=false`; do not treat this as Rust FIPS
-   core integration.
+6. Without packaged Android FIPS binaries, confirm the proof says FIPS status came from `android-native` and
+   `rustCore=false`; treat that as fallback status only.
 7. Confirm the proof uploads and downloads `android-native-pollen-proof` from inside the installed WebView.
 8. Do not treat this as Pollen WASM/pln proof until the Android backend uses that substrate instead of the in-app
    native object store.
@@ -197,6 +197,11 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 11. Current emulator proof for Android `pln` uses an x86_64 binary built from `/home/sandwich/Develop/pollen` with
     NDK 27.2.12479018 and runs:
     `MESHDROP_ANDROID_PLN_X86_64=/tmp/meshdrop-pln-android-x86_64 npm run test:android-fips-pollen`.
+12. Current emulator proof for Android Rust FIPS uses x86_64 `fips` and `fipsctl` binaries built from
+    `/home/sandwich/Develop/fips-android-core-20260706` with NDK 27.2.12479018 and runs:
+    `MESHDROP_ANDROID_FIPS_X86_64=/home/sandwich/Develop/fips-android-core-20260706/target/x86_64-linux-android/release/fips MESHDROP_ANDROID_FIPSCTL_X86_64=/home/sandwich/Develop/fips-android-core-20260706/target/x86_64-linux-android/release/fipsctl MESHDROP_ANDROID_PLN_X86_64=/tmp/meshdrop-pln-android-x86_64 npm run test:android-fips-pollen`.
+13. Confirm the FIPS proof reports `android-native-fipsctl` with `rustCore=true` before claiming Android Rust FIPS
+    status integration.
 
 ## Android Share/File Input Acceptance
 
@@ -290,8 +295,9 @@ available.
 - The Android debug APK artifact alone does not prove install UAT; `npm run test:android-apk-install` provides the
   emulator install proof.
 - The Android native backend can package explicit per-ABI `fips`, `fipsctl`, and `pln` tool binaries. The default smoke
-  artifact still does not include Android Rust FIPS or Android pln binaries; the Android `pln` proof requires
-  `MESHDROP_ANDROID_PLN_<ABI>` to point at a real Android `pln` binary.
+  artifact still does not include Android Rust FIPS or Android pln binaries; Android Rust FIPS proof requires
+  `MESHDROP_ANDROID_FIPS_<ABI>` and `MESHDROP_ANDROID_FIPSCTL_<ABI>` to point at real Android binaries, and the Android
+  `pln` proof requires `MESHDROP_ANDROID_PLN_<ABI>` to point at a real Android `pln` binary.
 - Android WebView transfer proof alone does not prove physical Android device install UAT; the current physical-device
   claim is backed by `npm run test:android-physical-device` passing on Google Pixel 7 Pro `28031FDH300BS5`.
 - The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.
