@@ -307,10 +307,9 @@ async function restoreFollowList(page) {
 async function waitForConnectedPeer(page, roomType) {
     try {
         const handle = await page.waitForFunction(type => {
-            const peer = document.querySelector(`x-peer.type-${type}`);
-            if (!peer) return "";
-            if (!globalThis.__meshdropE2E.connected.includes(peer.id)) return "";
-            return peer.id;
+            const connected = new Set(globalThis.__meshdropE2E.connected || []);
+            const peer = [...document.querySelectorAll(`x-peer.type-${type}`)].find(candidate => connected.has(candidate.id));
+            return peer?.id || "";
         }, roomType, {timeout: 30000});
         return handle.jsonValue();
     } catch (error) {

@@ -670,10 +670,9 @@ async function waitForConnectedPeer(page, roomType) {
     try {
         const peerId = await page.waitForFunction(type => {
             const selector = type ? `x-peer.type-${type}` : "x-peer";
-            const peer = document.querySelector(selector);
-            if (!peer) return "";
-            if (!globalThis.__meshdropE2E.connected.includes(peer.id)) return "";
-            return peer.id;
+            const connected = new Set(globalThis.__meshdropE2E.connected || []);
+            const peer = [...document.querySelectorAll(selector)].find(candidate => connected.has(candidate.id));
+            return peer?.id || "";
         }, roomType, {timeout: 20000});
 
         return peerId.jsonValue();
@@ -1149,6 +1148,9 @@ async function startFakeFips(options = {}) {
     const port = await freePort();
     const server = net.createServer(socket => {
         let buffered = "";
+        socket.on("error", () => {
+            // E2E clients can disconnect while a poll is in flight.
+        });
         socket.on("data", chunk => {
             buffered += chunk.toString("utf8");
             if (!buffered.includes("\n")) return;
