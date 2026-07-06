@@ -15,13 +15,14 @@ Use this runbook for the server-backed Docker target built from `Dockerfile` and
 For a shared-instance deployment, set these values in `docker-compose.yml` or an equivalent compose override:
 
 - `MESHDROP_ADMIN_NPUB`: the npub or hex pubkey allowed to sign server-side settings changes.
-- `MESHDROP_DISCOVERY_NPUBS`: comma-separated npubs or hex pubkeys used for FIPS/Pollen federation discovery.
 - `NOSTR_RELAYS`: relay list for Nostr WebRTC signaling and announcements.
 - `FIPS_DISCOVERY=true`: enables the FIPS backend path.
 - `POLLEN_TRANSFER=true`: enables the Pollen backend path.
 - `BLOSSOM_SERVERS`: optional comma-separated Blossom servers.
 
-Do not use `NOSTR_ROOM` or `FIPS_ROOM` for FIPS/Pollen federation UAT. Those paths are expected to use npub-network discovery.
+Do not configure static discovery npub lists or static room IDs for FIPS/Pollen discovery. Browser clients derive
+trusted peer rooms at runtime from the logged-in Nostr identity's kind 3 follow list after loading NIP-65 relays from
+bootstrap relays.
 Do not bind-mount host `fips` or `fipsctl` binaries. The Docker image installs both tools under `/usr/local/bin`; compose
 only needs the `fips.yaml` config mount, `/dev/net/tun`, `NET_ADMIN`, FIPS/Pollen ports, and data volumes.
 
@@ -39,7 +40,7 @@ only needs the `fips.yaml` config mount, `/dev/net/tun`, `NET_ADMIN`, FIPS/Polle
    - `capabilities.runtime.hasBackend` as `true`.
    - FIPS and Pollen transport capabilities as supported when enabled.
    - `admin.enabled` as `true` only when `MESHDROP_ADMIN_NPUB` is configured.
-4. Confirm the FIPS and Pollen network IDs begin with `npub-network:` when discovery peers are configured.
+4. Confirm the FIPS and Pollen configured rooms are empty unless explicit public discovery is enabled.
 5. Use the configured admin identity to submit a signed settings change from the GUI.
 6. Confirm the same settings controls are hidden or rejected for a non-admin identity.
 7. Transfer a small file between two peers over every enabled transport that claims WebRTC support.
@@ -52,7 +53,7 @@ Run:
 npm run test:docker
 ```
 
-The smoke proves container boot, `/config`, runtime capability metadata, FIPS/Pollen npub-network discovery IDs,
+The smoke proves container boot, `/config`, runtime capability metadata, runtime Nostr WOT discovery room derivation,
 installed `fips`/`fipsctl` binaries, signed-admin capability exposure, a signed admin GUI FIPS peer save against a
 container-local FIPS control mock, Pollen local status, federation metadata, served browser assets, local WebRTC
 transfer, Pollen mesh transfer between two browser peers loaded from one container, and Nostr WebRTC transfer between
@@ -74,7 +75,7 @@ npm run test:docker:admin
 
 This UAT inherits `docker-compose.yml`, overrides the container name and fixed ports so it can run beside an existing
 deployment, injects a temporary `MESHDROP_ADMIN_NPUB`, starts the service with compose, checks `/config`, confirms
-FIPS/Pollen use configured `npub-network:` IDs instead of legacy rooms, drives the signed admin GUI request, confirms a
+FIPS/Pollen do not expose static discovery rooms by default, drives the signed admin GUI request, confirms a
 non-admin signer cannot see or submit server settings, and initiates local plus Pollen browser transfers.
 
 Passing output must include `Proof docker-deployed-admin-settings: compose admin`.

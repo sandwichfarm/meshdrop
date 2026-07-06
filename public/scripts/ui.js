@@ -146,6 +146,10 @@ const PeerAvailabilityProtocol = {
         return pubkey ? [`nostr:${String(pubkey).toLowerCase()}`] : [];
     },
 
+    routeLabel(roomType) {
+        return this.roomTypeMeta[roomType]?.shortLabel || roomType || "route";
+    },
+
     privateTransferAvailable() {
         return globalThis.BlossomTransferProtocol?.hasWebCrypto?.() !== false;
     },
@@ -264,6 +268,58 @@ const PeerAvailabilityProtocol = {
 
 globalThis.PeerAvailabilityProtocol = PeerAvailabilityProtocol;
 
+const PeerRouteStatusProtocol = {
+    text(status = {}) {
+        const route = PeerAvailabilityProtocol.routeLabel(status.route || status.roomType);
+
+        switch (status.state) {
+            case "candidate":
+                return status.selected ? `Trying ${route}...` : `${route} available`;
+            case "selected":
+                return `Trying ${route}...`;
+            case "connecting":
+                return `Connecting via ${route}...`;
+            case "waiting":
+                return `Waiting via ${route}...`;
+            case "offer":
+                return `Sending ${route} offer...`;
+            case "answer":
+                return `Answering via ${route}...`;
+            case "remote-offer":
+                return `Received ${route} offer...`;
+            case "remote-answer":
+                return `Received ${route} answer...`;
+            case "ice-checking":
+            case "connection-connecting":
+                return `Checking ${route} ICE...`;
+            case "ice-connected":
+            case "ice-completed":
+            case "connection-connected":
+            case "connected":
+                return `Connected via ${route}`;
+            case "ice-failed":
+            case "connection-failed":
+            case "failed":
+                return `${route} failed`;
+            case "timeout":
+                return `${route} timed out`;
+            case "error":
+                return `${route} error`;
+            case "connection-disconnected":
+            case "ice-disconnected":
+                return `${route} disconnected`;
+            default:
+                return route ? `Connecting via ${route}...` : meshdropLocalization.getTranslation("notifications.connecting");
+        }
+    },
+
+    statusKey(status = {}) {
+        return `route-${status.route || status.roomType || "unknown"}-${status.state || "unknown"}`;
+    }
+};
+
+globalThis.PeerRouteStatusProtocol = PeerRouteStatusProtocol;
+
 const MeshDropSafeDom = {
     setQrSvg($container, svgMarkup) {
         const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
@@ -349,6 +405,7 @@ class PeersUI {
 
         this.peers = {};
         this._peerAliases = {};
+        this._routeStatuses = {};
 
         this.shareMode = {
             active: false,
@@ -361,6 +418,7 @@ class PeersUI {
         meshdropEvents.on('peer-added', _ => this._evaluateOverflowingPeers());
         meshdropEvents.on('peer-connected', e => this._onPeerConnected(e.detail.peerId, e.detail.connectionHash));
         meshdropEvents.on('peer-disconnected', e => this._onPeerDisconnected(e.detail));
+        meshdropEvents.on('peer-route-status', e => this._onPeerRouteStatus(e.detail));
         meshdropEvents.on('peers', e => this._onPeers(e.detail));
         meshdropEvents.on('set-progress', e => this._onSetProgress(e.detail));
 
@@ -467,6 +525,7 @@ class PeersUI {
 
         peer._roomIds[roomType] = roomId;
         peer._peerIdsByRoomType[roomType] = peer.id;
+        peer.routeStatus = this._routeStatuses[peer.id] || this._routeStatuses[this._visiblePeerId(peer.id)] || null;
         this.peers[peer.id] = peer;
         this._rememberPeerAliases(peer.id, peer);
         new PeerUI(peer, null, {
@@ -505,6 +564,7 @@ class PeersUI {
             ...existingPeer.nostrIdentity,
             ...peer.nostrIdentity
         };
+        existingPeer.routeStatus = this._routeStatuses[peer.id] || this._routeStatuses[existingPeerId] || existingPeer.routeStatus || null;
 
         if (this._isMoreSpecificPeerName(peer.name, existingPeer.name)) {
             existingPeer.name = peer.name;
@@ -518,7 +578,10 @@ class PeersUI {
         this._rememberPeerAliases(existingPeerId, existingPeer);
         this._rememberPeerAliases(existingPeerId, peer);
         const peerNode = meshdropGetById(existingPeerId);
-        if (peerNode) peerNode.ui._setAvatar(existingPeer.nostrIdentity?.picture);
+        if (peerNode) {
+            peerNode.ui._setAvatar(existingPeer.nostrIdentity?.picture);
+            if (existingPeer.routeStatus) peerNode.ui.setRouteStatus(existingPeer.routeStatus);
+        }
         this._redrawPeerRoomTypes(existingPeerId);
     }
 
@@ -606,6 +669,7 @@ class PeersUI {
         Object.keys(this._peerAliases).forEach(alias => {
             if (this._peerAliases[alias] === peerId) delete this._peerAliases[alias];
         });
+        delete this._routeStatuses[peerId];
         this._renderProtocolPeerCounts();
 
         const $peer = meshdropGetById(peerId);
@@ -636,6 +700,24 @@ class PeersUI {
         const $peer = meshdropGetById(this._visiblePeerId(progress.peerId));
         if (!$peer) return;
         $peer.ui.setProgress(progress.progress, progress.status, progress.transport)
+    }
+
+    _onPeerRouteStatus(status = {}) {
+        if (!status.peerId) return;
+
+        const peerId = this._visiblePeerId(status.peerId);
+        const normalized = {
+            ...status,
+            peerId
+        };
+        this._routeStatuses[status.peerId] = normalized;
+        this._routeStatuses[peerId] = normalized;
+
+        const peer = this.peers[peerId];
+        if (peer) peer.routeStatus = normalized;
+
+        const peerNode = meshdropGetById(peerId);
+        peerNode?.ui?.setRouteStatus(normalized);
     }
 
     _renderProtocolPeerCounts() {
@@ -883,6 +965,7 @@ class PeerUI {
         this._peer = peer;
         this._connected = connectionHash !== null && connectionHash !== undefined;
         this._connectionHash = this._formatConnectionHash(connectionHash);
+        this._routeStatus = peer.routeStatus || null;
 
         // This is needed if the ShareMode is started BEFORE the PeerUI is drawn.
         this._shareMode = shareMode;
@@ -898,7 +981,7 @@ class PeerUI {
 
     html() {
         let title = !this._connected
-            ? meshdropLocalization.getTranslation("notifications.connecting")
+            ? this._connectingStatusText()
             : this._shareMode.active
             ? meshdropLocalization.getTranslation("peer-ui.click-to-send-share-mode", null, {descriptor: this._shareMode.descriptor})
             : meshdropLocalization.getTranslation("peer-ui.click-to-send");
@@ -994,8 +1077,11 @@ class PeerUI {
     markConnected(connectionHash) {
         this._connected = true;
         this._connectionHash = this._formatConnectionHash(connectionHash);
-        if (this.currentStatus === 'connecting') {
+        this._routeStatus = null;
+        if (this.currentStatus === 'connecting' || this.currentStatus?.startsWith('route-')) {
             this.$el.removeAttribute('status');
+            this.$el.removeAttribute('data-route');
+            this.$el.removeAttribute('data-route-state');
             this.$el.querySelector('.status').innerHTML = '';
             this.currentStatus = null;
         }
@@ -1015,21 +1101,42 @@ class PeerUI {
     _evaluateShareMode() {
         let title;
         if (!this._connected) {
-            title = meshdropLocalization.getTranslation("notifications.connecting");
+            title = this._connectingStatusText();
             this.$input.setAttribute('disabled', true);
             this.$el.setAttribute('status', 'connecting');
+            if (this._routeStatus?.route || this._routeStatus?.roomType) {
+                this.$el.dataset.route = this._routeStatus.route || this._routeStatus.roomType;
+            } else {
+                this.$el.removeAttribute('data-route');
+            }
+            if (this._routeStatus?.state) {
+                this.$el.dataset.routeState = this._routeStatus.state;
+            } else {
+                this.$el.removeAttribute('data-route-state');
+            }
             this.$el.querySelector('.status').innerText = title;
-            this.currentStatus = 'connecting';
+            this.currentStatus = this._routeStatus
+                ? PeerRouteStatusProtocol.statusKey(this._routeStatus)
+                : 'connecting';
         }
         else if (!this._shareMode.active) {
             title = meshdropLocalization.getTranslation("peer-ui.click-to-send");
             this.$input.removeAttribute('disabled');
+            this.$el.removeAttribute('data-route');
+            this.$el.removeAttribute('data-route-state');
         }
         else {
             title =  meshdropLocalization.getTranslation("peer-ui.click-to-send-share-mode", null, {descriptor: this._shareMode.descriptor});
             this.$input.setAttribute('disabled', true);
+            this.$el.removeAttribute('data-route');
+            this.$el.removeAttribute('data-route-state');
         }
         this.$label.setAttribute('title', title);
+    }
+
+    _connectingStatusText() {
+        if (!this._routeStatus) return meshdropLocalization.getTranslation("notifications.connecting");
+        return PeerRouteStatusProtocol.text(this._routeStatus);
     }
 
     _createCallbacks() {
@@ -1118,6 +1225,13 @@ class PeerUI {
             });
 
         row.replaceChildren(...pills);
+    }
+
+    setRouteStatus(status = null) {
+        this._routeStatus = status;
+        this._peer.routeStatus = status;
+        if (this._connected) return;
+        this._evaluateShareMode();
     }
 
     _icon() {

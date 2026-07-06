@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import net from "node:net";
-import {generateSecretKey, getPublicKey, nip19, utils} from "nostr-tools";
 
 import FipsControlClient, {createFipsConfig, DEFAULT_FIPS_CONTROL_SOCKET} from "../server/fips-control.js";
 
@@ -44,23 +43,16 @@ test("FIPS config can be disabled explicitly", () => {
     assert.equal(config.room, "");
 });
 
-test("FIPS config derives its federation room from the configured npub network", () => {
-    const localSecret = generateSecretKey();
-    const peerSecret = generateSecretKey();
-    const peerPubkey = getPublicKey(peerSecret);
+test("FIPS config leaves discovery rooms to the browser runtime", () => {
     const config = createFipsConfig({
         FIPS_CONTROL_SOCKET: "21210",
-        FIPS_ROOM: "meshdrop-test",
-        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
-        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(peerPubkey),
         FIPS_CONTROL_TIMEOUT_MS: "2500"
     });
 
     assert.equal(config.enabled, true);
     assert.equal(config.controlSocket, "21210");
     assert.equal(config.controlHost, "127.0.0.1");
-    assert.match(config.room, /^npub-network:[a-f0-9]{32}$/);
-    assert.notEqual(config.room, "meshdrop-test");
+    assert.equal(config.room, "");
     assert.equal(config.timeoutMs, 2500);
     assert.equal(config.eventCommand, "events");
 });

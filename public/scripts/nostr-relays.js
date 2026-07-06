@@ -110,6 +110,10 @@ const NostrDiscoveryProtocol = {
         return events
             .filter(event => event?.kind === kind && event.pubkey === pubkey)
             .sort((left, right) => (right.created_at || 0) - (left.created_at || 0))[0] || null;
+    },
+
+    mergeRelayUrls(...relayLists) {
+        return this.normalizeRelayUrls(relayLists.flat());
     }
 };
 
@@ -120,8 +124,8 @@ const RelaySettingsPreferences = {
         return {
             bootstrapRelays: NostrDiscoveryProtocol.bootstrapRelays,
             webRtcRelays: NostrDiscoveryProtocol.rtcAnnouncementRelays,
-            inboxRelays: NostrDiscoveryProtocol.bootstrapRelays,
-            outboxRelays: NostrDiscoveryProtocol.bootstrapRelays
+            inboxRelays: [],
+            outboxRelays: []
         };
     },
 
@@ -154,8 +158,8 @@ const RelaySettingsPreferences = {
         return {
             bootstrapRelays: this.normalizeRelays(settings.bootstrapRelays, defaults.bootstrapRelays),
             webRtcRelays: this.normalizeRelays(settings.webRtcRelays, defaults.webRtcRelays),
-            inboxRelays: this.normalizeRelays(settings.inboxRelays, defaults.inboxRelays),
-            outboxRelays: this.normalizeRelays(settings.outboxRelays, defaults.outboxRelays)
+            inboxRelays: this.normalizeRelays(settings.inboxRelays, []),
+            outboxRelays: this.normalizeRelays(settings.outboxRelays, [])
         };
     },
 
@@ -182,12 +186,70 @@ const RelaySettingsPreferences = {
     displaySettings(identity = null) {
         const stored = this.read();
         const discoveredRelays = identity?.relays || {};
+        const hasStoredInbox = Object.prototype.hasOwnProperty.call(stored, "inboxRelays");
+        const hasStoredOutbox = Object.prototype.hasOwnProperty.call(stored, "outboxRelays");
         return this.normalize({
             bootstrapRelays: stored.bootstrapRelays,
             webRtcRelays: stored.webRtcRelays,
-            inboxRelays: stored.inboxRelays || discoveredRelays.read,
-            outboxRelays: stored.outboxRelays || discoveredRelays.write
+            inboxRelays: hasStoredInbox ? stored.inboxRelays : discoveredRelays.read,
+            outboxRelays: hasStoredOutbox ? stored.outboxRelays : discoveredRelays.write
         });
+    }
+};
+
+const NpubNetworkProtocol = {
+    roomPrefix: "npub-network:",
+    textEncoder: new TextEncoder(),
+
+    normalizePubkey(pubkey) {
+        return NostrDiscoveryProtocol.pubkeyRegex.test(pubkey || "") ? pubkey.toLowerCase() : "";
+    },
+
+    normalizeRoom(room) {
+        return /^npub-network:[a-z0-9:-]+$/i.test(String(room || "")) ? String(room) : "";
+    },
+
+    trustedPubkeys(identity = null) {
+        const localPubkey = this.normalizePubkey(identity?.pubkey);
+        return [...new Set((identity?.followPubkeys || [])
+            .map(pubkey => this.normalizePubkey(pubkey))
+            .filter(pubkey => pubkey && pubkey !== localPubkey))];
+    },
+
+    async roomsForIdentity(identity = null, config = {}) {
+        const rooms = [];
+        const explicitRoom = this.normalizeRoom(typeof config === "string" ? config : config.room);
+        const discoveryMode = typeof config === "object" ? config.discoveryMode : "";
+        if (discoveryMode === "public" && explicitRoom) rooms.push(explicitRoom);
+
+        const localPubkey = this.normalizePubkey(identity?.pubkey);
+        const trusted = this.trustedPubkeys(identity);
+        if (localPubkey && trusted.length) {
+            rooms.push(...await Promise.all(trusted.map(pubkey => this.pairwiseRoom(localPubkey, pubkey))));
+        }
+
+        return [...new Set(rooms.filter(Boolean))];
+    },
+
+    async pairwiseRoom(localPubkey, peerPubkey) {
+        const pair = [this.normalizePubkey(localPubkey), this.normalizePubkey(peerPubkey)]
+            .filter(Boolean)
+            .sort();
+        if (pair.length !== 2 || pair[0] === pair[1]) return "";
+
+        return `${this.roomPrefix}${await this._digest(pair.join("\n"))}`;
+    },
+
+    async _digest(value) {
+        if (!globalThis.crypto?.subtle) {
+            return value.replace(/[^a-f0-9]/gi, "").slice(0, 32);
+        }
+
+        const digest = await globalThis.crypto.subtle.digest("SHA-256", this.textEncoder.encode(value));
+        return [...new Uint8Array(digest)]
+            .map(byte => byte.toString(16).padStart(2, "0"))
+            .join("")
+            .slice(0, 32);
     }
 };
 
@@ -214,10 +276,11 @@ class NostrRelayPool {
 
     async lookupUser(pubkey) {
         const relays = await this.getUserRelays(pubkey);
+        const lookupRelays = this.lookupRelays(relays);
         const [profile, followList, blossomServerList] = await Promise.all([
-            this.getUserProfile(pubkey, relays.write),
-            this.getUserFollowList(pubkey, relays.write),
-            this.getUserBlossomServerList(pubkey, relays.write)
+            this.getUserProfile(pubkey, lookupRelays),
+            this.getUserFollowList(pubkey, lookupRelays),
+            this.getUserBlossomServerList(pubkey, lookupRelays)
         ]);
 
         return {
@@ -240,12 +303,17 @@ class NostrRelayPool {
         });
         const parsed = NostrDiscoveryProtocol.relayListFromEvent(event);
         const relays = {
-            read: parsed.read.length ? parsed.read : this.bootstrapRelays,
-            write: parsed.write.length ? parsed.write : this.bootstrapRelays
+            read: parsed.read,
+            write: parsed.write,
+            status: event ? "found" : "missing"
         };
 
         this._relayLists.set(pubkey, relays);
         return relays;
+    }
+
+    lookupRelays(relays = {}) {
+        return NostrDiscoveryProtocol.mergeRelayUrls(this.bootstrapRelays, relays.read || [], relays.write || []);
     }
 
     async getUserProfile(pubkey, relayUrls = null) {
@@ -395,6 +463,7 @@ class NostrRelayPool {
 globalThis.NostrDiscoveryProtocol = NostrDiscoveryProtocol;
 globalThis.RelaySettingsPreferences = RelaySettingsPreferences;
 globalThis.meshdropRelaySettingsPreferences = RelaySettingsPreferences;
+globalThis.NpubNetworkProtocol = NpubNetworkProtocol;
 globalThis.NostrRelayPool = NostrRelayPool;
 globalThis.meshdropNostrRelays = new NostrRelayPool();
 

@@ -39,7 +39,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker/);
     assert.match(readDoc("docs/uat/docker.md"), /npm run test:docker:two-host/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_ADMIN_NPUB/);
-    assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DISCOVERY_NPUBS/);
+    assert.match(readDoc("docs/uat/docker.md"), /runtime Nostr WOT discovery/);
+    assert.doesNotMatch(readDoc("docs/uat/docker.md"), staticDiscoveryNpubsPattern());
     assert.match(readDoc("docs/uat/docker.md"), /Proof docker-two-host-nostr-webrtc/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DOCKER_PUBLIC_RELAY_URLS=wss:\/\/bucket\.coracle\.social/);
     assert.match(readDoc("docs/uat/docker.md"), /MESHDROP_DOCKER_PUBLIC_RELAY_ATTEMPTS/);
@@ -51,7 +52,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     const start9 = readDoc("docs/uat/start9.md");
     assert.match(start9, /npm run build:start9/);
     assert.match(start9, /MESHDROP_TARGET=start9/);
-    assert.match(start9, /MESHDROP_DISCOVERY_NPUBS/);
+    assert.match(start9, /browser Nostr WOT discovery/);
+    assert.doesNotMatch(start9, staticDiscoveryNpubsPattern());
     assert.match(start9, /MESHDROP_ADMIN_NPUB/);
     assert.match(start9, /\.s9pk/);
     assert.match(start9, /npm run test:start9-package/);
@@ -64,7 +66,8 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     const umbrel = readDoc("docs/uat/umbrel.md");
     assert.match(umbrel, /npm run build:umbrel/);
     assert.match(umbrel, /MESHDROP_TARGET=umbrel/);
-    assert.match(umbrel, /MESHDROP_DISCOVERY_NPUBS/);
+    assert.match(umbrel, /browser Nostr WOT discovery/);
+    assert.doesNotMatch(umbrel, staticDiscoveryNpubsPattern());
     assert.match(umbrel, /MESHDROP_ADMIN_NPUB/);
     assert.match(umbrel, /npm run test:umbrel-package/);
     assert.match(umbrel, /MESHDROP_UMBREL_UAT_URL/);
@@ -365,3 +368,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.doesNotMatch(targetStatus, /native Android WebView file transfer UAT/);
     assert.doesNotMatch(targetStatus, /mobile file-picker\/share-sheet integration, Bluetooth/);
 });
+
+function staticDiscoveryNpubsPattern() {
+    return new RegExp(["DISCOVERY", "NPUBS"].join("_"));
+}

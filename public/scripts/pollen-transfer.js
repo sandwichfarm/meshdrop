@@ -118,7 +118,7 @@ class PollenTransferController {
         this._active = true;
         this._render();
         if (remember) this._setPreferredActive(true);
-        Events.fire("join-pollen-room");
+        Events.fire("join-pollen-room", {rooms: await this._runtimeRooms()});
         if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.pollen-transfer-enabled"));
     }
 
@@ -232,6 +232,18 @@ class PollenTransferController {
         if (!PollenTransferProtocol.enabledFromConfig(this._config) || !this._available) return;
 
         await this.enable({notify: false, remember: false});
+    }
+
+    async _runtimeRooms() {
+        const identityController = globalThis.meshdropNostrIdentity;
+        const identity = await identityController?.ensureFollowListLoaded?.()
+            || identityController?.getIdentity?.();
+        return globalThis.NpubNetworkProtocol?.roomsForIdentity
+            ? globalThis.NpubNetworkProtocol.roomsForIdentity(identity, {
+                room: this._config?.pollen?.room,
+                discoveryMode: this._config?.pollen?.discoveryMode
+            })
+            : [];
     }
 
     _render() {

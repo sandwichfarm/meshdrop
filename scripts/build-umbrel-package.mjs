@@ -95,7 +95,7 @@ async function writeTargetManifest(stageDir, version, image) {
         },
         configuration: {
             adminNpubEnv: "MESHDROP_ADMIN_NPUB",
-            discoveryNpubsEnv: "MESHDROP_DISCOVERY_NPUBS",
+            discovery: "browser-nostr-wot",
             staticRooms: false
         },
         transports: {

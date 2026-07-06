@@ -73,7 +73,7 @@ test("Start9 package builder creates SDK source artifact", async () => {
 
         const main = await readTarEntry(result.artifactPath, `${prefix}/startos/main.ts`);
         assert.match(main, /MESHDROP_TARGET: "start9"/);
-        assert.match(main, /MESHDROP_DISCOVERY_NPUBS: ""/);
+        assert.doesNotMatch(main, staticDiscoveryNpubsPattern());
         assert.match(main, /MESHDROP_ADMIN_NPUB: ""/);
         assert.match(main, /POLLEN_TRANSFER: "true"/);
         assert.doesNotMatch(main, /NOSTR_ROOM|FIPS_ROOM|POLLEN_ROOM/);
@@ -81,12 +81,17 @@ test("Start9 package builder creates SDK source artifact", async () => {
         const target = await readTarEntry(result.artifactPath, `${prefix}/meshdrop-target.json`);
         assert.match(target, /"target": "start9"/);
         assert.match(target, /"s9pkBuilt": false/);
+        assert.match(target, /"discovery": "browser-nostr-wot"/);
         assert.match(target, /"staticRooms": false/);
     }
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});
     }
 });
+
+function staticDiscoveryNpubsPattern() {
+    return new RegExp(["DISCOVERY", "NPUBS"].join("_"));
+}
 
 test("Start9 generated package source typechecks against declared SDK dependency", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "meshdrop-start9-typecheck-"));

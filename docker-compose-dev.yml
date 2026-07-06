@@ -12,7 +12,6 @@ services:
       - RTC_CONFIG=false # Set to the path of a file that specifies the STUN/TURN servers.
       - DEBUG_MODE=false # Set to true to debug container and peer connections.
       - NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net # Relay list for Nostr mesh discovery.
-      - MESHDROP_DISCOVERY_NPUBS= # Comma-separated npubs or hex pubkeys this instance should discover for FIPS/Pollen federation.
       - MESHDROP_ADMIN_NPUB= # Shared-instance admin npub allowed to sign server-side settings changes.
       - BLOSSOM_SERVERS= # Comma-separated Blossom servers for optional storage-backed transfers.
       - FIPS_DISCOVERY=false # Set to true when a FIPS daemon control socket is reachable from the container.

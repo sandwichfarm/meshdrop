@@ -88,8 +88,12 @@ function assertStart9Environment(env) {
     assert(env.FIPS_DISCOVERY === "false", "generated Start9 env should keep FIPS disabled until target UAT exists");
     assert(env.PLN_DIR === "/data/pln", "generated Start9 env did not mount Pollen state under /data");
     assert(env.POLLEN_PORT === "60611", "generated Start9 env did not expose the Pollen peer port");
-    assert("MESHDROP_DISCOVERY_NPUBS" in env, "generated Start9 env did not expose MESHDROP_DISCOVERY_NPUBS");
+    assert(!Object.keys(env).some(key => staticDiscoveryNpubsPattern().test(key)), "generated Start9 env still exposes static discovery npubs");
     assert("MESHDROP_ADMIN_NPUB" in env, "generated Start9 env did not expose MESHDROP_ADMIN_NPUB");
+}
+
+function staticDiscoveryNpubsPattern() {
+    return new RegExp(["DISCOVERY", "NPUBS"].join("_"));
 }
 
 function startContainer(env, dataDir) {

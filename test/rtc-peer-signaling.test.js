@@ -158,16 +158,63 @@ test("RTC signaling ignores stale answers and candidates from another negotiatio
     assert.deepEqual(errors, []);
 });
 
-test("RTC signaling accepts legacy sessionless answers for the active local offer", async () => {
+test("RTC route status exposes ICE failure and triggers route fallback", async () => {
+    const {RTCPeer, connections, fired} = createHarness();
+    const peer = new RTCPeer({send() {}}, true, "peer-a", "nostr", "nostr-room", {});
+    await flushPromises();
+
+    connections[0].iceConnectionState = "failed";
+    peer._onIceConnectionStateChange();
+
+    assert.equal(
+        fired.some(event => event.type === "peer-route-failed"
+            && event.detail.peerId === "peer-a"
+            && event.detail.reason === "ice-failed"),
+        true
+    );
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === "peer-a"
+            && event.detail.route === "nostr"
+            && event.detail.state === "ice-failed"),
+        true
+    );
+});
+
+test("RTC route timeout triggers fallback instead of waiting for a fresh announcement", async () => {
+    const {RTCPeer, fired} = createHarness();
+    const peer = new RTCPeer({send() {}}, true, "peer-a", "fips", "fips-room", {});
+    await flushPromises();
+
+    peer._clearRouteAttemptTimeout();
+    peer._onRouteAttemptTimeout("test-timeout");
+
+    assert.equal(
+        fired.some(event => event.type === "peer-route-failed"
+            && event.detail.peerId === "peer-a"
+            && event.detail.reason === "route-timeout"),
+        true
+    );
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === "peer-a"
+            && event.detail.route === "fips"
+            && event.detail.state === "timeout"
+            && event.detail.timeoutMs === 15000),
+        true
+    );
+});
+
+test("RTC signaling rejects sessionless answers", async () => {
     const {RTCPeer, connections, errors} = createHarness();
     const peer = new RTCPeer({send() {}}, true, "peer-a", "nostr", "room", {});
     await flushPromises();
 
-    peer.onServerMessage({sdp: {type: "answer", sdp: "legacy-answer"}});
+    peer.onServerMessage({sdp: {type: "answer", sdp: "sessionless-answer"}});
     await flushPromises();
 
-    assert.equal(connections[0].remoteDescriptions.length, 1);
-    assert.equal(connections[0].remoteDescription.sdp, "legacy-answer");
+    assert.equal(connections[0].remoteDescriptions.length, 0);
+    assert.equal(connections[0].remoteDescription, null);
     assert.deepEqual(errors, []);
 });
 
@@ -458,6 +505,50 @@ test("PeersManager refresh merges Nostr identity into an existing transport peer
     assert.equal(manager._resolvePeerId(pubkey), "same-peer");
 });
 
+test("PeersManager merges same-npub routes and signals the route-specific target id", async () => {
+    const {PeersManager, connections} = createHarness();
+    const manager = new PeersManager({send() {}});
+    const sent = [];
+    const pubkey = "d".repeat(64);
+    const nostrTransport = {send: message => sent.push(message)};
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "fips",
+        roomId: "fips-room",
+        peer: {
+            id: "fips-peer",
+            rtcSupported: true,
+            nostrIdentity: {pubkey},
+            name: {displayName: "NADAR2", deviceName: "Mac Macintosh"}
+        }
+    });
+    manager._onPeerJoined({
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room",
+        transport: nostrTransport,
+        peer: {
+            id: pubkey,
+            rtcSupported: true,
+            nostrIdentity: {pubkey},
+            name: {displayName: "NADAR2", deviceName: "Nostr peer"}
+        }
+    });
+    await flushPromises();
+
+    assert.deepEqual(Object.keys(manager.peers), ["fips-peer"]);
+    assert.equal(manager.peers["fips-peer"]._roomIds.fips, "fips-room");
+    assert.equal(manager.peers["fips-peer"]._roomIds.nostr, "nostr-room");
+    assert.equal(manager.peers["fips-peer"]._peerIdsByRoomType.fips, "fips-peer");
+    assert.equal(manager.peers["fips-peer"]._peerIdsByRoomType.nostr, pubkey);
+    assert.equal(manager._resolvePeerId(pubkey), "fips-peer");
+    assert.equal(connections.length, 1);
+    assert.equal(sent.at(-1).to, pubkey);
+    assert.equal(sent.at(-1).roomType, "nostr");
+});
+
 test("peer-left removes a room type even when the websocket remains connected", () => {
     const {PeersManager, fired} = createHarness();
     const manager = new PeersManager({send() {}});
@@ -507,7 +598,7 @@ test("leaving a room locally removes that room type from visible peers", () => {
 });
 
 test("PeersManager falls back from direct Nostr to FIPS then Pollen on RTC failure", () => {
-    const {PeersManager} = createHarness();
+    const {PeersManager, fired} = createHarness();
     const manager = new PeersManager({send() {}});
     const switches = [];
     const fipsTransport = {send() {}};
@@ -519,6 +610,7 @@ test("PeersManager falls back from direct Nostr to FIPS then Pollen on RTC failu
         _isCaller: true,
         _roomIds: {nostr: "nostr-room", fips: "fips-room", pollen: "pollen-room"},
         _transportsByRoomType: {fips: fipsTransport, pollen: pollenTransport},
+        _peerIdsByRoomType: {nostr: "nostr-peer", fips: "fips-peer", pollen: "pollen-peer"},
         _isCallerByRoomType: {fips: false, pollen: true},
         _getRoomTypes() {
             return Object.keys(this._roomIds);
@@ -531,7 +623,7 @@ test("PeersManager falls back from direct Nostr to FIPS then Pollen on RTC failu
         }
     };
 
-    manager._onPeerDisconnected("peer-a");
+    manager._onPeerRouteFailed({peerId: "peer-a", reason: "test-failure"});
 
     assert.equal(manager.peers["peer-a"]._roomIds.nostr, undefined);
     assert.deepEqual(switches, [{
@@ -540,6 +632,22 @@ test("PeersManager falls back from direct Nostr to FIPS then Pollen on RTC failu
         roomId: "fips-room",
         transport: fipsTransport
     }]);
+    assert.equal(fired.some(event => event.type === "peer-disconnected"), false);
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === "peer-a"
+            && event.detail.route === "nostr"
+            && event.detail.state === "failed"),
+        true
+    );
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === "peer-a"
+            && event.detail.route === "fips"
+            && event.detail.routePeerId === "fips-peer"
+            && event.detail.state === "selected"),
+        true
+    );
 });
 
 test("disabled local discovery ignores late IP peer announcements", () => {
