@@ -85,9 +85,9 @@ Repeat with `target=start9` and `target=umbrel`.
 
 ## Not proven
 
-- Anonymous local readback is not proven for `v0.1.4`: the release readback job failed at anonymous GHCR after Docker
-  smoke passed, and the release workflow's `npm run verify:ghcr-anonymous -- v0.1.4` step failed with GHCR
-  `unauthorized` for `ghcr.io/sandwichfarm/meshdrop:v0.1.4-standalone`.
+- Anonymous local readback is not proven for `v0.1.5`: the release readback job failed at anonymous GHCR after Docker
+  smoke passed, and the release workflow's `npm run verify:ghcr-anonymous -- v0.1.5` step failed with GHCR
+  `unauthorized` for `ghcr.io/sandwichfarm/meshdrop:v0.1.5-standalone`.
 - The local GitHub token lacks `read:packages`, so this session cannot inspect package visibility through the Packages
   REST API. Making `ghcr.io/sandwichfarm/meshdrop` public is still required before anonymous manifest readback can pass.
 - The iOS source, native-source, unsigned Simulator app, and unsigned device app artifacts are not complete native
@@ -101,21 +101,28 @@ Repeat with `target=start9` and `target=umbrel`.
 
 ## Current Verified Release
 
-`v0.1.4` release assets and authenticated GHCR readback are proven by release run `28724437334`. It was published on
-2026-07-05 and verified with these readbacks before the strict anonymous GHCR gate failed:
+`v0.1.5` release assets and authenticated GHCR readback are proven by release run `28760231569`. It was published on
+2026-07-06 and verified with these readbacks before the strict anonymous GHCR gate failed:
 
-- GitHub release: https://github.com/sandwichfarm/meshdrop/releases/tag/v0.1.4
-- Release workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28724437334
-- Assets: `meshdrop-android-0.1.4.tar.gz`, `meshdrop-android-apk-0.1.4.tar.gz`,
-  `meshdrop-android-native-source-0.1.4.tar.gz`, `meshdrop-desktop-0.1.4.tar.gz`,
-  `meshdrop-desktop-chromium-0.1.4.tar.gz`, `meshdrop-desktop-linux-0.1.4.tar.gz`,
-  `meshdrop-ios-0.1.4.tar.gz`, `meshdrop-ios-native-source-0.1.4.tar.gz`,
-  `meshdrop-node-0.1.4.tar.gz`, `meshdrop-source-0.1.4.tar.gz`, `meshdrop-spa-0.1.4.tar.gz`,
-  `meshdrop-start9-0.1.4.tar.gz`, `meshdrop-umbrel-0.1.4.tar.gz`, and `SHA256SUMS`.
+- GitHub release: https://github.com/sandwichfarm/meshdrop/releases/tag/v0.1.5
+- Release workflow: https://github.com/sandwichfarm/meshdrop/actions/runs/28760231569
+- Assets: `meshdrop-android-0.1.5.tar.gz`, `meshdrop-android-apk-0.1.5.tar.gz`,
+  `meshdrop-android-native-source-0.1.5.tar.gz`, `meshdrop-android-release-apk-0.1.5.tar.gz`,
+  `meshdrop-desktop-0.1.5.tar.gz`, `meshdrop-desktop-chromium-0.1.5.tar.gz`,
+  `meshdrop-desktop-chromium-bundled-0.1.5.tar.gz`,
+  `meshdrop-desktop-chromium-bundled-installer-0.1.5.run`,
+  `meshdrop-desktop-chromium-bundled-installer-0.1.5.run.asc`,
+  `meshdrop-desktop-chromium-bundled-installer-0.1.5.run.pubkey.asc`,
+  `meshdrop-desktop-chromium-bundled-installer-0.1.5.run.sha256`,
+  `meshdrop-desktop-linux-0.1.5.tar.gz`, `meshdrop-ios-0.1.5.tar.gz`,
+  `meshdrop-ios-device-app-0.1.5.tar.gz`, `meshdrop-ios-native-source-0.1.5.tar.gz`,
+  `meshdrop-ios-simulator-app-0.1.5.tar.gz`, `meshdrop-node-0.1.5.tar.gz`,
+  `meshdrop-source-0.1.5.tar.gz`, `meshdrop-spa-0.1.5.tar.gz`,
+  `meshdrop-start9-0.1.5.tar.gz`, `meshdrop-umbrel-0.1.5.tar.gz`, and `SHA256SUMS`.
 - GHCR target image jobs passed for `start9`, `standalone`, and `umbrel`.
-- GHCR tags checked by `release-verify.yml`: `v0.1.4-standalone`, `0.1.4-standalone`, `v0.1.4-start9`,
-  `0.1.4-start9`, `v0.1.4-umbrel`, and `0.1.4-umbrel`.
+- GHCR tags checked by `release-verify.yml`: `v0.1.5-standalone`, `0.1.5-standalone`, `v0.1.5-start9`,
+  `0.1.5-start9`, `v0.1.5-umbrel`, and `0.1.5-umbrel`.
 - `release-verify.yml` confirmed `linux/amd64` and `linux/arm64` manifests with GitHub Actions package permissions,
-  pulled target metadata, and Docker smoke passed for `ghcr.io/sandwichfarm/meshdrop:v0.1.4-standalone`.
+  pulled target metadata, and Docker smoke passed for `ghcr.io/sandwichfarm/meshdrop:v0.1.5-standalone`.
 - The same release readback failed at anonymous GHCR manifest readback with `unauthorized`, so the release image target
-  remains incomplete until `ghcr.io/sandwichfarm/meshdrop` is public and anonymous readback passes.
+  remains blocked on public package visibility or an intentional authenticated-only release decision.

@@ -47,12 +47,13 @@ Hardware/node UAT remains open for signed iOS device packages, StartOS, and Umbr
 
 Goal: make GitHub Actions and release automation reflect the real alpha shipping path.
 
-Current status: incomplete. CI/release automation exists, but current `master` is not tagged after PR #105 and anonymous
-GHCR readback fails with `unauthorized`.
+Current status: mostly complete. CI/release automation exists and `v0.1.5` published the latest target artifacts/images,
+but anonymous GHCR readback still fails with `unauthorized`.
 
 - PR checks cover build/test/runtime smoke surfaces.
 - Release flow avoids redundant CI when branch protection already proves the target.
 - Tagged alpha releases produce GitHub releases and image/artifact outputs.
+- Make GHCR target images anonymously readable, or document the intended authenticated-only pull model.
 
 ---
 *Roadmap initialized: 2026-07-04 from goal objective. Status audited: 2026-07-06.*
