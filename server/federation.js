@@ -1,62 +1,12 @@
-import crypto from "crypto";
-import fs from "fs";
-import net from "net";
-import path from "path";
-import {spawn} from "child_process";
-import {finalizeEvent, generateSecretKey, getPublicKey, utils} from "nostr-tools";
-import {WebSocket} from "ws";
-import {
-    createNpubDiscoveryNetwork,
-    parseNostrPubkeys,
-    pubkeyFromSecret
-} from "./npub-network.js";
+import {createFederationConfig} from "./federation-config.js";
+import {FederationFipsTransport} from "./federation-fips.js";
+import {FederationNostrDiscovery} from "./federation-nostr.js";
+import {FederationPollenTransport} from "./federation-pollen.js";
 
-const FEDERATION_KIND = 25051;
-const SERVICE_PREFIX = "meshdrop-fed";
 const writeStderr = (...parts) => process.stderr.write(`${parts.join(" ")}\n`);
+const errorMessage = error => error?.message || String(error);
 
-export function createFederationConfig(env = process.env) {
-    const enabled = env.MESHDROP_FEDERATION !== "false";
-    const serverId = env.MESHDROP_SERVER_ID || loadOrCreateServerId(env.PLN_DIR || "/var/lib/meshdrop/pln");
-    const secretKey = loadOrCreateNostrKey(env.MESHDROP_NOSTR_SECRET_KEY, env.PLN_DIR || "/var/lib/meshdrop/pln");
-    const network = createNpubDiscoveryNetwork({
-        localPubkey: pubkeyFromSecret(secretKey),
-        peerPubkeys: parseNostrPubkeys(env.MESHDROP_DISCOVERY_NPUBS || env.MESHDROP_NPUBS || "")
-    });
-
-    return {
-        enabled,
-        serverId,
-        port: Number.parseInt(env.PORT || "3000", 10) || 3000,
-        basePath: env.MESHDROP_FEDERATION_BASE_PATH || "",
-        pollMs: Number.parseInt(env.MESHDROP_FEDERATION_POLL_MS || "", 10) || 15000,
-        fips: {
-            enabled: enabled && env.FIPS_DISCOVERY !== "false",
-            room: network.id,
-            port: Number.parseInt(env.FIPS_FEDERATION_PORT || env.PORT || "3000", 10) || 3000,
-            publicUrl: env.FIPS_FEDERATION_URL || env.MESHDROP_FEDERATION_PUBLIC_URL || ""
-        },
-        pollen: {
-            enabled: enabled && env.POLLEN_TRANSFER !== "false",
-            room: network.id,
-            command: env.PLN_BIN || "pln",
-            dir: env.PLN_DIR || "/var/lib/meshdrop/pln",
-            serviceName: env.POLLEN_FEDERATION_SERVICE || `${SERVICE_PREFIX}-${serverId.slice(0, 16)}`
-        },
-        nostr: {
-            enabled: env.POLLEN_NOSTR_BOOTSTRAP !== "false",
-            relays: (env.NOSTR_RELAYS || "wss://bucket.coracle.social")
-                .split(",")
-                .map(relay => relay.trim())
-                .filter(Boolean),
-            pubkey: network.localPubkey,
-            recipientPubkeys: network.recipientPubkeys,
-            networkId: network.id,
-            secretKey
-        },
-        timeoutMs: Number.parseInt(env.MESHDROP_FEDERATION_TIMEOUT_MS || "", 10) || 2500
-    };
-}
+export {createFederationConfig};
 
 export default class MeshFederation {
 
@@ -68,10 +18,35 @@ export default class MeshFederation {
         this.localPeers = new Map();
         this.remoteServers = new Map();
         this.timers = [];
-        this.relaySockets = new Map();
-        this.seenNostrEvents = new Set();
         this.fipsPeerEvents = null;
         this.localFipsBaseUrl = this.config.fips.publicUrl;
+        this.pollenTransport = new FederationPollenTransport({
+            config,
+            pollenClient,
+            trace: (...parts) => this._trace(...parts)
+        });
+        this.fipsTransport = new FederationFipsTransport({
+            config,
+            fipsClient,
+            trace: (...parts) => this._trace(...parts),
+            setLocalBaseUrl: baseUrl => { this.localFipsBaseUrl = baseUrl; },
+            getLocalBaseUrl: () => this.localFipsBaseUrl,
+            discoverPeer: peer => this._discoverFipsPeer(peer),
+            removePeer: (peer, disconnect) => this._removeFipsPeer(peer, disconnect),
+            discoverHttpServer: server => this._discoverHttpServer(server),
+            removeRemoteServer: (server, disconnect) => this._removeRemoteServer(server, disconnect),
+            remoteServers: this.remoteServers
+        });
+        this.nostrDiscovery = new FederationNostrDiscovery({
+            config,
+            trace: (...parts) => this._trace(...parts),
+            getFipsBaseUrl: () => this.localFipsBaseUrl,
+            discoverHttpServer: server => this._discoverHttpServer(server),
+            connectPollenService: (serverId, serviceName) => this._connectPollenService(serverId, serviceName),
+            reportError: (...parts) => writeStderr(...parts)
+        });
+        this.relaySockets = this.nostrDiscovery.relaySockets;
+        this.seenNostrEvents = this.nostrDiscovery.seenEvents;
     }
 
     attachWsServer(wsServer) {
@@ -81,10 +56,20 @@ export default class MeshFederation {
     start() {
         if (!this.config.enabled) return;
 
+        this._trace(
+            "start",
+            `server=${this.config.serverId}`,
+            `fips=${this.config.fips.enabled}`,
+            `pollen=${this.config.pollen.enabled}`,
+            `nostr=${this.config.nostr.enabled}`,
+            `network=${this.config.nostr.networkId}`
+        );
         if (this.config.pollen.enabled) {
-            this._ensurePollenService();
+            this._ensurePollenService().catch(error => {
+                writeStderr("Pollen federation service failed", errorMessage(error));
+            });
         }
-        if (this.config.pollen.enabled && this.config.nostr.enabled) {
+        if ((this.config.fips.enabled || this.config.pollen.enabled) && this.config.nostr.enabled) {
             this._connectNostrRelays();
         }
         this._listenFipsPeerEvents();
@@ -95,9 +80,8 @@ export default class MeshFederation {
     stop() {
         this.timers.forEach(timer => clearInterval(timer));
         this.timers = [];
-        for (const socket of this.relaySockets.values()) socket.close();
-        this.relaySockets.clear();
-        this.fipsPeerEvents?.close();
+        this.nostrDiscovery.stop();
+        this.fipsTransport.closePeerEvents();
         this.fipsPeerEvents = null;
     }
 
@@ -179,79 +163,53 @@ export default class MeshFederation {
     }
 
     async discoverFipsPeers() {
-        if (!this.config.fips.enabled || !this.fipsClient) return;
-
-        const status = await this.fipsClient.status();
-        if (!status.available) return;
-        if (!this.config.fips.publicUrl && status.ipv6Addr) {
-            this.localFipsBaseUrl = `http://[${status.ipv6Addr}]:${this.config.fips.port}${this.config.basePath}`;
-        }
-
-        const peers = Array.isArray(status.peers) ? status.peers : [];
-        await Promise.all(peers
-            .filter(peer => peer.ipv6Addr)
-            .map(peer => this._discoverFipsPeer(peer)));
+        return this.fipsTransport.discoverPeers();
     }
 
     _listenFipsPeerEvents() {
-        if (!this.config.fips.enabled || !this.fipsClient?.listenPeerEvents || this.fipsPeerEvents?.active) return;
-
-        this.fipsPeerEvents = this.fipsClient.listenPeerEvents(event => {
-            if (event.type === "peer-left") {
-                this._removeFipsPeer(event.peer, true);
-                return;
-            }
-
-            this._discoverFipsPeer(event.peer).catch(error => {
-                writeStderr("FIPS federation discovery event failed", error.message);
-            });
-        });
+        this.fipsTransport.listenPeerEvents();
+        this.fipsPeerEvents = this.fipsTransport.peerEvents;
     }
 
     async _discoverFipsPeer(peer) {
-        if (!peer?.ipv6Addr) return;
-
-        await this._discoverHttpServer({
-            serverId: `fips:${peer.ipv6Addr}`,
-            transport: "fips",
-            peer,
-            baseUrl: `http://[${peer.ipv6Addr}]:${this.config.fips.port}${this.config.basePath}`
-        });
+        return this.fipsTransport.discoverPeerAddress(peer);
     }
 
     _removeFipsPeer(peer, disconnect = true) {
-        if (!peer?.ipv6Addr) return;
-
-        const needle = `http://[${peer.ipv6Addr}]:`;
-        for (const server of this.remoteServers.values()) {
-            if (server.transport === "fips" && server.baseUrl.startsWith(needle)) {
-                this._removeRemoteServer(server, disconnect);
-            }
-        }
+        return this.fipsTransport.removePeerAddress(peer, disconnect);
     }
 
     async _poll() {
-        await this.discoverFipsPeers().catch(error => writeStderr("FIPS federation discovery failed", error.message));
+        await this.discoverFipsPeers().catch(error => writeStderr("FIPS federation discovery failed", errorMessage(error)));
+        await this._announceFipsNostr().catch(error => writeStderr("FIPS Nostr announcement failed", errorMessage(error)));
         if (this.config.pollen.enabled) {
-            await this._ensurePollenService().catch(error => writeStderr("Pollen federation service failed", error.message));
-            await this._announcePollenNostr().catch(error => writeStderr("Pollen Nostr announcement failed", error.message));
+            await this._ensurePollenService().catch(error => writeStderr("Pollen federation service failed", errorMessage(error)));
+            await this._announcePollenNostr().catch(error => writeStderr("Pollen Nostr announcement failed", errorMessage(error)));
         }
     }
 
     async _discoverHttpServer(server) {
         let response;
+        this._trace("http discover", server.transport, server.baseUrl);
         try {
             response = await fetch(`${server.baseUrl}/.well-known/meshdrop-federation`, {
                 signal: AbortSignal.timeout(this.config.timeoutMs)
             });
         } catch (error) {
             this._removeRemoteServer(server, true);
+            this._trace("http discover failed", server.transport, server.baseUrl, errorMessage(error));
             throw error;
         }
-        if (!response.ok) return;
+        if (!response.ok) {
+            this._trace("http discover rejected", server.transport, server.baseUrl, `status=${response.status}`);
+            return;
+        }
 
         const snapshot = await response.json();
-        if (!snapshot.serverId || snapshot.serverId === this.config.serverId) return;
+        if (!snapshot.serverId || snapshot.serverId === this.config.serverId) {
+            this._trace("http discover ignored self-or-empty", server.transport, server.baseUrl);
+            return;
+        }
         const peers = (snapshot.peers || []).map(peer => ({type: "peer-joined", ...peer}));
 
         const discovered = {
@@ -261,6 +219,12 @@ export default class MeshFederation {
             lastSeen: Date.now()
         };
         this.remoteServers.set(this._serverKey(discovered), discovered);
+        this._trace(
+            "http discover accepted",
+            server.transport,
+            `remote=${snapshot.serverId}`,
+            `peers=${discovered.peerIds.length}`
+        );
         await this.receiveEvents({
             serverId: snapshot.serverId,
             transport: server.transport,
@@ -274,7 +238,7 @@ export default class MeshFederation {
         if (descriptor.transport && descriptor.transport !== transport) return false;
 
         if (transport === "pollen" && descriptor.serviceName) {
-            await this._connectPollenService(payload.serverId, descriptor.serviceName).catch(() => {});
+            await this._connectPollenService(payload.serverId, descriptor.serviceName).catch(() => undefined);
             return this.remoteServers.has(this._serverKey({transport, serverId: payload.serverId}));
         }
 
@@ -283,7 +247,7 @@ export default class MeshFederation {
                 serverId: payload.serverId,
                 transport,
                 baseUrl: descriptor.baseUrl
-            }).catch(() => {});
+            }).catch(() => undefined);
             return this.remoteServers.has(this._serverKey({transport, serverId: payload.serverId}));
         }
 
@@ -369,129 +333,44 @@ export default class MeshFederation {
     }
 
     async _ensurePollenService() {
-        if (!this.config.pollen.enabled) return;
-
-        const status = this.pollenClient ? await this.pollenClient.status() : {available: true};
-        if (!status.available) return;
-
-        const result = await this._runPln(["serve", String(this.config.port), this.config.pollen.serviceName]);
-        if (result.code !== 0 && !/already|exists|registered/i.test(`${result.stderr}\n${result.stdout}`)) {
-            throw new Error(result.stderr || result.error || "pln serve failed");
-        }
+        return this.pollenTransport.ensureService();
     }
 
     _connectNostrRelays() {
-        for (const relay of this.config.nostr.relays) {
-            if (this.relaySockets.has(relay)) continue;
+        return this.nostrDiscovery.connectRelays();
+    }
 
-            const socket = new WebSocket(relay);
-            socket.onopen = () => {
-                socket.send(JSON.stringify([
-                    "REQ",
-                    `meshdrop-fed-${this.config.serverId}`,
-                    {kinds: [FEDERATION_KIND], "#p": [this.config.nostr.pubkey]}
-                ]));
-                this._announcePollenNostr(socket).catch(() => {});
-            };
-            socket.onmessage = event => this._onNostrRelayMessage(event.data);
-            socket.onerror = error => writeStderr("Pollen Nostr relay error", relay, error.message);
-            socket.onclose = () => this.relaySockets.delete(relay);
-            this.relaySockets.set(relay, socket);
-        }
+    _nostrDiscoveryFilters() {
+        return this.nostrDiscovery.discoveryFilters();
     }
 
     async _announcePollenNostr(socket = null) {
-        if (!this.config.nostr.enabled || !this.config.pollen.enabled) return;
+        return this.nostrDiscovery.announcePollen(socket);
+    }
 
-        const event = finalizeEvent({
-            kind: FEDERATION_KIND,
-            created_at: Math.floor(Date.now() / 1000),
-            tags: [
-                ["type", "pollen-federation"],
-                ...this.config.nostr.recipientPubkeys.map(pubkey => ["p", pubkey]),
-                ["network", this.config.nostr.networkId],
-                ["server", this.config.serverId],
-                ["service", this.config.pollen.serviceName],
-                ["room", this.config.pollen.room]
-            ],
-            content: ""
-        }, this.config.nostr.secretKey);
-
-        const message = JSON.stringify(["EVENT", event]);
-        if (socket) {
-            if (socket.readyState === WebSocket.OPEN) socket.send(message);
-            return;
-        }
-
-        for (const relaySocket of this.relaySockets.values()) {
-            if (relaySocket.readyState === WebSocket.OPEN) relaySocket.send(message);
-        }
+    async _announceFipsNostr(socket = null) {
+        return this.nostrDiscovery.announceFips(socket);
     }
 
     async _onNostrRelayMessage(rawMessage) {
-        let message;
-        try {
-            message = JSON.parse(rawMessage);
-        } catch {
-            return;
-        }
+        return this.nostrDiscovery.onRelayMessage(rawMessage);
+    }
 
-        if (message[0] !== "EVENT") return;
-        const event = message[2];
-        if (!event?.id || this.seenNostrEvents.has(event.id)) return;
-        this.seenNostrEvents.add(event.id);
-
-        if (event.pubkey === getPublicKey(this.config.nostr.secretKey)) return;
-        if (this._tag(event, "type") !== "pollen-federation") return;
-        if (!this._hasTag(event, "p", this.config.nostr.pubkey)) return;
-
-        const serverId = this._tag(event, "server");
-        const serviceName = this._tag(event, "service");
-        if (!serverId || serverId === this.config.serverId || !serviceName) return;
-
-        await this._connectPollenService(serverId, serviceName).catch(error => {
-            writeStderr("Pollen federation connect failed", serviceName, error.message);
-        });
+    _isNostrDiscoveryEventForThisNetwork(event) {
+        return this.nostrDiscovery._isEventForThisNetwork(event);
     }
 
     async _connectPollenService(serverId, serviceName) {
-        const localPort = await findFreePort();
-        const result = await this._runPln(["connect", serviceName, String(localPort)]);
-        if (result.code !== 0) throw new Error(result.stderr || result.error || "pln connect failed");
-
+        const baseUrl = await this.pollenTransport.connectService(serverId, serviceName);
         await this._discoverHttpServer({
             serverId,
             transport: "pollen",
-            baseUrl: `http://127.0.0.1:${localPort}${this.config.basePath}`
+            baseUrl
         });
     }
 
     _runPln(args) {
-        const child = spawn(this.config.pollen.command, args, {
-            env: {...process.env, PLN_DIR: this.config.pollen.dir},
-            stdio: ["ignore", "pipe", "pipe"]
-        });
-
-        let stdout = "";
-        let stderr = "";
-        let error = "";
-        child.stdout.setEncoding("utf8");
-        child.stderr.setEncoding("utf8");
-        child.stdout.on("data", chunk => { stdout += chunk; });
-        child.stderr.on("data", chunk => { stderr += chunk; });
-        child.on("error", err => { error = err.message; });
-
-        return new Promise(resolve => {
-            child.on("close", code => resolve({code, stdout, stderr: stderr.trim(), error}));
-        });
-    }
-
-    _tag(event, name) {
-        return event.tags?.find(tag => tag[0] === name)?.[1] || "";
-    }
-
-    _hasTag(event, name, value) {
-        return (event.tags || []).some(tag => tag[0] === name && tag[1] === value);
+        return this.pollenTransport._runPln(args);
     }
 
     _isFederatedRoom(roomType) {
@@ -510,43 +389,9 @@ export default class MeshFederation {
     _serverKey(server) {
         return `${server.transport}:${server.serverId}`;
     }
-}
 
-function findFreePort() {
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.on("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-            const port = server.address().port;
-            server.close(() => resolve(port));
-        });
-    });
-}
-
-function loadOrCreateServerId(dir) {
-    return loadOrCreateFile(path.join(dir, "meshdrop-server-id"), () => crypto.randomUUID());
-}
-
-function loadOrCreateNostrKey(envKey, dir) {
-    if (envKey) {
-        return utils.hexToBytes(envKey);
-    }
-
-    const hex = loadOrCreateFile(path.join(dir, "meshdrop-nostr-secret"), () => utils.bytesToHex(generateSecretKey()));
-    return utils.hexToBytes(hex);
-}
-
-function loadOrCreateFile(filePath, createValue) {
-    try {
-        return fs.readFileSync(filePath, "utf8").trim();
-    } catch {
-        const value = createValue();
-        try {
-            fs.mkdirSync(path.dirname(filePath), {recursive: true, mode: 0o700});
-            fs.writeFileSync(filePath, `${value}\n`, {mode: 0o600});
-        } catch {
-            return value;
-        }
-        return value;
+    _trace(...parts) {
+        if (!this.config.trace) return;
+        writeStderr("[meshdrop:federation]", ...parts);
     }
 }
