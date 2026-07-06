@@ -99,47 +99,69 @@
             </svg>
         </div>
         <div class="header-divider header-divider-settings" aria-hidden="true"></div>
-        <div id="nostr-identity" class="icon-button protocol-toggle" data-i18n-key="header.nostr-identity-connect" data-i18n-attrs="title" hidden>
-            <svg class="icon">
-                <use xlink:href="#key-icon"></use>
-            </svg>
+        <div class="protocol-toggle-group protocol-toggle-group-identity" data-protocol-group="identity" role="group" aria-label="Identity">
+            <span class="protocol-toggle-group-label">Identity</span>
+            <div class="protocol-toggle-items">
+                <div id="nostr-identity" class="icon-button protocol-toggle" data-i18n-key="header.nostr-identity-connect" data-i18n-attrs="title" hidden>
+                    <svg class="icon">
+                        <use xlink:href="#key-icon"></use>
+                    </svg>
+                    <span class="protocol-toggle-label">Nostr</span>
+                </div>
+            </div>
         </div>
-        <div id="local-discovery" class="icon-button protocol-toggle selected"
-             title="Local network discovery enabled">
-            <svg class="icon">
-                <use xlink:href="#local-discovery-icon"></use>
-            </svg>
-        </div>
-        <div id="fips-discovery" class="icon-button protocol-toggle"
-             data-i18n-key="header.fips-discovery-enable" data-i18n-attrs="title" hidden>
-            <svg class="icon">
-                <use xlink:href="#fips-control-icon"></use>
-            </svg>
-        </div>
-        <div id="pollen-transfer" class="icon-button protocol-toggle"
-             data-i18n-key="header.pollen-transfer-enable" data-i18n-attrs="title" hidden>
-            <svg class="icon">
-                <use xlink:href="#pollen-seed-icon"></use>
-            </svg>
-        </div>
-        <div id="nostr-mesh" class="icon-button protocol-toggle"
-             data-i18n-key="header.nostr-mesh-connect" data-i18n-attrs="title" hidden>
-            <svg class="icon">
-                <use xlink:href="#wifi-tethering"></use>
-            </svg>
+        <div class="protocol-toggle-group protocol-toggle-group-network" data-protocol-group="network" role="group" aria-label="Network postures">
+            <span class="protocol-toggle-group-label">Network</span>
+            <div class="protocol-toggle-items">
+                <div id="local-discovery" class="icon-button protocol-toggle selected"
+                     title="Local network discovery enabled">
+                    <svg class="icon">
+                        <use xlink:href="#local-discovery-icon"></use>
+                    </svg>
+                    <span class="protocol-toggle-label">Instance</span>
+                </div>
+                <div id="fips-discovery" class="icon-button protocol-toggle"
+                     data-i18n-key="header.fips-discovery-enable" data-i18n-attrs="title" hidden>
+                    <svg class="icon">
+                        <use xlink:href="#fips-control-icon"></use>
+                    </svg>
+                    <span class="protocol-toggle-label">FIPS</span>
+                </div>
+                <div id="pollen-transfer" class="icon-button protocol-toggle"
+                     data-i18n-key="header.pollen-transfer-enable" data-i18n-attrs="title" hidden>
+                    <svg class="icon">
+                        <use xlink:href="#pollen-seed-icon"></use>
+                    </svg>
+                    <span class="protocol-toggle-label">Pollen</span>
+                </div>
+                <div id="nostr-mesh" class="icon-button protocol-toggle"
+                     data-i18n-key="header.nostr-mesh-connect" data-i18n-attrs="title" hidden>
+                    <svg class="icon">
+                        <use xlink:href="#wifi-tethering"></use>
+                    </svg>
+                    <span class="protocol-toggle-label">Relay</span>
+                </div>
+            </div>
         </div>
         <div class="header-divider header-divider-network" aria-hidden="true"></div>
-        <div id="blossom-transfer" class="icon-button protocol-toggle"
-             data-i18n-key="header.blossom-transfer-enable" data-i18n-attrs="title" hidden>
-            <svg class="icon">
-                <use xlink:href="#blossom-flower-icon"></use>
-            </svg>
-        </div>
-        <div id="hashtree-transfer" class="icon-button protocol-toggle"
-             data-i18n-key="header.hashtree-transfer-enable" data-i18n-attrs="title" hidden>
-            <svg class="icon">
-                <use xlink:href="#hashtree-hash-icon"></use>
-            </svg>
+        <div class="protocol-toggle-group protocol-toggle-group-storage" data-protocol-group="storage" role="group" aria-label="Storage routes">
+            <span class="protocol-toggle-group-label">Storage</span>
+            <div class="protocol-toggle-items">
+                <div id="blossom-transfer" class="icon-button protocol-toggle"
+                     data-i18n-key="header.blossom-transfer-enable" data-i18n-attrs="title" hidden>
+                    <svg class="icon">
+                        <use xlink:href="#blossom-flower-icon"></use>
+                    </svg>
+                    <span class="protocol-toggle-label">Blossom</span>
+                </div>
+                <div id="hashtree-transfer" class="icon-button protocol-toggle"
+                     data-i18n-key="header.hashtree-transfer-enable" data-i18n-attrs="title" hidden>
+                    <svg class="icon">
+                        <use xlink:href="#hashtree-hash-icon"></use>
+                    </svg>
+                    <span class="protocol-toggle-label">Hashtree</span>
+                </div>
+            </div>
         </div>
         <div id="protocol-settings" class="icon-button protocol-toggle" title="Settings" hidden>
             <svg class="icon">
