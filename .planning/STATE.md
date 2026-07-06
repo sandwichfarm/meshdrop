@@ -127,7 +127,7 @@ Closed during this audit branch:
 | 2026-07-06 | `260706-android-native-core-tool-hooks` | complete | Android native-source/APK can package per-ABI `fips`, `fipsctl`, and `pln` tools and delegate backend calls when present; default smoke still lacks Android Rust FIPS and Android pln binaries |
 | 2026-07-06 | `260706-android-pln-proof-and-fips-launch` | complete | Installed Android APK starts packaged `pln up --port 0` and WebView Pollen upload/download passes through `android-native-pln`; FIPS launch plumbing added, but Android Rust FIPS build remains blocked upstream |
 | 2026-07-06 | `260706-android-rust-fips-core-proof` | complete | Release-built Android `fips`/`fipsctl` package into installed APK; `npm run test:android-fips-pollen` reports `android-native-fipsctl` with `rustCore=true`; changed-code slop clean; full-repo slop baseline remains failing outside touched files |
-| 2026-07-06 | `260706-ux-network-postures` | complete | Shared network posture UI, LAN/Pollen badge counts, honest same-instance LAN wording, route grouping, privacy selector, and private payload encryption for direct/Hashtree/Pollen; focused 36/36 and 43/43; `npm test` 242/242; e2e and Docker smokes pass; slop baseline remains policy-failing |
+| 2026-07-06 | `260706-ux-network-postures` | complete | Shared network posture UI, Instance/Pollen badge counts, honest same-instance discovery wording, route grouping, privacy selector, and private payload encryption for direct/Hashtree/Pollen; focused 36/36 and 43/43; `npm test` 242/242; e2e and Docker smokes pass; slop baseline remains policy-failing |
 
 ## Active Quick Task
 

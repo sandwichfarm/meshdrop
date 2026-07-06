@@ -419,8 +419,13 @@ async function runRouteChoiceScenario(browser, baseUrl) {
 
         const pollen = options.options.find(option => option.id === "pollen-mesh");
         const fips = options.options.find(option => option.id === "fips");
+        const local = options.options.find(option => option.id === "local");
         assert(pollen, "Pollen mesh route was not selectable");
         assert(fips, "FIPS mesh route was not selectable");
+        assert(local, "Instance route was not selectable");
+        assert(local.label === "Instance", "Instance route label missing");
+        assert(local.details.includes("Discoverysame MeshDrop instance"), "Instance route discovery copy missing");
+        assert(local.details.includes("Data pathWebRTC ICE direct"), "Instance route WebRTC copy missing");
         assert(pollen.privacy === "P2P after Pollen discovery", "Pollen mesh privacy copy missing");
         assert(fips.privacy === "P2P after FIPS discovery", "FIPS mesh privacy copy missing");
         assert(options.privacyModes.some(([mode, selected]) => mode === "private" && selected === "true"), "Private mode not selected by default");

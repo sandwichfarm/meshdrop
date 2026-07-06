@@ -18,8 +18,8 @@ const PeerAvailabilityProtocol = {
     roomTypeMeta: {
         "ip": {
             id: "local",
-            label: "LAN",
-            shortLabel: "LAN",
+            label: "Instance",
+            shortLabel: "Instance",
             className: "badge-room-ip",
             description: "Same MeshDrop instance discovery with a direct peer data channel",
             group: "Network routes",

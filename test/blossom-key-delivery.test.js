@@ -145,7 +145,7 @@ test("private direct requests encrypt file payload before transfer", async () =>
 
     await peer.requestFileTransfer(
         [new File(["secret"], "secret.txt", {type: "text/plain"})],
-        {id: "local", type: "direct", label: "LAN", privacyMode: "private"}
+        {id: "local", type: "direct", label: "Instance", privacyMode: "private"}
     );
 
     const request = harness.sent.find(message => message.type === "request");
@@ -164,7 +164,7 @@ test("unencrypted direct requests keep raw payload metadata", async () => {
 
     await peer.requestFileTransfer(
         [new File(["secret"], "secret.txt", {type: "text/plain"})],
-        {id: "local", type: "direct", label: "LAN", privacyMode: "unencrypted"}
+        {id: "local", type: "direct", label: "Instance", privacyMode: "unencrypted"}
     );
 
     const request = harness.sent.find(message => message.type === "request");

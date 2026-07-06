@@ -50,7 +50,7 @@
         "display-name_data-placeholder": "Loading…",
         "display-name_title": "Edit your device name permanently",
         "discovery": "You can be discovered:",
-        "on-this-network": "LAN",
+        "on-this-network": "Instance",
         "on-this-network_title": "You can be discovered by peers on this MeshDrop instance. WebRTC can still choose a local-network data path when browsers connect.",
         "webrtc-discovery": "Relay",
         "webrtc-discovery_title": "You can be discovered through Nostr relay signaling. File bytes still use WebRTC when direct negotiation succeeds.",

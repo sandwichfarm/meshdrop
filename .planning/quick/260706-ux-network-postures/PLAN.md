@@ -10,13 +10,13 @@ date: 2026-07-06
 ## Goal
 
 Make MeshDrop's shared UI communicate discovery and transfer choices clearly across every target that supports the
-feature. LAN, FIPS, and Pollen should read as network postures; Blossom and Hashtree should read as storage/server
-routes; WebRTC should be described as the peer data-channel method instead of a confusing peer network.
+feature. Same-instance discovery, FIPS, and Pollen should read as network postures; Blossom and Hashtree should read as
+storage/server routes; WebRTC should be described as the peer data-channel method instead of a confusing peer network.
 
 ## Scope
 
 1. Add Pollen to the footer "You can be discovered" badges when Pollen mesh discovery is active.
-2. Reorder network posture UI to LAN, FIPS, Pollen, then relay/room/paired fallbacks where applicable.
+2. Reorder network posture UI to instance, FIPS, Pollen, then relay/room/paired fallbacks where applicable.
 3. Group transfer choices into network routes and storage routes with clear capability details and peer counts.
 4. Keep the implementation shared in the common web runtime so Docker, SPA, desktop, and mobile targets inherit it when
    their runtime capabilities expose the corresponding features.

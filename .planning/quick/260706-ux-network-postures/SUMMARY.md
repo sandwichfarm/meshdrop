@@ -9,17 +9,17 @@ date: 2026-07-06
 
 ## Result
 
-Shared web runtime now presents LAN, FIPS, Pollen, and relay discovery as network postures wherever the target exposes
-those features. Blossom and Hashtree are grouped as storage routes. The transfer chooser now asks for privacy before
-route choice, defaults to Private, confirms Unencrypted sends, and encrypts Private file payloads before direct,
-Hashtree, and Pollen sends. Blossom remains encrypted-only.
+Shared web runtime now presents same-instance discovery, FIPS, Pollen, and relay discovery as network postures wherever
+the target exposes those features. Blossom and Hashtree are grouped as storage routes. The transfer chooser now asks for
+privacy before route choice, defaults to Private, confirms Unencrypted sends, and encrypts Private file payloads before
+direct, Hashtree, and Pollen sends. Blossom remains encrypted-only.
 
 ## Changed
 
-- Added LAN/Pollen discovery badge/count support to footer and header action state.
-- Reordered shared network controls and footer badges to LAN, FIPS, Pollen, Relay.
-- Clarified that LAN means same MeshDrop instance discovery, while WebRTC ICE still chooses the best direct/local data
-  path after discovery through LAN, FIPS, Pollen, or relay.
+- Added instance/Pollen discovery badge/count support to footer and header action state.
+- Reordered shared network controls and footer badges to Instance, FIPS, Pollen, Relay.
+- Replaced the misleading LAN label with Instance because the `ip` room is same MeshDrop instance discovery, while
+  WebRTC ICE still chooses the best direct/local data path after discovery through Instance, FIPS, Pollen, or relay.
 - Renamed misleading WEB-RTC-facing copy to Nostr relay signaling where it describes discovery, while keeping WebRTC as
   the peer data-channel capability.
 - Grouped transfer choices into Network routes and Storage routes with capability details.
@@ -44,4 +44,6 @@ Hashtree, and Pollen sends. Blossom remains encrypted-only.
 
 - Private key delivery is fail-closed unless the route uses RTC data channel or NIP-44 key wrapping. WS/server fallback
   cannot honestly be private without recipient key wrapping.
+- This does not add a new same-LAN cross-instance discovery protocol; cross-instance discovery remains via federated
+  FIPS/Pollen/relay signaling before WebRTC negotiates the data path.
 - Full-repo AI-slop baseline is still failing outside this task's functional changes.

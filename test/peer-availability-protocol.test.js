@@ -5,7 +5,7 @@ await import("../public/scripts/ui.js");
 
 const protocol = globalThis.PeerAvailabilityProtocol;
 
-test("peer availability exposes LAN, FIPS, Pollen, and relay room types", () => {
+test("peer availability exposes instance, FIPS, Pollen, and relay room types", () => {
     const peer = {
         _roomIds: {
             fips: "meshdrop-fips",
@@ -18,7 +18,7 @@ test("peer availability exposes LAN, FIPS, Pollen, and relay room types", () => 
     assert.deepEqual(
         protocol.availability(peer).map(option => [option.id, option.label, option.shortLabel]),
         [
-            ["local", "LAN", "LAN"],
+            ["local", "Instance", "Instance"],
             ["fips", "FIPS", "FIPS"],
             ["pollen-mesh", "Pollen", "Pollen"],
             ["webrtc", "Nostr relay", "Relay"]
@@ -145,7 +145,7 @@ test("peer counts summarize network posture badges", () => {
     assert.deepEqual(
         protocol.networkPostureCounts(peers).map(entry => [entry.id, entry.count, entry.shortLabel]),
         [
-            ["local", 1, "LAN"],
+            ["local", 1, "Instance"],
             ["fips", 2, "FIPS"],
             ["pollen-mesh", 2, "Pollen"],
             ["webrtc", 1, "Relay"]
