@@ -5,7 +5,7 @@ await import("../public/scripts/ui.js");
 
 const protocol = globalThis.PeerAvailabilityProtocol;
 
-test("peer availability exposes instance, FIPS, Pollen, and relay room types", () => {
+test("peer availability exposes instance, FIPS, Pollen, and Nostr room types", () => {
     const peer = {
         _roomIds: {
             fips: "meshdrop-fips",
@@ -21,7 +21,7 @@ test("peer availability exposes instance, FIPS, Pollen, and relay room types", (
             ["local", "Instance", "Instance"],
             ["fips", "FIPS", "FIPS"],
             ["pollen-mesh", "Pollen", "Pollen"],
-            ["webrtc", "Nostr relay", "Relay"]
+            ["webrtc", "Nostr", "Nostr"]
         ]
     );
 });
@@ -105,7 +105,8 @@ test("transfer options expose privacy and encryption metadata", () => {
         assert.equal(pollenMesh.group, "Network routes");
         assert.equal(pollenMesh.privacy, "P2P after Pollen discovery");
         assert.deepEqual(pollenMesh.details.at(-1), ["Best case", "local network candidate"]);
-        assert.equal(webrtc.label, "Nostr relay");
+        assert.equal(webrtc.label, "Nostr");
+        assert.equal(webrtc.privacy, "P2P after Nostr discovery");
         assert.deepEqual(webrtc.details.at(-1), ["Relays see", "signaling only"]);
         assert.equal(hashtree.group, "Storage routes");
         assert.equal(hashtree.privacy, "Integrity, not secrecy");
@@ -148,9 +149,24 @@ test("peer counts summarize network posture badges", () => {
             ["local", 1, "Instance"],
             ["fips", 2, "FIPS"],
             ["pollen-mesh", 2, "Pollen"],
-            ["webrtc", 1, "Relay"]
+            ["webrtc", 1, "Nostr"]
         ]
     );
+});
+
+test("private payload mode is disabled when Web Crypto is unavailable", () => {
+    const originalBlossom = globalThis.BlossomTransferProtocol;
+    globalThis.BlossomTransferProtocol = {hasWebCrypto: () => false};
+
+    try {
+        assert.equal(protocol.privateTransferAvailable(), false);
+        assert.equal(protocol.privacyModeAvailable("private"), false);
+        assert.equal(protocol.privacyModeAvailable("unencrypted"), true);
+        assert.equal(protocol.defaultPrivacyMode(), "unencrypted");
+    }
+    finally {
+        globalThis.BlossomTransferProtocol = originalBlossom;
+    }
 });
 
 test("generated display names are not treated as peer identity", () => {
@@ -169,5 +185,15 @@ test("generated display names are not treated as peer identity", () => {
             nostrIdentity: {pubkey: "1".repeat(64)}
         }, "pollen"),
         [`nostr:${"1".repeat(64)}`]
+    );
+});
+
+test("Nostr identity keys normalize pubkey case before grouping peers", () => {
+    assert.deepEqual(
+        protocol.identityKeys({
+            id: "peer-c",
+            nostrIdentity: {pubkey: "A".repeat(64)}
+        }, "ip"),
+        [`nostr:${"a".repeat(64)}`]
     );
 });

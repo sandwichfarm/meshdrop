@@ -135,6 +135,11 @@ const RelaySettingsPreferences = {
         }
     },
 
+    hasStoredSettings() {
+        if (typeof localStorage === "undefined") return false;
+        return localStorage.getItem(this.storageKey) !== null;
+    },
+
     write(settings) {
         const normalized = this.normalize(settings);
         if (typeof localStorage !== "undefined") {
@@ -172,6 +177,17 @@ const RelaySettingsPreferences = {
             ...this.normalizeRelays(readRelays).map(relay => ["r", relay, "read"]),
             ...this.normalizeRelays(writeRelays).map(relay => ["r", relay, "write"])
         ];
+    },
+
+    displaySettings(identity = null) {
+        const stored = this.read();
+        const discoveredRelays = identity?.relays || {};
+        return this.normalize({
+            bootstrapRelays: stored.bootstrapRelays,
+            webRtcRelays: stored.webRtcRelays,
+            inboxRelays: stored.inboxRelays || discoveredRelays.read,
+            outboxRelays: stored.outboxRelays || discoveredRelays.write
+        });
     }
 };
 
@@ -378,6 +394,7 @@ class NostrRelayPool {
 
 globalThis.NostrDiscoveryProtocol = NostrDiscoveryProtocol;
 globalThis.RelaySettingsPreferences = RelaySettingsPreferences;
+globalThis.meshdropRelaySettingsPreferences = RelaySettingsPreferences;
 globalThis.NostrRelayPool = NostrRelayPool;
 globalThis.meshdropNostrRelays = new NostrRelayPool();
 

@@ -82,9 +82,9 @@ const NostrMeshProtocol = {
             name: {
                 model: null,
                 os: "Nostr",
-                browser: "Relay",
+                browser: "Nostr",
                 type: null,
-                deviceName: "Nostr relay peer",
+                deviceName: "Nostr peer",
                 displayName: profile?.displayName || displayName
             }
         };
