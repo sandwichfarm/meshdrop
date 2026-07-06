@@ -180,7 +180,8 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 4. Confirm the smoke prints `Proof android-physical-device-uat`.
 5. Confirm the proof names the hardware manufacturer/model, Android release/API level, CPU ABI, selected serial, and
    the install, WebView capability, WebView transfer, share-intent transfer, and native picker UI smoke scripts.
-6. Do not treat the physical-device UAT as proven until this command passes on physical Android hardware.
+6. Latest proof: this command passed on Google Pixel 7 Pro `28031FDH300BS5` and printed
+   `Proof android-physical-device-uat`.
 
 ## Native Mobile Acceptance
 
@@ -234,9 +235,8 @@ records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API
 - These artifacts do not prove app-store packages, Play Store upload signing, AABs, or IPAs.
 - The Android debug APK artifact alone does not prove install UAT; `npm run test:android-apk-install` provides the
   emulator install proof.
-- Android WebView transfer proof does not prove physical Android device install UAT.
-- These artifacts do not prove physical Android device install UAT; `npm run test:android-physical-device` must pass on
-  physical Android hardware for that claim.
+- Android WebView transfer proof alone does not prove physical Android device install UAT; the current physical-device
+  claim is backed by `npm run test:android-physical-device` passing on Google Pixel 7 Pro `28031FDH300BS5`.
 - The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.
 - The iOS device app artifact proves an unsigned generic `iphoneos` `.app` build product only; it does not prove a
   signed device-installable IPA, App Store/TestFlight packaging, App Group provisioning, or physical-device install.

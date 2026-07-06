@@ -19,7 +19,8 @@ Merged PRs through #105 satisfy the source/runtime/harness portions of the origi
 - Phase 3 Docker shared-instance admin is complete for the repo contract: compose/runtime admin npub config, `/config`
   metadata, GUI visibility, backend signed-event validation, FIPS settings updates, and restart requests are covered by
   focused tests plus Docker/admin UAT.
-- Phase 4 platform work is complete for automated build/run/runbook proof, but not for real hardware/node acceptance.
+- Phase 4 platform work is complete for automated build/run/runbook proof and Android physical hardware UAT, but not
+  for StartOS/Umbrel node acceptance or signed iOS device acceptance.
 - Phase 5 CI/release automation is mostly complete, but current `master` still needs a new tag and anonymous GHCR
   readback before release proof can be called complete.
 
@@ -29,7 +30,12 @@ Current hard gaps:
 - `gh api /orgs/sandwichfarm/packages/container/meshdrop` fails with `403` because this token lacks `read:packages`, so
   this session cannot inspect or change package visibility.
 - Current `master` at PR #105 is unreleased; `v0.1.4` predates the latest release artifact set.
-- Physical Android hardware UAT, deployed StartOS/Umbrel UAT, and signed iOS device package/UAT remain unproven.
+- Deployed StartOS/Umbrel UAT and signed iOS device package/UAT remain unproven.
+
+Closed during this audit branch:
+
+- `npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`, proving APK install, WebView
+  capability, WebView Nostr WebRTC transfer, Android share-intent transfer, and native picker UI on physical hardware.
 
 ## Quick Tasks Completed
 
