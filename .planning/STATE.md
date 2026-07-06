@@ -122,6 +122,7 @@ Closed during this audit branch:
 | 2026-07-06 | `260706-ios-signed-device-launch-proof` | complete | Signed iOS device harness now installs and launches through `devicectl`; focused tests and runbook guards pass; real macOS hardware pass remains open |
 | 2026-07-06 | `260706-ios-share-inbox-bridge` | complete | iOS native-source share extension stages files into App Group and containing app exposes `globalThis.meshdropShareInbox`; focused 6/6; `npm test` 229/229; changed-code slop clean; device share-transfer UAT remains open |
 | 2026-07-06 | `260706-ios-share-inbox-web-consume` | complete | Web app consumes native share-inbox files into share mode; focused 3/3; `npm test` 231/231; changed-code slop clean; device share-transfer UAT remains open |
+| 2026-07-06 | `260706-external-uat-finishline-verifier` | complete | Consolidated external UAT verifier added; focused 5/5; expected `npm run test:external-uat -- v0.1.5` blocker output; `npm test` 235/235; changed-code slop clean; full-repo slop baseline still failing outside touched files |
 
 ## Active Quick Task
 
