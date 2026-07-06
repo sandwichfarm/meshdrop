@@ -1,23 +1,29 @@
 # Summary
 
-MeshDrop FIPS/Pollen federation now has a real discovery layer over Nostr:
+MeshDrop discovery now defaults to Nostr web-of-trust instead of a static room:
 
-- FIPS and Pollen publish ephemeral `kind:20385` federation discovery events.
-- `kind:20385` was selected only after exact live relay checks against `relay.damus.io`, `relay.primal.net`, and `nos.lol`; `20384` was rejected because it was already present on relay history.
-- Default instances share `npub-network:unconfigured` instead of deriving one private network per server.
-- Federation logs now trace FIPS status, direct FIPS peer probes, Nostr relay subscribe/open/announce, Pollen service registration, Pollen connect, and HTTP federation descriptor discovery.
-- The new NIP draft is in `nips/meshdrop-pollen-discovery.md`.
+- `npub-network:unconfigured` is no longer synthesized as the default discovery scope.
+- Trusted MeshDrop peers are discovered through local Nostr identity follow/trust metadata and author-filtered Nostr subscriptions.
+- NIP-100/WebRTC presence events advertise MeshDrop/WebRTC capability and are accepted only from trusted npubs unless explicit public discovery is enabled.
+- Explicit public/debug rooms remain opt-in through `MESHDROP_PUBLIC_DISCOVERY=true`.
+- FIPS and Pollen are route substrates. Generic FIPS/Pollen peers are logged as route candidates and are not probed as MeshDrop HTTP servers.
+- MeshDrop HTTP federation runs only after a trusted signed Nostr event explicitly advertises a MeshDrop HTTP base or Pollen service.
+- Route priority is direct/local WebRTC first, then direct Nostr WebRTC, then FIPS, then Pollen.
+- UI copy and route chooser labels say `Nostr`, not `Relay`; empty WOT Nostr room ids still produce a selectable Nostr route.
+- The Pollen/FIPS discovery NIP draft in `nips/meshdrop-pollen-discovery.md` now documents WOT default, explicit public/debug `#d` usage, and provisional kind `20385`.
 
 ## Evidence
 
-- Focused: `node --test test/federation-server.test.js test/fips-control.test.js` passed 30/30.
-- Repo: `npm test` passed 259/259.
-- Browser: `npm run test:e2e` passed and proved federated Pollen WebRTC file delivery.
-- Docker: `npm run test:docker` passed, including signed admin FIPS save, local WebRTC, Pollen WebRTC, and two-host Nostr WebRTC transfer.
-- Changed-code slop: `npx --yes aislop scan --changes .` clean.
-- Full-repo slop: `npx --yes aislop scan .` still fails on existing baseline outside touched files.
-- Runtime: live compose rebuilt to `meshdrop:local` image `sha256:e844f1c7a68864f4020b2db38a9945f5bedd784536d1c0f8794df13b3dc3a071`; `/fips/status` reports available with connected peers; `/pollen/status` reports available; bucket relay returned both FIPS and Pollen `kind:20385` events from the live server.
+- Focused federation/RTC: `node --test test/federation-server.test.js test/nostr-mesh-protocol.test.js test/rtc-peer-signaling.test.js test/signaling-room-priority.test.js` passed 70/70.
+- Focused UI/Docker harness: `node --test test/peer-availability-protocol.test.js test/docker-smoke-script.test.js test/header-copy.test.js` passed 12/12.
+- Repo: `npm test` passed 270/270.
+- Browser: `npm run test:e2e` passed, including Nostr WebRTC transfer, generic FIPS route-candidate-only behavior, and trusted federated Pollen transfer.
+- Docker: `npm run test:docker` passed, including signed admin FIPS save, local WebRTC, and two-container Nostr WebRTC transfer.
+- Whitespace: `git diff --check` passed.
+- Kind check: live `{"kinds":[20385],"limit":1}` REQ returned EOSE with 0 events on `wss://relay.damus.io`, `wss://relay.primal.net`, and `wss://nos.lol`.
+- Changed-code AI-slop/security/lint: `npx --yes aislop scan --changes .` reports 0 formatting, lint, security, or AI-slop issues; it still exits nonzero on existing file-size/duplicate/long-function policy warnings in touched large files.
+- Full-repo slop: `npx --yes aislop scan .` still fails on existing baseline warnings in vendored crypto/helpers, large files, and `server/nostr-identity.js`.
 
 ## Remaining Risk
 
-The second physical MeshDrop instance must run this patched build, or a compatible implementation of `kind:20385`, before it can consume these discovery events. Generic FIPS routers in `fips.yaml` still are not MeshDrop HTTP servers; those probes are now traceable and non-fatal.
+The second physical MeshDrop instance must run this patched build and use a Nostr identity/follow relationship before it can see peers through default WOT discovery. Rooms are intentionally not the default path anymore; public/lobby/debug rooms require explicit opt-in.

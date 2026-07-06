@@ -2,12 +2,15 @@
 
 const NostrMeshProtocol = {
     kind: 25050,
-    defaultRoomPrefix: "meshdrop",
     presenceHeartbeatMs: 25000,
     storageKey: "meshdrop_nostr_mesh_enabled",
 
     readEnabled(storage = globalThis.localStorage) {
         return storage?.getItem?.(this.storageKey) === "true";
+    },
+
+    hasEnabledPreference(storage = globalThis.localStorage) {
+        return storage?.getItem?.(this.storageKey) !== null;
     },
 
     writeEnabled(enabled, storage = globalThis.localStorage) {
@@ -21,17 +24,33 @@ const NostrMeshProtocol = {
             && globalThis.RuntimeCapabilities.transportSupported(config, "webrtc", true);
     },
 
-    networkId(identity) {
-        return identity?.pubkey ? `nostr:${identity.pubkey}` : "nostr";
+    networkId(_identity, config = null) {
+        return config?.nostrMesh?.room || "";
     },
 
-    recipientTags(identity) {
-        const self = identity?.pubkey || "";
-        const pubkeyRegex = NostrDiscoveryProtocol?.pubkeyRegex || /^[0-9a-f]{64}$/i;
-        return [...new Set(identity?.followPubkeys || [])]
-            .map(pubkey => String(pubkey || "").toLowerCase())
-            .filter(pubkey => pubkey !== self && pubkeyRegex.test(pubkey))
-            .map(pubkey => ["p", pubkey]);
+    trustedPubkeys(identity = null) {
+        return [...new Set((identity?.followPubkeys || [])
+            .filter(pubkey => NostrDiscoveryProtocol.pubkeyRegex.test(pubkey || ""))
+            .map(pubkey => pubkey.toLowerCase())
+            .filter(pubkey => pubkey !== identity?.pubkey?.toLowerCase()))];
+    },
+
+    subscriptionFilters(identity = null, config = null, since = Math.floor(Date.now() / 1000) - 5) {
+        const room = this.networkId(identity, config);
+        if (room) return [{kinds: [this.kind], since, "#r": [room]}];
+
+        const trusted = this.trustedPubkeys(identity);
+        if (!trusted.length) return [];
+
+        const filters = [];
+        for (let index = 0; index < trusted.length; index += 50) {
+            filters.push({
+                kinds: [this.kind],
+                since,
+                authors: trusted.slice(index, index + 50)
+            });
+        }
+        return filters;
     },
 
     relayUrlsFromConfig(config) {
@@ -62,8 +81,27 @@ const NostrMeshProtocol = {
     },
 
     tagValue(event, tagName) {
-        const tag = event.tags.find(tag => tag[0] === tagName && tag[1]);
+        const tag = (event.tags || []).find(tag => tag[0] === tagName && tag[1]);
         return tag ? tag[1] : "";
+    },
+
+    hasTag(event, tagName, value) {
+        return (event.tags || []).some(tag => tag[0] === tagName && tag[1] === value);
+    },
+
+    presenceCapabilityTags() {
+        return [
+            ["client", "meshdrop"],
+            ["protocol", "nip100-webrtc"],
+            ["capability", "meshdrop"],
+            ["capability", "webrtc"]
+        ];
+    },
+
+    advertisesMeshDropWebRtc(event) {
+        return this.hasTag(event, "client", "meshdrop")
+            && this.hasTag(event, "capability", "meshdrop")
+            && this.hasTag(event, "capability", "webrtc");
     },
 
     peerFromEvent(event, profile = null) {
@@ -183,8 +221,16 @@ class NostrMeshConnection {
             const hydratedIdentity = await identityController.ensureFollowListLoaded();
             this._identityController = identityController;
             this._identity = hydratedIdentity || identity;
-            this._room = NostrMeshProtocol.networkId(this._identity);
+            this._room = NostrMeshProtocol.networkId(this._identity, this._config);
+            this._trustedPubkeys = new Set(NostrMeshProtocol.trustedPubkeys(this._identity));
             this._relayUrls = NostrMeshProtocol.relayUrlsFromConfig(this._config);
+            this._trace(
+                "trusted npub set loaded",
+                `mode=${this._room ? "explicit-room" : "wot"}`,
+                `status=${this._identity.followListStatus || "unknown"}`,
+                `count=${this._trustedPubkeys.size}`,
+                `sample=${[...this._trustedPubkeys].slice(0, 3).map(pubkey => pubkey.slice(0, 8)).join(",") || "none"}`
+            );
             this._active = true;
             this._connectRelays();
             this._startPresenceHeartbeat();
@@ -313,22 +359,27 @@ class NostrMeshConnection {
 
     _subscribe(socket) {
         const since = Math.floor(Date.now() / 1000) - 5;
-        socket.send(JSON.stringify([
-            "REQ",
-            this._subscriptionId,
-            {kinds: [NostrMeshProtocol.kind], since, "#p": [this._identity.pubkey]}
-        ]));
+        const filters = NostrMeshProtocol.subscriptionFilters(this._identity, this._config, since);
+        this._trace("nostr discovery subscription filters", JSON.stringify(filters.map(filter => this._filterSummary(filter))));
+        if (!filters.length) {
+            this._trace("nostr discovery subscription skipped", "trusted-set-empty");
+            return;
+        }
+        socket.send(JSON.stringify(["REQ", this._subscriptionId, ...filters]));
     }
 
     async _publishPresence(type, socket = null) {
+        const tags = [
+            ["type", type],
+            ...NostrMeshProtocol.presenceCapabilityTags(),
+            ["name", this._identity.displayName || `npub ${this._identity.pubkey.slice(0, 8)}`]
+        ];
+        if (this._room) tags.splice(1, 0, ["r", this._room]);
+
         const event = await this._signEvent({
             kind: NostrMeshProtocol.kind,
             created_at: Math.floor(Date.now() / 1000),
-            tags: [
-                ["type", type],
-                ...NostrMeshProtocol.recipientTags(this._identity),
-                ["name", this._identity.displayName || `npub ${this._identity.pubkey.slice(0, 8)}`]
-            ],
+            tags,
             content: ""
         });
 
@@ -343,9 +394,10 @@ class NostrMeshConnection {
                 created_at: Math.floor(Date.now() / 1000),
                 tags: [
                     ["type", type],
+                    ...NostrMeshProtocol.presenceCapabilityTags(),
                     ["p", recipient],
                     ["name", this._identity.displayName || `npub ${this._identity.pubkey.slice(0, 8)}`]
-                ],
+                ].concat(this._room ? [["r", this._room]] : []),
                 content: encryptedContent
             });
 
@@ -397,7 +449,15 @@ class NostrMeshConnection {
 
         if (relayMessage[0] !== "EVENT") return;
         const event = relayMessage[2];
-        if (!this._shouldHandleEvent(event)) return;
+        const decision = this._eventDecision(event);
+        this._trace(
+            "nostr discovery event",
+            `accepted=${decision.accepted}`,
+            `reason=${decision.reason}`,
+            `type=${NostrMeshProtocol.eventType(event) || "unknown"}`,
+            `pubkey=${event?.pubkey?.slice(0, 8) || "unknown"}`
+        );
+        if (!decision.accepted) return;
 
         this._seenEvents.add(event.id);
         const type = NostrMeshProtocol.eventType(event);
@@ -423,19 +483,36 @@ class NostrMeshConnection {
     }
 
     _shouldHandleEvent(event) {
-        if (!event || event.kind !== NostrMeshProtocol.kind) return false;
-        if (!event.id || this._seenEvents.has(event.id)) return false;
-        if (event.pubkey === this._identity?.pubkey) return false;
+        return this._eventDecision(event).accepted;
+    }
+
+    _eventDecision(event) {
+        if (!event || event.kind !== NostrMeshProtocol.kind) return {accepted: false, reason: "wrong-kind"};
+        if (!event.id) return {accepted: false, reason: "missing-id"};
+        if (this._seenEvents.has(event.id)) return {accepted: false, reason: "duplicate"};
+        if (event.pubkey === this._identity?.pubkey) return {accepted: false, reason: "self"};
 
         const type = NostrMeshProtocol.eventType(event);
-        if (!type) return false;
-        if (!NostrFollowPolicy.allowsPubkey(event.pubkey, this._identity)) return false;
+        if (!type) return {accepted: false, reason: "missing-type"};
+
+        const room = NostrMeshProtocol.room(event);
+        if (this._room && room !== this._room) return {accepted: false, reason: "room-mismatch"};
+
+        const trusted = this._trustedPubkeys?.has(event.pubkey?.toLowerCase()) === true;
+        const publicRoomMode = !!this._room;
+        if (!trusted && !publicRoomMode) return {accepted: false, reason: "untrusted-author"};
 
         if (type === "connect" || type === "disconnect") {
-            return NostrMeshProtocol.isAddressedTo(event, this._identity?.pubkey);
+            if (!NostrMeshProtocol.advertisesMeshDropWebRtc(event)) {
+                return {accepted: false, reason: "missing-meshdrop-webrtc-capability"};
+            }
+            return {accepted: true, reason: trusted ? "trusted-presence" : "explicit-room-presence"};
         }
 
-        return NostrMeshProtocol.isAddressedTo(event, this._identity?.pubkey);
+        if (!NostrMeshProtocol.isAddressedTo(event, this._identity?.pubkey)) {
+            return {accepted: false, reason: "not-addressed"};
+        }
+        return {accepted: true, reason: trusted ? "trusted-signal" : "explicit-room-signal"};
     }
 
     _onPeerConnect(event) {
@@ -536,6 +613,20 @@ class NostrMeshConnection {
 
         this.disconnect(false);
         await this.connect();
+    }
+
+    _filterSummary(filter) {
+        return {
+            kinds: filter.kinds,
+            since: filter.since,
+            authors: filter.authors?.length || 0,
+            p: filter["#p"]?.map(pubkey => pubkey.slice(0, 8)),
+            r: filter["#r"]
+        };
+    }
+
+    _trace(...parts) {
+        console.info("[meshdrop:nostr]", ...parts);
     }
 }
 

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import {generateSecretKey, utils} from "nostr-tools";
 import {
+    DEFAULT_NPUB_DISCOVERY_NETWORK_ID,
     createNpubDiscoveryNetwork,
     parseNostrPubkeys,
     pubkeyFromSecret
@@ -14,9 +15,13 @@ export function createFederationConfig(env = process.env) {
     const enabled = env.MESHDROP_FEDERATION !== "false";
     const serverId = env.MESHDROP_SERVER_ID || loadOrCreateServerId(env.PLN_DIR || "/var/lib/meshdrop/pln");
     const secretKey = loadOrCreateNostrKey(env.MESHDROP_NOSTR_SECRET_KEY, env.PLN_DIR || "/var/lib/meshdrop/pln");
+    const publicNetworkId = env.MESHDROP_PUBLIC_DISCOVERY === "true"
+        ? env.MESHDROP_PUBLIC_DISCOVERY_ROOM || DEFAULT_NPUB_DISCOVERY_NETWORK_ID
+        : "";
     const network = createNpubDiscoveryNetwork({
         localPubkey: pubkeyFromSecret(secretKey),
-        peerPubkeys: parseNostrPubkeys(env.MESHDROP_DISCOVERY_NPUBS || env.MESHDROP_NPUBS || "")
+        peerPubkeys: parseNostrPubkeys(env.MESHDROP_DISCOVERY_NPUBS || env.MESHDROP_NPUBS || ""),
+        publicNetworkId
     });
 
     return {
@@ -36,7 +41,14 @@ export function createFederationConfig(env = process.env) {
             room: network.id,
             command: env.PLN_BIN || "pln",
             dir: env.PLN_DIR || "/var/lib/meshdrop/pln",
-            serviceName: env.POLLEN_FEDERATION_SERVICE || `${SERVICE_PREFIX}-${serverId.slice(0, 16)}`
+            serviceName: env.POLLEN_FEDERATION_SERVICE || `${SERVICE_PREFIX}-${serverId.slice(0, 16)}`,
+            name: env.POLLEN_NAME || "meshdrop",
+            port: Number.parseInt(env.POLLEN_PORT || "60611", 10) || 60611,
+            public: env.POLLEN_PUBLIC === "true",
+            ips: (env.POLLEN_IPS || "").split(",").map(ip => ip.trim()).filter(Boolean),
+            inviteTtl: env.POLLEN_INVITE_TTL || "5m",
+            clusterBootstrap: env.POLLEN_NOSTR_CLUSTER_BOOTSTRAP !== "false" && network.recipientPubkeys.length > 0,
+            daemonDeferred: env.POLLEN_DAEMON_DEFERRED === "1"
         },
         nostr: {
             enabled: env.POLLEN_NOSTR_BOOTSTRAP !== "false",
@@ -47,6 +59,7 @@ export function createFederationConfig(env = process.env) {
             pubkey: network.localPubkey,
             recipientPubkeys: network.recipientPubkeys,
             networkId: network.id,
+            discoveryMode: network.discoveryMode,
             secretKey
         },
         trace: env.MESHDROP_FEDERATION_TRACE !== "false",

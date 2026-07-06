@@ -27,20 +27,6 @@ async function main() {
             roomType: "ip",
             transportId: "local"
         });
-        console.log(`Docker browser transfer smoke start: ${proofPrefix}-pollen-webrtc`);
-        await runProofTransfer(browser, {
-            name: `${proofPrefix}-pollen-webrtc`,
-            roomType: "pollen",
-            transportId: "pollen-mesh",
-            setupBoth: async pages => {
-                await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropPollenTransfer.enable())));
-                await Promise.all(pages.map(page => (
-                    page.waitForFunction(() => globalThis.meshdropPollenTransfer.isActive(), undefined, {
-                        timeout: pageReadyTimeoutMs
-                    })
-                )));
-            }
-        });
     }
     finally {
         await browser.close();

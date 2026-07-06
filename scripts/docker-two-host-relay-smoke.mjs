@@ -314,7 +314,7 @@ async function sendProofFile(page, peerId, proofFile) {
         const file = new File([proof.text], proof.name, {type: "text/plain"});
         window.dispatchEvent(new CustomEvent("select-files-transport", {detail: {to, files: [file]}}));
         const button = document.querySelector('[data-transport-id="webrtc"]');
-        if (!button) throw new Error("Missing Nostr relay transport option");
+        if (!button) throw new Error("Missing Nostr transport option");
         button.click();
     }, {to: peerId, proof: proofFile});
 }

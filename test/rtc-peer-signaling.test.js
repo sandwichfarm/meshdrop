@@ -506,6 +506,42 @@ test("leaving a room locally removes that room type from visible peers", () => {
     assert.equal(fired.some(event => event.type === "peer-disconnected"), false);
 });
 
+test("PeersManager falls back from direct Nostr to FIPS then Pollen on RTC failure", () => {
+    const {PeersManager} = createHarness();
+    const manager = new PeersManager({send() {}});
+    const switches = [];
+    const fipsTransport = {send() {}};
+    const pollenTransport = {send() {}};
+
+    manager.peers["peer-a"] = {
+        rtcSupported: true,
+        _intentionalDisconnect: false,
+        _isCaller: true,
+        _roomIds: {nostr: "nostr-room", fips: "fips-room", pollen: "pollen-room"},
+        _transportsByRoomType: {fips: fipsTransport, pollen: pollenTransport},
+        _isCallerByRoomType: {fips: false, pollen: true},
+        _getRoomTypes() {
+            return Object.keys(this._roomIds);
+        },
+        _removeRoomType(roomType) {
+            delete this._roomIds[roomType];
+        },
+        switchSignalingRoute(isCaller, roomType, roomId, transport) {
+            switches.push({isCaller, roomType, roomId, transport});
+        }
+    };
+
+    manager._onPeerDisconnected("peer-a");
+
+    assert.equal(manager.peers["peer-a"]._roomIds.nostr, undefined);
+    assert.deepEqual(switches, [{
+        isCaller: false,
+        roomType: "fips",
+        roomId: "fips-room",
+        transport: fipsTransport
+    }]);
+});
+
 test("disabled local discovery ignores late IP peer announcements", () => {
     const {PeersManager, connections, context} = createHarness();
     context.meshdropLocalDiscovery = {isEnabled: () => false};

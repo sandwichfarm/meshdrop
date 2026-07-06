@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {finalizeEvent, generateSecretKey, getPublicKey, nip19, utils} from "nostr-tools";
+import {finalizeEvent, generateSecretKey, getPublicKey, nip19, nip44, utils} from "nostr-tools";
 import {WebSocketServer} from "ws";
 
 import PairDropWsServer from "../server/ws-server.js";
@@ -257,7 +257,7 @@ test("federation config derives FIPS and Pollen discovery from npub contacts", (
     assert.equal(config.nostr.room, undefined);
 });
 
-test("federation config uses the shared unconfigured npub network when no contacts are configured", () => {
+test("federation config does not synthesize a public npub network when no contacts are configured", () => {
     const localSecret = generateSecretKey();
     const config = createFederationConfig({
         MESHDROP_FEDERATION: "true",
@@ -266,15 +266,59 @@ test("federation config uses the shared unconfigured npub network when no contac
         MESHDROP_DISCOVERY_NPUBS: ""
     });
 
-    assert.equal(config.fips.room, "npub-network:unconfigured");
-    assert.equal(config.pollen.room, "npub-network:unconfigured");
-    assert.equal(config.nostr.networkId, "npub-network:unconfigured");
+    assert.equal(config.fips.room, "");
+    assert.equal(config.pollen.room, "");
+    assert.equal(config.nostr.networkId, "");
+    assert.equal(config.nostr.discoveryMode, "wot");
     assert.deepEqual(config.nostr.recipientPubkeys, []);
 });
 
-test("federation subscribes to Pollen announcements addressed to the local npub", async () => {
+test("federation config keeps npub-network unconfigured only for explicit public discovery", () => {
     const localSecret = generateSecretKey();
+    const config = createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_DISCOVERY_NPUBS: "",
+        MESHDROP_PUBLIC_DISCOVERY: "true"
+    });
+
+    assert.equal(config.fips.room, "npub-network:unconfigured");
+    assert.equal(config.pollen.room, "npub-network:unconfigured");
+    assert.equal(config.nostr.networkId, "npub-network:unconfigured");
+    assert.equal(config.nostr.discoveryMode, "public");
+});
+
+test("federation public discovery uses explicit network tags and filters only when enabled", async () => {
+    const localSecret = generateSecretKey();
+    const sent = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_PUBLIC_DISCOVERY: "true",
+        FIPS_FEDERATION_URL: "http://[fd00::1]:3000"
+    }));
+
+    await federation._announceFipsNostr({
+        readyState: 1,
+        send: message => sent.push(JSON.parse(message))
+    });
+
+    assert.deepEqual(federation._nostrDiscoveryFilters(), [
+        {kinds: [20385], "#d": ["npub-network:unconfigured"]}
+    ]);
+    assert.equal(sent.length, 1);
+    const tags = sent[0][1].tags;
+    assert(tags.some(tag => tag[0] === "d" && tag[1] === "npub-network:unconfigured"));
+    assert(tags.some(tag => tag[0] === "network" && tag[1] === "npub-network:unconfigured"));
+});
+
+test("federation subscribes to trusted authors and local-addressed announcements", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
     const localPubkey = getPublicKey(localSecret);
+    const peerPubkey = getPublicKey(peerSecret);
     const server = new WebSocketServer({host: "127.0.0.1", port: 0});
     const messages = [];
     server.on("connection", socket => {
@@ -285,6 +329,7 @@ test("federation subscribes to Pollen announcements addressed to the local npub"
         MESHDROP_FEDERATION: "true",
         MESHDROP_SERVER_ID: "local-server",
         MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(peerPubkey),
         NOSTR_RELAYS: `ws://127.0.0.1:${server.address().port}`,
         POLLEN_TRANSFER: "false"
     }));
@@ -299,7 +344,7 @@ test("federation subscribes to Pollen announcements addressed to the local npub"
     }
 
     assert.equal(messages[0][0], "REQ");
-    assert.deepEqual(messages[0][2], {kinds: [20385], "#d": ["npub-network:unconfigured"]});
+    assert.deepEqual(messages[0][2], {kinds: [20385], authors: [peerPubkey]});
     assert.deepEqual(messages[0][3], {kinds: [20385], "#p": [localPubkey]});
 });
 
@@ -314,6 +359,11 @@ test("federation announces Pollen service to configured npub contacts", async ()
         MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
         MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(peerPubkey)
     }));
+    federation.nostrDiscovery.getPollenIdentity = async () => ({
+        nodeId: "local-pln-node",
+        rootHash: "local-pln-root",
+        hasMembership: true
+    });
 
     await federation._announcePollenNostr({
         readyState: 1,
@@ -324,8 +374,10 @@ test("federation announces Pollen service to configured npub contacts", async ()
     const tags = sent[0][1].tags;
     assert(tags.some(tag => tag[0] === "p" && tag[1] === peerPubkey));
     assert(tags.some(tag => tag[0] === "protocol" && tag[1] === "meshdrop-pollen-nostr-discovery"));
-    assert(tags.some(tag => tag[0] === "d" && tag[1] === federation.config.nostr.networkId));
-    assert(tags.some(tag => tag[0] === "network" && tag[1] === federation.config.nostr.networkId));
+    assert.equal(tags.some(tag => tag[0] === "d"), false);
+    assert.equal(tags.some(tag => tag[0] === "network"), false);
+    assert(tags.some(tag => tag[0] === "pln-node" && tag[1] === "local-pln-node"));
+    assert(tags.some(tag => tag[0] === "pln-root" && tag[1] === "local-pln-root"));
     assert.equal(tags.some(tag => tag[0] === "r"), false);
 });
 
@@ -351,12 +403,13 @@ test("federation announces FIPS MeshDrop base URL over Nostr", async () => {
     const tags = sent[0][1].tags;
     assert(tags.some(tag => tag[0] === "type" && tag[1] === "fips-federation"));
     assert(tags.some(tag => tag[0] === "protocol" && tag[1] === "meshdrop-fips-nostr-discovery"));
-    assert(tags.some(tag => tag[0] === "d" && tag[1] === federation.config.nostr.networkId));
+    assert.equal(tags.some(tag => tag[0] === "d"), false);
+    assert.equal(tags.some(tag => tag[0] === "network"), false);
     assert(tags.some(tag => tag[0] === "p" && tag[1] === peerPubkey));
     assert(tags.some(tag => tag[0] === "base" && tag[1] === "http://[fd00::1]:3000"));
 });
 
-test("federation accepts unaddressed Pollen Nostr announcements on the same discovery network", async () => {
+test("federation accepts Pollen Nostr announcements from trusted authors", async () => {
     const localSecret = generateSecretKey();
     const peerSecret = generateSecretKey();
     const connected = [];
@@ -364,7 +417,7 @@ test("federation accepts unaddressed Pollen Nostr announcements on the same disc
         MESHDROP_FEDERATION: "true",
         MESHDROP_SERVER_ID: "local-server",
         MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
-        MESHDROP_DISCOVERY_NPUBS: ""
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(getPublicKey(peerSecret))
     }));
     federation._connectPollenService = async (serverId, serviceName) => connected.push([serverId, serviceName]);
 
@@ -374,7 +427,6 @@ test("federation accepts unaddressed Pollen Nostr announcements on the same disc
         tags: [
             ["type", "pollen-federation"],
             ["protocol", "meshdrop-pollen-nostr-discovery"],
-            ["d", "npub-network:unconfigured"],
             ["server", "remote-a"],
             ["service", "meshdrop-fed-a"]
         ],
@@ -386,7 +438,149 @@ test("federation accepts unaddressed Pollen Nostr announcements on the same disc
     assert.deepEqual(connected, [["remote-a", "meshdrop-fed-a"]]);
 });
 
-test("federation accepts unaddressed FIPS Nostr announcements on the same discovery network", async () => {
+test("federation ignores Pollen Nostr announcements from a different Pollen cluster", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const connected = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(getPublicKey(peerSecret))
+    }));
+    federation.nostrDiscovery.getPollenIdentity = async () => ({rootHash: "local-root"});
+    federation._connectPollenService = async (serverId, serviceName) => connected.push([serverId, serviceName]);
+
+    const event = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "pollen-federation"],
+            ["protocol", "meshdrop-pollen-nostr-discovery"],
+            ["server", "remote-a"],
+            ["service", "meshdrop-fed-a"],
+            ["pln-root", "remote-root"]
+        ],
+        content: ""
+    }, peerSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", event]));
+
+    assert.deepEqual(connected, []);
+});
+
+test("federation ignores Pollen Nostr announcements without cluster identity when local root is known", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const connected = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(getPublicKey(peerSecret))
+    }));
+    federation.nostrDiscovery.getPollenIdentity = async () => ({rootHash: "local-root"});
+    federation._connectPollenService = async (serverId, serviceName) => connected.push([serverId, serviceName]);
+
+    const event = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "pollen-federation"],
+            ["protocol", "meshdrop-pollen-nostr-discovery"],
+            ["server", "remote-a"],
+            ["service", "meshdrop-fed-a"]
+        ],
+        content: ""
+    }, peerSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", event]));
+
+    assert.deepEqual(connected, []);
+});
+
+test("federation answers known Pollen join requests with encrypted subject-bound invites", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const localPubkey = getPublicKey(localSecret);
+    const peerPubkey = getPublicKey(peerSecret);
+    const sent = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(peerPubkey)
+    }));
+    federation.nostrDiscovery.getPollenIdentity = async () => ({
+        nodeId: "local-pln-node",
+        rootHash: "local-root",
+        hasMembership: true,
+        canInvite: true
+    });
+    federation.pollenTransport.createInvite = async subjectNodeId => `invite-for-${subjectNodeId}`;
+    federation.relaySockets.set("test", {
+        readyState: 1,
+        send: message => sent.push(JSON.parse(message))
+    });
+
+    const request = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "pollen-join-request"],
+            ["protocol", "meshdrop-pollen-nostr-discovery"],
+            ["p", localPubkey],
+            ["server", "remote-server"],
+            ["pln-node", "remote-pln-node"]
+        ],
+        content: ""
+    }, peerSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", request]));
+
+    assert.equal(sent.length, 1);
+    const invite = sent[0][1];
+    assert(invite.tags.some(tag => tag[0] === "type" && tag[1] === "pollen-invite"));
+    assert(invite.tags.some(tag => tag[0] === "p" && tag[1] === peerPubkey));
+    const plaintext = nip44.decrypt(invite.content, nip44.getConversationKey(peerSecret, localPubkey));
+    assert.equal(JSON.parse(plaintext).token, "invite-for-remote-pln-node");
+});
+
+test("federation joins from encrypted Pollen invites addressed to the local npub", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const localPubkey = getPublicKey(localSecret);
+    const peerPubkey = getPublicKey(peerSecret);
+    const joined = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(peerPubkey)
+    }));
+    federation.nostrDiscovery.joinPollenInvite = async payload => joined.push(payload.token);
+    const content = nip44.encrypt(
+        JSON.stringify({token: "subject-bound-token"}),
+        nip44.getConversationKey(peerSecret, localPubkey)
+    );
+    const invite = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "pollen-invite"],
+            ["protocol", "meshdrop-pollen-nostr-discovery"],
+            ["p", localPubkey],
+            ["server", "remote-server"]
+        ],
+        content
+    }, peerSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", invite]));
+
+    assert.deepEqual(joined, ["subject-bound-token"]);
+});
+
+test("federation accepts explicit FIPS HTTP advertisements from trusted authors", async () => {
     const localSecret = generateSecretKey();
     const peerSecret = generateSecretKey();
     const discovered = [];
@@ -394,7 +588,7 @@ test("federation accepts unaddressed FIPS Nostr announcements on the same discov
         MESHDROP_FEDERATION: "true",
         MESHDROP_SERVER_ID: "local-server",
         MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
-        MESHDROP_DISCOVERY_NPUBS: ""
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(getPublicKey(peerSecret))
     }));
     federation._discoverHttpServer = async server => discovered.push(server);
 
@@ -404,8 +598,8 @@ test("federation accepts unaddressed FIPS Nostr announcements on the same discov
         tags: [
             ["type", "fips-federation"],
             ["protocol", "meshdrop-fips-nostr-discovery"],
-            ["d", "npub-network:unconfigured"],
             ["server", "remote-a"],
+            ["capability", "meshdrop-http"],
             ["base", "http://[fd00::2]:3000"]
         ],
         content: ""
@@ -420,12 +614,42 @@ test("federation accepts unaddressed FIPS Nostr announcements on the same discov
     }]);
 });
 
-test("federation ignores Pollen Nostr announcements not addressed to the local npub", async () => {
+test("federation rejects explicit FIPS HTTP advertisements from untrusted authors", async () => {
+    const localSecret = generateSecretKey();
+    const trustedSecret = generateSecretKey();
+    const untrustedSecret = generateSecretKey();
+    const discovered = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        MESHDROP_DISCOVERY_NPUBS: nip19.npubEncode(getPublicKey(trustedSecret))
+    }));
+    federation._discoverHttpServer = async server => discovered.push(server);
+
+    const rejected = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "fips-federation"],
+            ["protocol", "meshdrop-fips-nostr-discovery"],
+            ["server", "remote-a"],
+            ["capability", "meshdrop-http"],
+            ["base", "http://[fd00::2]:3000"]
+        ],
+        content: ""
+    }, untrustedSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", rejected]));
+
+    assert.deepEqual(discovered, []);
+});
+
+test("federation accepts Pollen announcements from trusted addressed authors only", async () => {
     const localSecret = generateSecretKey();
     const peerSecret = generateSecretKey();
     const otherSecret = generateSecretKey();
     const localPubkey = getPublicKey(localSecret);
-    const otherPubkey = getPublicKey(otherSecret);
     const connected = [];
     const federation = new MeshFederation(createFederationConfig({
         MESHDROP_FEDERATION: "true",
@@ -440,18 +664,19 @@ test("federation ignores Pollen Nostr announcements not addressed to the local n
         created_at: 1,
         tags: [
             ["type", "pollen-federation"],
-            ["d", "npub-network:other"],
-            ["p", otherPubkey],
+            ["protocol", "meshdrop-pollen-nostr-discovery"],
+            ["p", localPubkey],
             ["server", "remote-a"],
             ["service", "meshdrop-fed-a"]
         ],
         content: ""
-    }, peerSecret);
+    }, otherSecret);
     const accepted = finalizeEvent({
         kind: 20385,
         created_at: 2,
         tags: [
             ["type", "pollen-federation"],
+            ["protocol", "meshdrop-pollen-nostr-discovery"],
             ["p", localPubkey],
             ["server", "remote-b"],
             ["service", "meshdrop-fed-b"]
@@ -647,6 +872,48 @@ test("federation listens to FIPS peer discovery events", async () => {
 
     assert.deepEqual(discovered, ["fd00::2"]);
     assert.deepEqual(removed, ["fd00::2"]);
+});
+
+test("federation treats generic FIPS peers as route candidates, not MeshDrop HTTP servers", async () => {
+    const traces = [];
+    const fetches = [];
+    const originalFetch = globalThis.fetch;
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        FIPS_DISCOVERY: "true"
+    }), {
+        fipsClient: {
+            async status() {
+                return {
+                    available: true,
+                    ipv6Addr: "fd00::1",
+                    peers: [{
+                        displayName: "router-a",
+                        ipv6Addr: "fd00::2",
+                        transportType: "udp",
+                        transportAddr: "10.0.0.2:2121"
+                    }]
+                };
+            }
+        }
+    });
+    federation.config.trace = true;
+    federation._trace = (...parts) => traces.push(parts);
+    globalThis.fetch = async url => {
+        fetches.push(String(url));
+        throw new Error("unexpected fetch");
+    };
+
+    try {
+        await federation.discoverFipsPeers();
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+
+    assert.deepEqual(fetches, []);
+    assert(traces.some(parts => parts[0] === "fips route candidate" && parts.includes("fd00::2")));
+    assert.equal(federation.remoteServers.size, 0);
 });
 
 test("federation removes remote peers when a FIPS peer disappears", () => {

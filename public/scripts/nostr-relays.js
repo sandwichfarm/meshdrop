@@ -417,15 +417,12 @@ const NostrFollowPolicy = {
         return this.followSet(identity).has(pubkey.toLowerCase());
     },
 
-    allowsPeer(peer, roomType = null, identity = globalThis.meshdropNostrIdentity?.getIdentity?.()) {
+    allowsPeer(peer, roomType = null, _identity = globalThis.meshdropNostrIdentity?.getIdentity?.()) {
         const roomTypes = Object.keys(peer?._roomIds || {});
         const nostrOnly = !roomType && roomTypes.length === 1 && roomTypes[0] === "nostr";
         if (roomType !== "nostr" && !nostrOnly) return true;
 
-        const peerPubkey = peer?.nostrIdentity?.pubkey || peer?.id || "";
-        if (!peerPubkey || !identity) return false;
-
-        return this.allowsPubkey(peerPubkey, identity);
+        return this.allowsPubkey(peer?.nostrIdentity?.pubkey || peer?.id, _identity);
     }
 };
 

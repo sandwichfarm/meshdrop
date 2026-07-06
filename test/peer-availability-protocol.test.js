@@ -10,7 +10,7 @@ test("peer availability exposes instance, FIPS, Pollen, and Nostr room types", (
         _roomIds: {
             fips: "meshdrop-fips",
             pollen: "meshdrop-pollen",
-            nostr: "mesh:example",
+            nostr: "",
             ip: "127.0.0.1"
         }
     };
@@ -19,9 +19,9 @@ test("peer availability exposes instance, FIPS, Pollen, and Nostr room types", (
         protocol.availability(peer).map(option => [option.id, option.label, option.shortLabel]),
         [
             ["local", "Instance", "Instance"],
+            ["webrtc", "Nostr", "Nostr"],
             ["fips", "FIPS", "FIPS"],
-            ["pollen-mesh", "Pollen", "Pollen"],
-            ["webrtc", "Nostr", "Nostr"]
+            ["pollen-mesh", "Pollen", "Pollen"]
         ]
     );
 });
@@ -44,7 +44,7 @@ test("transfer options prefer local when available and include enabled storage p
                 nostr: "nostr-peer"
             },
             _roomIds: {
-                nostr: "mesh:example",
+                nostr: "",
                 fips: "meshdrop-fips",
                 pollen: "meshdrop-pollen",
                 ip: "127.0.0.1"
@@ -55,9 +55,9 @@ test("transfer options prefer local when available and include enabled storage p
             protocol.optionsFor(peer).map(option => [option.id, option.peerId || null]),
             [
                 ["local", "local-peer"],
+                ["webrtc", "nostr-peer"],
                 ["fips", "fips-peer"],
                 ["pollen-mesh", "pollen-peer"],
-                ["webrtc", "nostr-peer"],
                 ["hashtree", null],
                 ["blossom", null],
                 ["pollen", null]
@@ -103,11 +103,12 @@ test("transfer options expose privacy and encryption metadata", () => {
             ["Best case", "local network candidate"]
         ]);
         assert.equal(pollenMesh.group, "Network routes");
-        assert.equal(pollenMesh.privacy, "P2P after Pollen discovery");
+        assert.equal(pollenMesh.privacy, "P2P over Pollen route");
         assert.deepEqual(pollenMesh.details.at(-1), ["Best case", "local network candidate"]);
         assert.equal(webrtc.label, "Nostr");
         assert.equal(webrtc.privacy, "P2P after Nostr discovery");
-        assert.deepEqual(webrtc.details.at(-1), ["Relays see", "signaling only"]);
+        assert.deepEqual(webrtc.details.at(0), ["Discovery", "Nostr WOT"]);
+        assert.deepEqual(webrtc.details.at(-1), ["Nostr events", "signaling only"]);
         assert.equal(hashtree.group, "Storage routes");
         assert.equal(hashtree.privacy, "Integrity, not secrecy");
         assert.deepEqual(hashtree.details.at(-1), ["Unencrypted", "servers see chunks"]);
@@ -127,7 +128,7 @@ test("transfer options expose privacy and encryption metadata", () => {
 test("peer counts use actual MeshDrop room membership", () => {
     const peers = {
         a: {_roomIds: {fips: "meshdrop-fips"}},
-        b: {_roomIds: {fips: "meshdrop-fips", nostr: "mesh:example"}},
+        b: {_roomIds: {fips: "meshdrop-fips", nostr: ""}},
         c: {_roomIds: {ip: "127.0.0.1"}}
     };
 
@@ -140,16 +141,16 @@ test("peer counts summarize network posture badges", () => {
         a: {_roomIds: {ip: "127.0.0.1", fips: "meshdrop-fips"}},
         b: {_roomIds: {pollen: "meshdrop-pollen"}},
         c: {_roomIds: {fips: "meshdrop-fips", pollen: "meshdrop-pollen"}},
-        d: {_roomIds: {nostr: "mesh:example"}}
+        d: {_roomIds: {nostr: ""}}
     };
 
     assert.deepEqual(
         protocol.networkPostureCounts(peers).map(entry => [entry.id, entry.count, entry.shortLabel]),
         [
             ["local", 1, "Instance"],
+            ["webrtc", 1, "Nostr"],
             ["fips", 2, "FIPS"],
-            ["pollen-mesh", 2, "Pollen"],
-            ["webrtc", 1, "Nostr"]
+            ["pollen-mesh", 2, "Pollen"]
         ]
     );
 });

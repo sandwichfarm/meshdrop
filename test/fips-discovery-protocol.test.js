@@ -21,8 +21,8 @@ test("FIPS discovery protocol reads configured room and enabled state", () => {
         false
     );
     assert.equal(protocol.roomFromConfig({fips: {room: "npub-network:test"}}), "npub-network:test");
-    assert.equal(protocol.roomFromConfig({fips: {room: "meshdrop-test"}}), "npub-network:unconfigured");
-    assert.equal(protocol.roomFromConfig({}), "npub-network:unconfigured");
+    assert.equal(protocol.roomFromConfig({fips: {room: "meshdrop-test"}}), "");
+    assert.equal(protocol.roomFromConfig({}), "");
 });
 
 test("FIPS discovery protocol summarizes unavailable status", () => {
@@ -35,7 +35,7 @@ test("FIPS discovery protocol summarizes unavailable status", () => {
             ipv6Addr: "",
             peerCount: 0,
             meshSize: 0,
-            room: "npub-network:unconfigured"
+            room: ""
         }
     );
 });
@@ -77,7 +77,7 @@ test("FIPS discovery protocol hides static room IDs", () => {
             ipv6Addr: "",
             peerCount: 0,
             meshSize: 0,
-            room: "npub-network:unconfigured"
+            room: ""
         }
     );
 });

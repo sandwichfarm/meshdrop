@@ -24,11 +24,9 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerTransfer, /select-files-transport/);
     assert.match(dockerTransfer, /MESHDROP_DOCKER_TRANSFER_PROOF_PREFIX \|\| "docker"/);
     assert.match(dockerTransfer, /`\$\{proofPrefix\}-local-webrtc`/);
-    assert.match(dockerTransfer, /`\$\{proofPrefix\}-pollen-webrtc`/);
     assert.match(dockerTransfer, /meshdrop-\$\{options\.name\}-proof\.txt/);
     assert.match(dockerTransfer, /scenario=\$\{options\.name\}/);
     assert.match(dockerTransfer, /transport=\$\{options\.transportId\}/);
-    assert.match(dockerTransfer, /meshdropPollenTransfer\.enable/);
     assert.match(dockerTransfer, /const transferTimeoutMs = 45000/);
     assert.match(dockerTransfer, /\{timeout: transferTimeoutMs\}/);
     assert.match(dockerTransfer, /setDefaultTimeout\(pageReadyTimeoutMs\)/);
@@ -56,8 +54,8 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(dockerTwoHostRelay, /relayCount=\$\{relayUrls\.length\}/);
     assert.match(dockerTwoHostRelay, /between two Docker instances/);
     assert.match(packageJson, /"test:docker:two-host": "node scripts\/docker-two-host-relay-smoke\.mjs"/);
-    assert.match(e2eSmoke, /retryScenario\(\s*"federated-fips-webrtc"/);
-    assert.match(e2eSmoke, /waitForDirectRoute\(pageA, peerId, "fips"\)/);
+    assert.match(e2eSmoke, /retryScenario\(\s*"generic-fips-route-candidate"/);
+    assert.match(e2eSmoke, /generic FIPS peers created MeshDrop browser peers/);
     assert.match(ciWorkflow, /Install Chromium[\s\S]*npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /docker_public_relay_urls:/);
     assert.match(ciWorkflow, /docker-public-relay-uat:/);

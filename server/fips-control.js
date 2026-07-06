@@ -1,6 +1,5 @@
 import net from "net";
 import {
-    DEFAULT_NPUB_DISCOVERY_NETWORK_ID,
     createNpubDiscoveryNetwork,
     normalizeNpubDiscoveryNetworkId,
     parseNostrPubkeys,
@@ -25,7 +24,7 @@ export function createFipsConfig(env = process.env) {
         enabled,
         controlSocket: env.FIPS_CONTROL_SOCKET || defaultFipsSocketPath(),
         controlHost: env.FIPS_CONTROL_HOST || DEFAULT_FIPS_CONTROL_HOST,
-        room: network.id || DEFAULT_NPUB_DISCOVERY_NETWORK_ID,
+        room: network.id,
         timeoutMs: parseInt(env.FIPS_CONTROL_TIMEOUT_MS, 10) || 1000,
         eventCommand: env.FIPS_EVENT_COMMAND || "events"
     };

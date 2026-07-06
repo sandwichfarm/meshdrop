@@ -33,7 +33,6 @@ export default class MeshFederation {
             getLocalBaseUrl: () => this.localFipsBaseUrl,
             discoverPeer: peer => this._discoverFipsPeer(peer),
             removePeer: (peer, disconnect) => this._removeFipsPeer(peer, disconnect),
-            discoverHttpServer: server => this._discoverHttpServer(server),
             removeRemoteServer: (server, disconnect) => this._removeRemoteServer(server, disconnect),
             remoteServers: this.remoteServers
         });
@@ -41,8 +40,11 @@ export default class MeshFederation {
             config,
             trace: (...parts) => this._trace(...parts),
             getFipsBaseUrl: () => this.localFipsBaseUrl,
+            getPollenIdentity: () => this.pollenTransport.identity(),
             discoverHttpServer: server => this._discoverHttpServer(server),
             connectPollenService: (serverId, serviceName) => this._connectPollenService(serverId, serviceName),
+            createPollenInvite: (pubkey, subjectNodeId) => this.pollenTransport.createInvite(subjectNodeId),
+            joinPollenInvite: payload => this.pollenTransport.joinInvite(payload.token),
             reportError: (...parts) => writeStderr(...parts)
         });
         this.relaySockets = this.nostrDiscovery.relaySockets;
@@ -82,6 +84,7 @@ export default class MeshFederation {
         this.timers = [];
         this.nostrDiscovery.stop();
         this.fipsTransport.closePeerEvents();
+        this.pollenTransport.stop();
         this.fipsPeerEvents = null;
     }
 
@@ -180,7 +183,7 @@ export default class MeshFederation {
     }
 
     async _poll() {
-        await this.discoverFipsPeers().catch(error => writeStderr("FIPS federation discovery failed", errorMessage(error)));
+        await this.discoverFipsPeers().catch(error => writeStderr("FIPS route candidate refresh failed", errorMessage(error)));
         await this._announceFipsNostr().catch(error => writeStderr("FIPS Nostr announcement failed", errorMessage(error)));
         if (this.config.pollen.enabled) {
             await this._ensurePollenService().catch(error => writeStderr("Pollen federation service failed", errorMessage(error)));

@@ -75,32 +75,6 @@ async function main() {
         });
 
         await runProofTransferScenario(browser, baseUrl, {
-            name: "fips-webrtc",
-            roomType: "fips",
-            transportId: "fips",
-            disableLocal: true,
-            setupBoth: async pages => {
-                await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropFipsDiscovery.enable())));
-                await Promise.all(pages.map(page => (
-                    page.waitForFunction(() => globalThis.meshdropFipsDiscovery.isActive())
-                )));
-            }
-        });
-
-        await runProofTransferScenario(browser, baseUrl, {
-            name: "pollen-webrtc",
-            roomType: "pollen",
-            transportId: "pollen-mesh",
-            disableLocal: true,
-            setupBoth: async pages => {
-                await Promise.all(pages.map(page => page.evaluate(() => globalThis.meshdropPollenTransfer.enable())));
-                await Promise.all(pages.map(page => (
-                    page.waitForFunction(() => globalThis.meshdropPollenTransfer.isActive())
-                )));
-            }
-        });
-
-        await runProofTransferScenario(browser, baseUrl, {
             name: "pollen-storage",
             roomType: "ip",
             transportId: "pollen",
@@ -126,10 +100,9 @@ async function main() {
         });
 
         await runLocalRouteChoiceTransferScenario(browser, baseUrl);
-        await runRouteChoiceScenario(browser, baseUrl);
         await retryScenario(
-            "federated-fips-webrtc",
-            () => runFederatedFipsWebRtcScenario(browser, relay.port, blossom.port, pollen)
+            "generic-fips-route-candidate",
+            () => runGenericFipsRouteCandidateScenario(browser, relay.port, blossom.port, pollen)
         );
         await retryScenario(
             "federated-pollen-webrtc",
@@ -381,67 +354,6 @@ async function waitForHydration(page) {
     ));
 }
 
-async function runRouteChoiceScenario(browser, baseUrl) {
-    const contextA = await newContext(browser, "route-a");
-    const contextB = await newContext(browser, "route-b");
-    const pageA = await contextA.newPage();
-    const pageB = await contextB.newPage();
-    const logs = watchPages("routes", [pageA, pageB]);
-
-    try {
-        await Promise.all([
-            pageA.goto(baseUrl, {waitUntil: "domcontentloaded"}),
-            pageB.goto(baseUrl, {waitUntil: "domcontentloaded"})
-        ]);
-        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
-        await Promise.all([
-            pageA.evaluate(() => globalThis.meshdropFipsDiscovery.enable()),
-            pageB.evaluate(() => globalThis.meshdropFipsDiscovery.enable()),
-            pageA.evaluate(() => globalThis.meshdropPollenTransfer.enable()),
-            pageB.evaluate(() => globalThis.meshdropPollenTransfer.enable())
-        ]);
-        await waitForPeerClass(pageA, "fips");
-        await waitForPeerClass(pageA, "pollen");
-
-        const options = await pageA.evaluate(() => {
-            const peer = document.querySelector("x-peer.type-fips.type-pollen");
-            const file = new File(["route"], "route.txt", {type: "text/plain"});
-            window.dispatchEvent(new CustomEvent("select-files-transport", {
-                detail: {to: peer.id, files: [file]}
-            }));
-
-            return {
-                privacyModes: [...document.querySelectorAll(".transfer-privacy-option")]
-                    .map(option => [option.dataset.privacyMode, option.dataset.selected]),
-                options: [...document.querySelectorAll(".transport-choice-option")].map(option => ({
-                    id: option.dataset.transportId,
-                    label: option.querySelector(".transport-choice-label")?.textContent,
-                    privacy: option.querySelector(".transport-choice-privacy")?.textContent,
-                    details: [...option.querySelectorAll(".transport-choice-detail")].map(detail => detail.textContent)
-                }))
-            };
-        });
-
-        const pollen = options.options.find(option => option.id === "pollen-mesh");
-        const fips = options.options.find(option => option.id === "fips");
-        const local = options.options.find(option => option.id === "local");
-        assert(pollen, "Pollen mesh route was not selectable");
-        assert(fips, "FIPS mesh route was not selectable");
-        assert(local, "Instance route was not selectable");
-        assert(local.label === "Instance", "Instance route label missing");
-        assert(local.details.includes("Discoverysame MeshDrop instance"), "Instance route discovery copy missing");
-        assert(local.details.includes("Data pathWebRTC ICE direct"), "Instance route WebRTC copy missing");
-        assert(pollen.privacy === "P2P after Pollen discovery", "Pollen mesh privacy copy missing");
-        assert(fips.privacy === "P2P after FIPS discovery", "FIPS mesh privacy copy missing");
-        assert(options.privacyModes.some(([mode, selected]) => mode === "private" && selected === "true"), "Private mode not selected by default");
-        assert(options.privacyModes.some(([mode]) => mode === "unencrypted"), "Unencrypted mode missing");
-        assert(!logs.pageErrors.length, `routes: page errors: ${logs.pageErrors.join("\n")}`);
-    }
-    finally {
-        await Promise.allSettled([contextA.close(), contextB.close()]);
-    }
-}
-
 async function runLocalRouteChoiceTransferScenario(browser, baseUrl) {
     const contextA = await newContext(browser, "local-route-a");
     const contextB = await newContext(browser, "local-route-b");
@@ -482,7 +394,7 @@ async function runLocalRouteChoiceTransferScenario(browser, baseUrl) {
     }
 }
 
-async function runFederatedFipsWebRtcScenario(browser, relayPort, blossomPort, pollen) {
+async function runGenericFipsRouteCandidateScenario(browser, relayPort, blossomPort, pollen) {
     const portA = await freePort();
     const portB = await freePort();
     const fipsA = await startFakeFips({ipv6Addr: "::1", peerName: "Server B"});
@@ -507,52 +419,26 @@ async function runFederatedFipsWebRtcScenario(browser, relayPort, blossomPort, p
     const contextB = await newContext(browser, "fed-b");
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
-    const logs = watchPages("federated-fips", [pageA, pageB]);
+    const logs = watchPages("generic-fips", [pageA, pageB]);
 
     try {
-        await Promise.all([
-            waitForHttp(`http://127.0.0.1:${portA}/config`),
-            waitForHttp(`http://127.0.0.1:${portB}/config`)
-        ]);
-        await Promise.all([
-            pageA.goto(`http://127.0.0.1:${portA}`, {waitUntil: "domcontentloaded"}),
-            pageB.goto(`http://127.0.0.1:${portB}`, {waitUntil: "domcontentloaded"})
-        ]);
-        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
+        await openFederatedPages({pageA, pageB, portA, portB});
         await Promise.all([
             pageA.evaluate(() => globalThis.meshdropFipsDiscovery.enable()),
             pageB.evaluate(() => globalThis.meshdropFipsDiscovery.enable())
         ]);
 
-        let peerId;
-        try {
-            peerId = await waitForConnectedPeer(pageA, "fips");
-        } catch (error) {
-            const [stateA, stateB] = await Promise.all([debugPageState(pageA), debugPageState(pageB)]);
-            throw new Error(`${error.message}\nserverA=${JSON.stringify(stateA)}\nserverB=${JSON.stringify(stateB)}`);
-        }
-        const receiverPeerId = await waitForConnectedPeer(pageB, "fips");
-        await Promise.all([
-            waitForDirectRoute(pageA, peerId, "fips"),
-            waitForDirectRoute(pageB, receiverPeerId, "fips")
-        ]);
-        await Promise.all([
-            waitForHostCandidatePair(pageA, peerId, "federated-fips sender"),
-            waitForHostCandidatePair(pageB, receiverPeerId, "federated-fips receiver")
-        ]);
-        await sendProofIcon(pageA, peerId, "fips");
-
-        const received = await waitForReceivedFiles(pageB, 1, "federated-fips", [pageA, pageB]);
-        assertReceived({
-            name: "federated-fips",
-            fileName: "meshdrop-proof-icon.svg",
-            contents: [PROOF_ICON]
-        }, received);
-        assert(!logs.pageErrors.length, `federated-fips: page errors: ${logs.pageErrors.join("\n")}`);
-        console.log("Proof federated-fips-webrtc: fips delivered meshdrop-proof-icon.svg across two MeshDrop servers");
+        await delay(1500);
+        const [stateA, stateB] = await Promise.all([debugPageState(pageA), debugPageState(pageB)]);
+        const fipsPeers = [stateA, stateB].flatMap(state =>
+            state.peers.filter(peer => peer.classes.includes("type-fips"))
+        );
+        assert(!fipsPeers.length, `generic FIPS peers created MeshDrop browser peers: ${JSON.stringify({stateA, stateB})}`);
+        assert(!logs.pageErrors.length, `generic-fips: page errors: ${logs.pageErrors.join("\n")}`);
+        console.log("Proof generic-fips-route-candidate: FIPS mesh peers stayed route candidates, not MeshDrop HTTP peers");
     }
     finally {
-        await Promise.allSettled([contextA.close(), contextB.close()]);
+        await Promise.allSettled([contextA.close(), contextB.close(), appA.close(), appB.close()]);
     }
 }
 
@@ -588,15 +474,7 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
     const logs = watchPages("federated-pollen", [pageA, pageB]);
 
     try {
-        await Promise.all([
-            waitForHttp(`http://127.0.0.1:${portA}/config`),
-            waitForHttp(`http://127.0.0.1:${portB}/config`)
-        ]);
-        await Promise.all([
-            pageA.goto(`http://127.0.0.1:${portA}`, {waitUntil: "domcontentloaded"}),
-            pageB.goto(`http://127.0.0.1:${portB}`, {waitUntil: "domcontentloaded"})
-        ]);
-        await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
+        await openFederatedPages({pageA, pageB, portA, portB});
         await Promise.all([disableLocalDiscovery(pageA), disableLocalDiscovery(pageB)]);
         await Promise.all([
             pageA.evaluate(() => globalThis.meshdropPollenTransfer.enable()),
@@ -622,8 +500,8 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
         await assertRouteChoice(pageA, peerId, {
             id: "pollen-mesh",
             label: "Pollen",
-            privacy: "P2P after Pollen discovery",
-            discoveryDetail: "DiscoveryPollen mesh",
+            privacy: "P2P over Pollen route",
+            discoveryDetail: "RoutePollen substrate",
             dataPathDetail: "Data pathWebRTC ICE direct"
         });
         await sendProofIcon(pageA, peerId, "pollen-mesh");
@@ -638,8 +516,20 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
         console.log("Proof federated-pollen-webrtc: pollen-mesh delivered meshdrop-proof-icon.svg across two MeshDrop servers");
     }
     finally {
-        await Promise.allSettled([contextA.close(), contextB.close()]);
+        await Promise.allSettled([contextA.close(), contextB.close(), appA.close(), appB.close()]);
     }
+}
+
+async function openFederatedPages({pageA, pageB, portA, portB}) {
+    await Promise.all([
+        waitForHttp(`http://127.0.0.1:${portA}/config`),
+        waitForHttp(`http://127.0.0.1:${portB}/config`)
+    ]);
+    await Promise.all([
+        pageA.goto(`http://127.0.0.1:${portA}`, {waitUntil: "domcontentloaded"}),
+        pageB.goto(`http://127.0.0.1:${portB}`, {waitUntil: "domcontentloaded"})
+    ]);
+    await Promise.all([waitForHydration(pageA), waitForHydration(pageB)]);
 }
 
 async function connectNostrIdentity(page) {
@@ -692,10 +582,9 @@ async function waitForConnectedPeer(page, roomType) {
     try {
         const peerId = await page.waitForFunction(type => {
             const selector = type ? `x-peer.type-${type}` : "x-peer";
-            const peer = document.querySelector(selector);
-            if (!peer) return "";
-            if (!globalThis.__meshdropE2E.connected.includes(peer.id)) return "";
-            return peer.id;
+            const connected = new Set(globalThis.__meshdropE2E.connected || []);
+            const peer = [...document.querySelectorAll(selector)].find(candidate => connected.has(candidate.id));
+            return peer?.id || "";
         }, roomType, {timeout: 20000});
 
         return peerId.jsonValue();
@@ -752,15 +641,6 @@ async function waitForHostCandidatePair(page, peerId, role) {
     } catch (error) {
         const state = await safeDebugPageState(page);
         throw new Error(`${role} did not use a host/host ICE candidate pair: ${error.message}\nstate=${JSON.stringify(state)}`);
-    }
-}
-
-async function waitForPeerClass(page, roomType) {
-    try {
-        await page.waitForFunction(type => document.querySelector(`x-peer.type-${type}`), roomType, {timeout: 20000});
-    } catch (error) {
-        const state = await safeDebugPageState(page);
-        throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);
     }
 }
 
@@ -1171,6 +1051,9 @@ async function startFakeFips(options = {}) {
     const port = await freePort();
     const server = net.createServer(socket => {
         let buffered = "";
+        socket.on("error", () => {
+            // E2E clients can disconnect while a poll is in flight.
+        });
         socket.on("data", chunk => {
             buffered += chunk.toString("utf8");
             if (!buffered.includes("\n")) return;

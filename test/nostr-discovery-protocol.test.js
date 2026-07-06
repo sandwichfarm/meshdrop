@@ -86,7 +86,7 @@ test("follow policy only allows pubkeys in the loaded contact list", () => {
     assert.equal(globalThis.NostrFollowPolicy.allowsPubkey(followed, {...identity, followListStatus: "loading"}), false);
 });
 
-test("follow policy gates Nostr relay peers without hiding local peers", () => {
+test("follow policy allows only trusted Nostr peers without hiding local peers", () => {
     const followed = "f".repeat(64);
     const stranger = "0".repeat(64);
     const identity = {

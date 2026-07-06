@@ -34,8 +34,11 @@ Make MeshDrop expose real cross-device peer discovery over already-available FIP
 
 ## Result
 
-- FIPS and Pollen federation now advertise MeshDrop endpoints over Nostr `kind:20385`.
-- Pollen discovery accepts unaddressed same-network announcements through `#d` network filters.
-- FIPS discovery advertises the local MeshDrop FIPS base URL over Nostr and no longer treats generic configured FIPS peers as fatal top-level discovery failures.
-- Blank discovery npub config now uses shared `npub-network:unconfigured`, so default instances can rendezvous instead of deriving isolated per-server networks.
+- Nostr web-of-trust is the default MeshDrop discovery model.
+- FIPS and Pollen are route substrates, not default MeshDrop app discovery sources.
+- Generic FIPS/Pollen peers are logged as route candidates and are not probed on port 3000.
+- MeshDrop HTTP federation runs only from explicit trusted signed Nostr advertisements.
+- `npub-network:unconfigured` is reserved for explicit public/lobby/debug discovery and is not synthesized by default.
+- Pollen federation announcements include `pln-node` and `pln-root` so unrelated Pollen clusters are skipped instead of repeatedly attempting impossible service connections.
+- Configured Pollen peers can bootstrap one shared Pollen cluster through encrypted, subject-bound Nostr invite events; existing clusters are never destructively purged.
 - Draft protocol lives in `nips/meshdrop-pollen-discovery.md`.
