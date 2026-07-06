@@ -922,3 +922,19 @@ test("Pollen action shows mesh peer count while active", () => {
     assert.equal(button.classes.has("selected"), true);
     assert.equal(button.getAttribute("data-badge"), "3");
 });
+
+test("Local discovery action shows same-instance peer count while enabled", () => {
+    resetUi();
+    const controller = new globalThis.LocalDiscoveryController();
+    const button = buttons.get("local-discovery");
+
+    globalThis.meshdropPeerAvailabilityCounts = {ip: 2};
+    controller._supported = true;
+    controller._enabled = true;
+    controller._render();
+
+    assert.equal(button.hasAttribute("hidden"), false);
+    assert.equal(button.classes.has("selected"), true);
+    assert.equal(button.getAttribute("data-badge"), "2");
+    assert.match(button.title, /Same MeshDrop instance discovery enabled/);
+});

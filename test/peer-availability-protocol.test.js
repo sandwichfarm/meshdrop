@@ -97,20 +97,24 @@ test("transfer options expose privacy and encryption metadata", () => {
 
         assert.equal(local.group, "Network routes");
         assert.equal(local.privacy, "Direct peer path");
-        assert.deepEqual(local.details.at(-1), ["Data channel", "WebRTC peer-to-peer"]);
+        assert.deepEqual(local.details, [
+            ["Discovery", "same MeshDrop instance"],
+            ["Data path", "WebRTC ICE direct"],
+            ["Best case", "local network candidate"]
+        ]);
         assert.equal(pollenMesh.group, "Network routes");
         assert.equal(pollenMesh.privacy, "P2P after Pollen discovery");
-        assert.deepEqual(pollenMesh.details.at(-1), ["Data channel", "WebRTC peer-to-peer"]);
+        assert.deepEqual(pollenMesh.details.at(-1), ["Best case", "local network candidate"]);
         assert.equal(webrtc.label, "Nostr relay");
         assert.deepEqual(webrtc.details.at(-1), ["Relays see", "signaling only"]);
         assert.equal(hashtree.group, "Storage routes");
         assert.equal(hashtree.privacy, "Integrity, not secrecy");
-        assert.deepEqual(hashtree.details.at(-1), ["Servers store", "readable file chunks"]);
+        assert.deepEqual(hashtree.details.at(-1), ["Unencrypted", "servers see chunks"]);
         assert.equal(blossom.group, "Storage routes");
         assert.equal(blossom.privacy, "Stored ciphertext");
         assert.deepEqual(blossom.details.at(-1), ["Servers store", "ciphertext only"]);
         assert.equal(pollen.privacy, "Storage handoff");
-        assert.deepEqual(pollen.details.at(-1), ["Server sees", "plaintext upload and fetch"]);
+        assert.deepEqual(pollen.details.at(-1), ["Unencrypted", "server sees files"]);
     }
     finally {
         globalThis.meshdropHashtreeTransfer = originalHashtree;

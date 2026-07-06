@@ -21,14 +21,14 @@ const PeerAvailabilityProtocol = {
             label: "LAN",
             shortLabel: "LAN",
             className: "badge-room-ip",
-            description: "Same-network discovery with a direct peer data channel",
+            description: "Same MeshDrop instance discovery with a direct peer data channel",
             group: "Network routes",
             privacy: "Direct peer path",
             privacyTone: "strong",
             details: [
-                ["Discovery", "same MeshDrop LAN"],
-                ["Payload path", "direct to device"],
-                ["Data channel", "WebRTC peer-to-peer"]
+                ["Discovery", "same MeshDrop instance"],
+                ["Data path", "WebRTC ICE direct"],
+                ["Best case", "local network candidate"]
             ]
         },
         "secret": {
@@ -42,8 +42,8 @@ const PeerAvailabilityProtocol = {
             privacyTone: "strong",
             details: [
                 ["Discovery", "paired device"],
-                ["Payload path", "direct to device"],
-                ["Data channel", "WebRTC peer-to-peer"]
+                ["Data path", "WebRTC ICE direct"],
+                ["Best case", "local network candidate"]
             ]
         },
         "nostr": {
@@ -57,7 +57,7 @@ const PeerAvailabilityProtocol = {
             privacyTone: "direct",
             details: [
                 ["Discovery", "Nostr relay"],
-                ["Payload path", "direct when possible"],
+                ["Data path", "WebRTC ICE direct"],
                 ["Relays see", "signaling only"]
             ]
         },
@@ -72,8 +72,8 @@ const PeerAvailabilityProtocol = {
             privacyTone: "direct",
             details: [
                 ["Discovery", "FIPS mesh"],
-                ["Payload path", "direct to peer"],
-                ["Data channel", "WebRTC peer-to-peer"]
+                ["Data path", "WebRTC ICE direct"],
+                ["Best case", "local network candidate"]
             ]
         },
         "pollen": {
@@ -87,8 +87,8 @@ const PeerAvailabilityProtocol = {
             privacyTone: "direct",
             details: [
                 ["Discovery", "Pollen mesh"],
-                ["Payload path", "direct to peer"],
-                ["Data channel", "WebRTC peer-to-peer"]
+                ["Data path", "WebRTC ICE direct"],
+                ["Best case", "local network candidate"]
             ]
         },
         "public-id": {
@@ -102,7 +102,7 @@ const PeerAvailabilityProtocol = {
             privacyTone: "direct",
             details: [
                 ["Discovery", "public room"],
-                ["Payload path", "direct when possible"],
+                ["Data path", "WebRTC ICE direct"],
                 ["Room server", "signaling only"]
             ]
         }
@@ -158,8 +158,8 @@ const PeerAvailabilityProtocol = {
                 privacyTone: "caution",
                 details: [
                     ["Path", "Blossom storage"],
-                    ["Encryption", "none by this route"],
-                    ["Servers store", "readable file chunks"]
+                    ["Private mode", "encrypts before upload"],
+                    ["Unencrypted", "servers see chunks"]
                 ]
             });
         }
@@ -190,8 +190,8 @@ const PeerAvailabilityProtocol = {
                 privacyTone: "caution",
                 details: [
                     ["Path", "browser to MeshDrop server to Pollen blob"],
-                    ["Encryption", "Pollen mesh transport only"],
-                    ["Server sees", "plaintext upload and fetch"]
+                    ["Private mode", "encrypts before upload"],
+                    ["Unencrypted", "server sees files"]
                 ]
             });
         }
@@ -629,6 +629,7 @@ class PeersUI {
                 .map(entry => [entry.roomType, entry.count])
         );
         globalThis.meshdropNostrMesh?._render?.();
+        globalThis.meshdropLocalDiscovery?._render?.();
         globalThis.meshdropFipsDiscovery?._render?.();
         globalThis.meshdropPollenTransfer?._render?.();
     }

@@ -16,8 +16,10 @@ Hashtree, and Pollen sends. Blossom remains encrypted-only.
 
 ## Changed
 
-- Added Pollen discovery badge/count support to footer and header action state.
+- Added LAN/Pollen discovery badge/count support to footer and header action state.
 - Reordered shared network controls and footer badges to LAN, FIPS, Pollen, Relay.
+- Clarified that LAN means same MeshDrop instance discovery, while WebRTC ICE still chooses the best direct/local data
+  path after discovery through LAN, FIPS, Pollen, or relay.
 - Renamed misleading WEB-RTC-facing copy to Nostr relay signaling where it describes discovery, while keeping WebRTC as
   the peer data-channel capability.
 - Grouped transfer choices into Network routes and Storage routes with capability details.
@@ -26,14 +28,15 @@ Hashtree, and Pollen sends. Blossom remains encrypted-only.
 
 ## Verification
 
-- `node --test test/blossom-key-delivery.test.js test/footer-discovery-protocol.test.js test/peer-availability-protocol.test.js test/header-copy.test.js test/action-visibility.test.js` passed 43/43.
-- `npm test` passed 241/241.
+- `node --test test/peer-availability-protocol.test.js test/action-visibility.test.js test/footer-discovery-protocol.test.js test/header-copy.test.js` passed 36/36.
+- `node --test test/blossom-key-delivery.test.js test/footer-discovery-protocol.test.js test/peer-availability-protocol.test.js test/header-copy.test.js test/action-visibility.test.js` passed 43/43 before the final LAN wording/count pass.
+- `npm test` passed 242/242.
 - `npm run test:e2e` passed, proving local, Blossom, Hashtree, FIPS, Pollen mesh, Pollen storage, Nostr, and federated
   FIPS browser transfers.
 - `npm run test:docker` passed, proving Docker-served local, Pollen, admin, and two-host Nostr browser transfer smoke.
 - `git diff --check` passed.
-- `npx --yes aislop scan --changes .` had Formatting, AI Slop, Security, and Linting clean; remaining warnings are
-  code-quality policy warnings for pre-existing large files/duplicate blocks in changed legacy files.
+- `npx --yes aislop scan --changes .` exited 0 with Formatting, AI Slop, Security, and Linting clean; remaining
+  warnings are code-quality policy warnings for pre-existing large files/duplicate blocks in changed legacy files.
 - `npx --yes aislop scan .` still fails baseline on pre-existing third-party lint warnings, large files, duplicate
   blocks, and `server/nostr-identity.js:11` hardcoded URL.
 
