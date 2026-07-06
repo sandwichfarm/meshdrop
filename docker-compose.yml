@@ -20,7 +20,6 @@ services:
       - BLOSSOM_SERVERS= # Comma-separated Blossom servers for optional storage-backed transfers.
       - FIPS_DISCOVERY=true # Run and use the FIPS daemon inside this container.
       - FIPS_CONFIG=/etc/fips/fips.yaml # FIPS daemon config mounted from ./fips.yaml.
-      - FIPS_CONTROL_SOCKET=/run/fips/control.sock # In-container FIPS control socket.
       - POLLEN_TRANSFER=true # Run and use the Pollen daemon inside this container.
       - PLN_DIR=/var/lib/meshdrop/pln # In-container Pollen state directory.
       - POLLEN_PORT=60611 # Pollen QUIC listen port.

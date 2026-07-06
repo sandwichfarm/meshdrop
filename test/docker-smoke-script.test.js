@@ -76,6 +76,7 @@ test("Docker packages FIPS binaries instead of mounting host tools", () => {
 
     assert.doesNotMatch(dockerCompose, /\/usr\/bin\/fips/);
     assert.doesNotMatch(dockerCompose, /\/usr\/bin\/fipsctl/);
+    assert.doesNotMatch(dockerCompose, /FIPS_CONTROL_SOCKET/);
     assert.match(dockerCompose, /\.\/fips\.yaml:\/etc\/fips\/fips\.yaml:ro/);
     assert.match(dockerCompose, /\/dev\/net\/tun:\/dev\/net\/tun/);
     assert.match(dockerCompose, /NET_ADMIN/);

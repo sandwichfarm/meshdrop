@@ -4,7 +4,7 @@ import net from "node:net";
 import {generateSecretKey, getPublicKey, nip19, utils} from "nostr-tools";
 
 import {DEFAULT_NPUB_DISCOVERY_NETWORK_ID} from "../server/npub-network.js";
-import FipsControlClient, {createFipsConfig, DEFAULT_FIPS_CONTROL_PORT} from "../server/fips-control.js";
+import FipsControlClient, {createFipsConfig, DEFAULT_FIPS_CONTROL_SOCKET} from "../server/fips-control.js";
 
 async function withFipsControlServer(handler, testBody) {
     const server = net.createServer(socket => {
@@ -29,13 +29,13 @@ async function withFipsControlServer(handler, testBody) {
     }
 }
 
-test("FIPS config uses the default control socket unless explicitly disabled", () => {
+test("FIPS config uses the in-container control socket by default", () => {
     const config = createFipsConfig({});
 
     assert.equal(config.enabled, true);
     assert.equal(config.room, DEFAULT_NPUB_DISCOVERY_NETWORK_ID);
     assert.equal(config.timeoutMs, 1000);
-    assert.equal(config.controlSocket, DEFAULT_FIPS_CONTROL_PORT);
+    assert.equal(config.controlSocket, DEFAULT_FIPS_CONTROL_SOCKET);
 });
 
 test("FIPS config can be disabled explicitly", () => {

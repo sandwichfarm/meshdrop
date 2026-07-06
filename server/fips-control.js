@@ -8,10 +8,10 @@ import {
 } from "./npub-network.js";
 
 export const DEFAULT_FIPS_CONTROL_HOST = "127.0.0.1";
-export const DEFAULT_FIPS_CONTROL_PORT = "21210";
+export const DEFAULT_FIPS_CONTROL_SOCKET = "/run/fips/control.sock";
 
 export function defaultFipsSocketPath() {
-    return DEFAULT_FIPS_CONTROL_PORT;
+    return DEFAULT_FIPS_CONTROL_SOCKET;
 }
 
 export function createFipsConfig(env = process.env) {
