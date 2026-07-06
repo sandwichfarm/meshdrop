@@ -49,7 +49,9 @@ export function createNpubDiscoveryNetwork({localPubkey = "", peerPubkeys = []} 
     const normalizedLocal = parseNostrPubkey(localPubkey);
     const peers = [...new Set(peerPubkeys.map(parseNostrPubkey).filter(Boolean))];
     const recipientPubkeys = peers.filter(pubkey => pubkey !== normalizedLocal);
-    const memberPubkeys = [...new Set([normalizedLocal, ...peers].filter(Boolean))].sort();
+    const memberPubkeys = peers.length
+        ? [...new Set([normalizedLocal, ...peers].filter(Boolean))].sort()
+        : [];
     const digest = memberPubkeys.length
         ? crypto.createHash("sha256").update(memberPubkeys.join("\n")).digest("hex").slice(0, 32)
         : "";

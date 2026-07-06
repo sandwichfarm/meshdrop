@@ -57,6 +57,7 @@ Add draft event kinds where existing NIPs do not fit:
 - `kind:30382` for portable MeshDrop transfer room definitions.
 - `kind:20382` for short-lived pairing offers.
 - `kind:20383` for short-lived pairing claims.
+- `kind:20385` for short-lived FIPS and Pollen server discovery.
 
 These numbers are implementation draft numbers. If this is proposed upstream, the kind numbers may need to change during NIP
 review.
@@ -87,3 +88,4 @@ specific enough to warrant an addressable event kind rather than overloading pub
 
 - [MeshDrop Transfer Rooms](./meshdrop-transfer-rooms.md)
 - [MeshDrop Device Pairing](./meshdrop-device-pairing.md)
+- [MeshDrop FIPS and Pollen Discovery](./meshdrop-pollen-discovery.md)
