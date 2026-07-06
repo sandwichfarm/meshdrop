@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+    devicectlInstallArgs,
+    devicectlLaunchArgs,
     parseIosSignedDeviceEnv,
     signedIosBuildArgs
 } from "../scripts/ios-signed-device-uat.mjs";
@@ -62,4 +64,30 @@ test("signed iOS device UAT builds for a specific device with signing enabled", 
     assert(args.includes("CODE_SIGN_IDENTITY=Apple Development: Mesh Drop"));
     assert(args.includes("PROVISIONING_PROFILE_SPECIFIER=MeshDrop UAT"));
     assert.equal(args.at(-1), "build");
+});
+
+test("signed iOS device UAT installs and launches the signed app", () => {
+    const config = parseIosSignedDeviceEnv({
+        MESHDROP_IOS_DEVELOPMENT_TEAM: "ABCDE12345",
+        MESHDROP_IOS_DEVICE_UDID: "00008110-001C11112222801E"
+    }, "darwin");
+
+    assert.deepEqual(devicectlInstallArgs(config, "/tmp/MeshDrop.app"), [
+        "devicectl",
+        "device",
+        "install",
+        "app",
+        "--device",
+        "00008110-001C11112222801E",
+        "/tmp/MeshDrop.app"
+    ]);
+    assert.deepEqual(devicectlLaunchArgs(config), [
+        "devicectl",
+        "device",
+        "process",
+        "launch",
+        "--device",
+        "00008110-001C11112222801E",
+        "farm.sandwich.meshdrop"
+    ]);
 });

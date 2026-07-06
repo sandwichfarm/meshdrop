@@ -108,7 +108,8 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
    `MESHDROP_IOS_PROVISIONING_PROFILE=<profile-name>`, and `MESHDROP_IOS_ALLOW_PROVISIONING_UPDATES=1`.
 4. Run `npm run test:ios-signed-device`.
 5. Confirm the smoke prints `Proof ios-signed-device-install`.
-6. Confirm the proof says App Group entitlements were inspected and the signed app installed through `devicectl`.
+6. Confirm the proof says App Group entitlements were inspected and the signed app installed and launched through
+   `devicectl`.
 7. Do not treat this as App Store/TestFlight proof, device file-picker UAT, share-sheet UAT, or native transfer UAT.
 
 ## Android Release APK Acceptance
