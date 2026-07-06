@@ -29,7 +29,8 @@ Current hard gaps:
 - `npm run verify:ghcr-anonymous -- v0.1.5` fails with GHCR `unauthorized`.
 - `gh api /orgs/sandwichfarm/packages/container/meshdrop` fails with `403` because this token lacks `read:packages`, so
   this session cannot inspect or change package visibility.
-- Deployed StartOS/Umbrel UAT and signed iOS device package/UAT remain unproven.
+- Deployed StartOS/Umbrel UAT and signed iOS device package/UAT remain unproven; the repo now has a fail-loud signed
+  iOS device-install harness that must pass on macOS hardware before those claims can close.
 
 Closed during this audit branch:
 
@@ -117,6 +118,7 @@ Closed during this audit branch:
 | 2026-07-06 | `260706-amber-nip04-webrtc` | complete | Android Amber signer exposes NIP-04/NIP-44 through active identity signer; focused 30/30; `npm test` 222/222; Android APK build; e2e transfer smoke; diff/slop gates |
 | 2026-07-06 | `260706-android-fips-pollen-options` | complete | Android APK manifest/static config exposes FIPS and Pollen; AVD WebView proof shows both visible; focused 37/37; `npm test` 223/223; e2e; changed-code slop clean |
 | 2026-07-06 | `260706-v15-release-readback` | complete | `v0.1.5` release assets, GHCR target images, authenticated readback, and Docker smoke passed; anonymous GHCR still returns `unauthorized` |
+| 2026-07-06 | `260706-ios-signed-device-uat-harness` | complete | Signed iOS device-install harness added; focused tests prove macOS/device/signing guardrails; real macOS hardware pass remains open |
 
 ## Active Quick Task
 

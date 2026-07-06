@@ -25,7 +25,8 @@ Files must transfer between peers reliably over every negotiated transport that 
 
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
 - [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services.
-- [ ] Obtain signed/device-installable iOS package proof and iOS device file-picker/share-sheet/native transfer UAT.
+- [ ] Run the signed iOS device-install harness on macOS hardware, then complete iOS device file-picker/share-sheet/native
+  transfer UAT.
 
 ### Out of Scope
 
@@ -58,4 +59,4 @@ Files must transfer between peers reliably over every negotiated transport that 
 | Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | ✓ Good |
 
 ---
-*Last updated: 2026-07-06 after auditing merged PRs #1-#107 and `v0.1.5` release/GHCR evidence.*
+*Last updated: 2026-07-06 after adding the signed iOS device-install harness.*

@@ -100,6 +100,17 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 6. Do not treat this artifact as a signed IPA, App Store/TestFlight package, App Group provisioning proof, picker UAT,
    share-sheet UAT, or native transfer proof.
 
+## iOS Signed Device Install Acceptance
+
+1. Attach a physical iOS device to a macOS host with Xcode installed and trusted for development.
+2. Set `MESHDROP_IOS_DEVELOPMENT_TEAM=<team-id>` and `MESHDROP_IOS_DEVICE_UDID=<device-udid>`.
+3. Optionally set `MESHDROP_IOS_SIGNING_IDENTITY=<installed identity>`,
+   `MESHDROP_IOS_PROVISIONING_PROFILE=<profile-name>`, and `MESHDROP_IOS_ALLOW_PROVISIONING_UPDATES=1`.
+4. Run `npm run test:ios-signed-device`.
+5. Confirm the smoke prints `Proof ios-signed-device-install`.
+6. Confirm the proof says App Group entitlements were inspected and the signed app installed through `devicectl`.
+7. Do not treat this as App Store/TestFlight proof, device file-picker UAT, share-sheet UAT, or native transfer UAT.
+
 ## Android Release APK Acceptance
 
 1. Confirm the Android release APK artifact contains `apk/meshdrop-android-release.apk`.
@@ -209,6 +220,7 @@ npm run build:android:release-apk -- --version 0.0.0-smoke --out-dir /tmp/meshdr
 node --test test/mobile-package.test.js
 npm run test:ios-simulator-app
 npm run test:ios-device-app
+npm run test:ios-signed-device
 npm run test:android-apk
 npm run test:android-release-apk
 MESHDROP_ANDROID_AVD=Medium_Phone_API_36.1 npm run test:android-apk-install
@@ -240,6 +252,8 @@ records Bluetooth as explicitly negotiated unsupported with no Web Bluetooth API
 - The iOS Simulator app artifact proves an unsigned Simulator `.app` package only.
 - The iOS device app artifact proves an unsigned generic `iphoneos` `.app` build product only; it does not prove a
   signed device-installable IPA, App Store/TestFlight packaging, App Group provisioning, or physical-device install.
+- `npm run test:ios-signed-device` is the required signed/device-install harness. It must pass on a macOS host with a
+  physical iOS device before claiming signed install or App Group provisioning proof.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
 - The iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18.4+ open-panel hook,
   and the iOS native-source artifact includes Xcode project, entitlement, and share extension source scaffolds, but
