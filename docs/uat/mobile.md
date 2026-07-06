@@ -69,11 +69,13 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 10. Confirm the iOS containing app injects `globalThis.__meshdropSharedFiles` and exposes
    `globalThis.meshdropShareInbox.list()` and `globalThis.meshdropShareInbox.read(name)` from the App Group
    `share-inbox.json` manifest.
-11. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
-12. Confirm the Android native-source artifact contains
+11. Confirm the web app consumes the native share inbox by converting staged App Group file responses into `File`
+   objects and firing `activate-share-mode`.
+12. Confirm the Android native-source artifact contains `native/android/app/src/main/AndroidManifest.xml`.
+13. Confirm the Android native-source artifact contains
    `native/android/app/src/main/java/farm/sandwich/meshdrop/MainActivity.java`.
-13. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
-14. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
+14. Confirm the Android native-source artifact contains `native/android/app/src/main/assets/meshdrop/index.html`.
+15. Confirm both native wrapper sources inject `globalThis.__meshdropTargetManifest`.
 
 ## Android APK Acceptance
 
@@ -116,7 +118,8 @@ app artifact built by `npm run build:ios:simulator-app`, and the unsigned iOS de
 7. With the app launched after installing the share extension, share a small file into MeshDrop from Files or Photos.
 8. In Web Inspector or an equivalent signed-device debug surface, confirm `globalThis.__meshdropSharedFiles` lists the
    staged file and `await globalThis.meshdropShareInbox.read("<staged-name>")` returns base64 content for it.
-9. Do not treat this as App Store/TestFlight proof, device file-picker UAT, share-sheet transfer UAT, or native transfer
+9. Confirm the MeshDrop page enters share mode for the staged file after the native `meshdrop:shared-files` event.
+10. Do not treat this as App Store/TestFlight proof, device file-picker UAT, share-sheet transfer UAT, or native transfer
    UAT until the shared file is sent to another MeshDrop peer.
 
 ## Android Release APK Acceptance
@@ -266,8 +269,9 @@ available.
 - These artifacts do not prove native mobile WebRTC transfer UAT on iOS devices.
 - The iOS native-source wrapper wires WKWebView file inputs to a document picker through the iOS 18.4+ open-panel hook,
   and the iOS native-source artifact includes Xcode project, entitlement, share extension source scaffolds, and an App
-  Group share-inbox bridge exposed as `globalThis.meshdropShareInbox`, but does not prove iOS device picker UAT, App
-  Group entitlement provisioning on a signed device, share-sheet device UAT, or native iOS share-initiated transfer.
+  Group share-inbox bridge exposed as `globalThis.meshdropShareInbox`; source tests prove the web app consumes staged
+  share-inbox files into share mode, but this does not prove iOS device picker UAT, App Group entitlement provisioning
+  on a signed device, share-sheet device UAT, or native iOS share-initiated transfer.
 - The iOS native-source artifact proves Bluetooth capability negotiation only as unsupported. It does not prove Bluetooth
   transfer support.
 - These artifacts do not prove Bluetooth transport support.

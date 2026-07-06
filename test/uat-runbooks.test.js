@@ -180,11 +180,13 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(mobile, /globalThis\.__meshdropSharedFiles/);
     assert.match(mobile, /globalThis\.meshdropShareInbox\.list\(\)/);
     assert.match(mobile, /globalThis\.meshdropShareInbox\.read\(name\)/);
+    assert.match(mobile, /firing `activate-share-mode`/);
     assert.match(mobile, /await globalThis\.meshdropShareInbox\.read\("<staged-name>"\)/);
-    assert.match(mobile, /App\s+Group entitlement provisioning on a signed device, share-sheet device UAT/);
+    assert.match(mobile, /enters share mode for the staged file/);
+    assert.match(mobile, /App\s+Group entitlement provisioning\s+on a signed device, share-sheet device UAT/);
     assert.match(
         mobile,
-        /iOS device picker\s+UAT, App\s+Group entitlement provisioning on a signed device, share-sheet device UAT/
+        /iOS device picker\s+UAT, App\s+Group entitlement provisioning\s+on a signed device, share-sheet device UAT/
     );
     assert.match(mobile, /share-inbox bridge exposed as `globalThis\.meshdropShareInbox`/);
     assert.match(mobile, /iOS Simulator app artifact proves an unsigned Simulator `\.app` package only/);
@@ -284,16 +286,18 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /\| Umbrel \| Rendered package compose transfer smoke and deployed-node UAT harness exist; real Umbrel node pass open \|/);
     assert.match(targetStatus, /`npm run test:umbrel-package` proves package build/);
     assert.match(targetStatus, /Passing `MESHDROP_UMBREL_UAT_URL=<url> npm run test:umbrel-deployed` after Umbrel UI install/);
-    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, unsigned device app proof, signed-device install-and-launch harness, share extension source bridge, and Bluetooth negotiation proof exist; signed\/device pass open \|/);
+    assert.match(targetStatus, /\| iOS \| Source artifact transfer smoke, native-source wrapper artifact, Xcode project build smoke, unsigned Simulator app package proof, unsigned device app proof, signed-device install-and-launch harness, share extension source bridge, web share-inbox consumption proof, and Bluetooth negotiation proof exist; signed\/device pass open \|/);
     assert.match(
         targetStatus,
         /\| Android \| Source artifact transfer smoke, native-source wrapper artifact, debug APK build proof, signed release APK proof, emulator install proof, WebView capability and Bluetooth negotiation proof, WebView transfer proof, share-intent file proof, native picker UI proof, and physical-device hardware UAT passed \|/
     );
-    assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `npm run build:ios:simulator-app`; `npm run build:ios:device-app`; `npm run test:ios-xcode-build`; `npm run test:ios-simulator-app`; `npm run test:ios-device-app`; `node --test test\/mobile-package\.test\.js`; `node --test test\/ios-signed-device-uat\.test\.js`/);
+    assert.match(targetStatus, /`npm run build:ios`; `npm run build:ios:native-source`; `npm run build:ios:simulator-app`; `npm run build:ios:device-app`; `npm run test:ios-xcode-build`; `npm run test:ios-simulator-app`; `npm run test:ios-device-app`; `node --test test\/mobile-package\.test\.js`; `node --test test\/native-share-inbox\.test\.js`; `node --test test\/ios-signed-device-uat\.test\.js`/);
     assert.match(targetStatus, /wires iOS 18\.4\+ file inputs to `UIDocumentPickerViewController`/);
     assert.match(targetStatus, /includes `MeshDrop\.xcodeproj` and shared App Group entitlement files/);
     assert.match(targetStatus, /injects App Group share-inbox metadata through `globalThis\.__meshdropSharedFiles`/);
     assert.match(targetStatus, /exposes `globalThis\.meshdropShareInbox\.read\(name\)` for staged file bytes/);
+    assert.match(targetStatus, /converts native share-inbox file responses into `File` objects/);
+    assert.match(targetStatus, /fires `activate-share-mode`/);
     assert.match(targetStatus, /records Bluetooth as negotiated unsupported with no Web Bluetooth API, no Bluetooth native bridge, and no transfer support/);
     assert.match(targetStatus, /`npm run test:ios-xcode-build` proves the generated `MeshDrop` Xcode scheme builds for iOS Simulator without code signing/);
     assert.match(targetStatus, /`npm run test:ios-simulator-app` proves an unsigned `MeshDrop\.app` Simulator package can be built and inspected/);
@@ -311,7 +315,7 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /`npm run build:ios:native-source`/);
     assert.match(targetStatus, /`npm run build:android:native-source`/);
     assert.match(targetStatus, /signed install, launch, and App Group entitlement proof/);
-    assert.match(targetStatus, /share-sheet device UAT that reads `globalThis\.meshdropShareInbox`/);
+    assert.match(targetStatus, /share-sheet device UAT that reads `globalThis\.meshdropShareInbox` and shows share mode for the staged file/);
     assert.doesNotMatch(targetStatus, /Bluetooth negotiation, and native mobile transfer UAT/);
     assert.match(targetStatus, /Gradle-built debug APK artifact/);
     assert.match(targetStatus, /UAT-signed release APK verified by `apksigner`/);
