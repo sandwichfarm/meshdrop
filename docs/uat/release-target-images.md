@@ -96,6 +96,8 @@ Repeat with `target=start9` and `target=umbrel`.
 
    Passing output includes `Proof external-uat-finishline`.
 
+   The operator closeout runbook is `docs/uat/external-finishline-closeout.md`.
+
 ## Not proven
 
 - Anonymous local readback is not proven for `v0.1.5`: the release readback job failed at anonymous GHCR after Docker
