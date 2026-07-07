@@ -51,7 +51,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Prove relay-only WebRTC transfer through a configured TURN path before labeling FIPS/Pollen overlay WebRTC as byte-carrying routes. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [x] Document remaining blocked route/release/UAT work in live GitHub issues with acceptance evidence.
-- [ ] Prove a Tor overlay stream route transfers bytes through a reproducible Dockerized `.onion` path, validates the payload hash, and emits proof with fallback disabled.
+- [x] Prove a Tor overlay stream route transfers bytes through a reproducible Dockerized `.onion` path, validates the payload hash, and emits proof with fallback disabled.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag. Blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
 - [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services. Blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
 - [ ] Run the signed iOS device-install harness on macOS hardware, then complete iOS device file-picker/share-sheet/native
@@ -116,7 +116,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Overlay networks start fail-closed | Tor/I2P/Loki need local dial proof before MeshDrop can claim transfer support | ✓ Good |
 | TURN relay proof precedes overlay WebRTC claims | Browser WebRTC can only count as FIPS/Pollen/Tor/I2P/Loki when stats prove file bytes used a relay candidate constrained to that route | ✓ Good |
 | Blocked transport claims live in GitHub issues | Future work needs a tracker-owned acceptance contract, not stale notes buried in PR bodies | ✓ Good |
-| Dockerized Tor proof unblocks local daemon absence | A route-specific smoke can provide its own Tor daemon/proxy surface instead of depending on host-installed Tor | Active v0.13.0 requirement |
+| Dockerized Tor proof unblocks local daemon absence | A route-specific smoke can provide its own Tor daemon/proxy surface instead of depending on host-installed Tor | ✓ Good |
 
 ---
-*Last updated: 2026-07-07 starting milestone v0.13.0 Tor Byte Transfer Proof.*
+*Last updated: 2026-07-07 completing Phase 17 Tor Byte Transfer Proof.*

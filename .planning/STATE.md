@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.13.0
 milestone_name: Tor Byte Transfer Proof
-status: in_progress
+status: complete
 last_updated: "2026-07-07T22:22:45.442Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 100
 ---
 
 # GSD State
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** Phase 17 Tor Byte Transfer Proof uses a Dockerized Tor hidden-service route to turn issue #151's Tor portion into real byte-transfer evidence.
+**Current focus:** Phase 17 Tor Byte Transfer Proof is complete; Tor has reproducible onion byte-transfer evidence while I2P/Loki remain tracked in issue #151.
 
 ## Milestone Audit: 2026-07-06
 
@@ -182,6 +182,7 @@ Closed during this audit branch:
 | 2026-07-07 | `260707-prh-harden-private-route-presence` | complete | WOT presence uses one `meshdrop-webrtc` capability and omits public route/private fields; plaintext route detail events fail closed; focused 104/104, `npm test` 300/300, e2e, Docker smoke, diff check, and changed-code slop exit 0 |
 | 2026-07-07 | `260707-fips-stream-route-proof` | complete | FIPS HTTP stream over FIPS mesh IPv6 with encrypted payload route proof; focused 9/9; `npm run test:fips-stream` over two FIPS containers with `fips0` byte deltas; `npm test` 342/342; e2e; diff/slop gates |
 | 2026-07-07 | `260707-route-status-compact-badges` | complete | Peer route status now renders one icon-only row: blocked Clearnet crossed out, pending FIPS/Pollen animated, words preserved only in aria/title; focused 28/28; browser proof clean; `npm test` 359/359; diff check; changed-code slop exits 0 |
+| 2026-07-07 | `260707-tor-byte-transfer-proof` | complete | Generic overlay stream upload/download endpoints; Dockerized Tor hidden-service smoke emits `Proof tor-http-stream` with generated `.onion`, 42/42 bytes, hash matched, fallback disabled; focused 31/31; `npm test` 368/368; diff check |
 
 ## Active Quick Task
 
@@ -194,5 +195,5 @@ None.
 
 Phase: 17 Tor Byte Transfer Proof
 Plan: `.planning/phases/17-tor-byte-transfer-proof/17-01-PLAN.md`
-Status: In progress
-Last activity: 2026-07-07 — Milestone v0.13.0 started with a one-phase Tor byte-transfer proof plan.
+Status: Complete
+Last activity: 2026-07-07 — Tor byte-transfer proof completed with Dockerized `.onion` route evidence.

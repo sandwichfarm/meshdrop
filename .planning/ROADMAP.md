@@ -4,7 +4,7 @@
 
 Goal: prove a real Tor overlay stream data path by transferring bytes through a Dockerized `.onion` endpoint and emitting route proof.
 
-Current status: planned.
+Current status: complete.
 
 Requirements: TOR-BYTE-01, TOR-BYTE-02, TOR-BYTE-03, TOR-BYTE-04, TOR-BYTE-05.
 
@@ -26,7 +26,10 @@ Verification:
 
 Completion evidence:
 
-- Pending.
+- `node --test test/overlay-stream-transfer.test.js test/overlay-network-adapters.test.js test/route-contract.test.js test/runtime-capabilities.test.js test/docker-smoke-script.test.js` -> 31/31 pass.
+- `npm run test:tor-stream` -> `Proof tor-http-stream` with a generated `.onion` endpoint, `tor-http-stream`, 42/42 bytes, hash matched, and fallback disabled.
+- `npm test` -> 368/368 pass.
+- `git diff --check` -> pass.
 
 ## Future Milestone Queue
 
@@ -37,4 +40,4 @@ Completion evidence:
 5. Signed iOS device/share-transfer UAT once macOS signing hardware and a real device are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/158.
 
 ---
-*Roadmap updated: 2026-07-07 starting milestone v0.13.0 Tor Byte Transfer Proof.*
+*Roadmap updated: 2026-07-07 completing Phase 17 Tor Byte Transfer Proof.*

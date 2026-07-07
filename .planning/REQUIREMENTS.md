@@ -19,11 +19,11 @@
 
 ### Tor Byte Transfer Proof
 
-- [ ] **TOR-BYTE-01**: MeshDrop exposes a generic backend overlay stream upload/download primitive that can serve short-lived encrypted payloads for configured overlay networks without changing FIPS/Pollen behavior.
-- [ ] **TOR-BYTE-02**: Tor stream descriptors require a valid `.onion` endpoint, route type `tor`, primitive `tor-http-stream`, owner/session binding, expiry, byte limit metadata, and private/encrypted/fail-closed constraints.
-- [ ] **TOR-BYTE-03**: A runtime smoke starts a reproducible Dockerized Tor hidden service/proxy path, transfers a proof payload through the onion endpoint, validates byte counts and SHA-256, and rejects Clearnet fallback as success.
-- [ ] **TOR-BYTE-04**: Tor route proof names sender runtime, recipient runtime, route type, data-plane primitive, WebRTC flag, instance-relay flag, byte counts, hash match, fallback status, and topology evidence for the onion route.
-- [ ] **TOR-BYTE-05**: I2P and Loki stay unavailable/fail-closed with GitHub issue #151 still tracking their future daemon/proxy byte-transfer proof.
+- [x] **TOR-BYTE-01**: MeshDrop exposes a generic backend overlay stream upload/download primitive that can serve short-lived encrypted payloads for configured overlay networks without changing FIPS/Pollen behavior.
+- [x] **TOR-BYTE-02**: Tor stream descriptors require a valid `.onion` endpoint, route type `tor`, primitive `tor-http-stream`, owner/session binding, expiry, byte limit metadata, and private/encrypted/fail-closed constraints.
+- [x] **TOR-BYTE-03**: A runtime smoke starts a reproducible Dockerized Tor hidden service/proxy path, transfers a proof payload through the onion endpoint, validates byte counts and SHA-256, and rejects Clearnet fallback as success.
+- [x] **TOR-BYTE-04**: Tor route proof names sender runtime, recipient runtime, route type, data-plane primitive, WebRTC flag, instance-relay flag, byte counts, hash match, fallback status, and topology evidence for the onion route.
+- [x] **TOR-BYTE-05**: I2P and Loki stay unavailable/fail-closed with GitHub issue #151 still tracking their future daemon/proxy byte-transfer proof.
 
 ## v0.12.0 Requirements
 
@@ -96,11 +96,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TOR-BYTE-01 | Phase 17 | Pending |
-| TOR-BYTE-02 | Phase 17 | Pending |
-| TOR-BYTE-03 | Phase 17 | Pending |
-| TOR-BYTE-04 | Phase 17 | Pending |
-| TOR-BYTE-05 | Phase 17 | Pending |
+| TOR-BYTE-01 | Phase 17 | Complete |
+| TOR-BYTE-02 | Phase 17 | Complete |
+| TOR-BYTE-03 | Phase 17 | Complete |
+| TOR-BYTE-04 | Phase 17 | Complete |
+| TOR-BYTE-05 | Phase 17 | Complete |
 | INST-GEN-01 | Phase 12 | Complete |
 | INST-GEN-02 | Phase 12 | Complete |
 | INST-GEN-03 | Phase 12 | Complete |
@@ -134,4 +134,4 @@
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 starting milestone v0.13.0 Tor Byte Transfer Proof.*
+*Last updated: 2026-07-07 completing Phase 17 Tor Byte Transfer Proof.*
