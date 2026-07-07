@@ -98,6 +98,8 @@ await import("../public/scripts/runtime-capabilities.js");
 await import("../public/scripts/nostr-pubkey.js");
 await import("../public/scripts/nostr-android-signer.js");
 await import("../public/scripts/nostr-identity.js");
+await import("../public/scripts/route-contract.js");
+await import("../public/scripts/instance-relay-transfer.js");
 await import("../public/scripts/local-discovery.js");
 await import("../public/scripts/nostr-mesh.js");
 await import("../public/scripts/nostr-mesh-autostart.js");

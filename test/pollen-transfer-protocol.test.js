@@ -15,6 +15,8 @@ globalThis.$ = () => null;
 globalThis.Events = {on() {}, fire() {}};
 
 await import("../public/scripts/runtime-capabilities.js");
+await import("../public/scripts/route-contract.js");
+await import("../public/scripts/instance-relay-transfer.js");
 await import("../public/scripts/pollen-transfer.js");
 
 const protocol = globalThis.PollenTransferProtocol;

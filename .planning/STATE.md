@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.7.0
-milestone_name: FIPS Stream Route Proof
-status: in_progress
-last_updated: "2026-07-07T16:05:17Z"
+milestone: v0.8.0
+milestone_name: Generic Instance Relay
+status: complete
+last_updated: "2026-07-07T16:28:36Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** prove encrypted payload bytes can move over the FIPS mesh IPv6 data plane with route proof.
+**Current focus:** generic instance-relay descriptor/proof semantics complete; next slice can apply the contract to another backend.
 
 ## Milestone Audit: 2026-07-06
 
@@ -64,6 +64,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-generic-instance-relay` | complete | Generic `InstanceRelayTransferProtocol`; Pollen delegates descriptor/proof semantics without public shape change; focused 15/15; `npm test` 344/344; `npm run test:e2e`; `npm run test:docker`; diff/slop gates |
 | 2026-07-07 | `260707-android-native-route-adapter` | complete | Android native route adapter contract/proof added; focused 8/8; `npm run test:android-fips-pollen` route proof bytes 26/26; `npm test` 333/333; diff/slop gates |
 | 2026-07-07 | `260707-spa-route-honesty` | complete | Backend-free SPA config/options fail closed for backend-only FIPS/Pollen/native claims; focused 64/64; `npm run test:spa-artifact`; `npm test` 330/330; diff/slop gates |
 | 2026-07-07 | `260707-i6u-add-external-uat-status-report-mode` | complete | External UAT status/final JSON reports added; focused 10/10; `npm test` 311/311; status/final blockers recorded; diff/changed-code slop gates |
@@ -179,8 +180,7 @@ None.
 
 ## Current Position
 
-Phase: 11-fips-stream-route-proof complete
-Plan: `.planning/phases/11-fips-stream-route-proof/11-01-PLAN.md`
-Summary: `.planning/phases/11-fips-stream-route-proof/11-01-SUMMARY.md`
-Status: Complete
-Last activity: 2026-07-07 — FIPS stream route proof implemented and verified
+Phase: 12 complete
+Plan: `.planning/ROADMAP.md`
+Status: Generic instance-relay contract complete
+Last activity: 2026-07-07 — Milestone v0.8.0 Generic Instance Relay complete
