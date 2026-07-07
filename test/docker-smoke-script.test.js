@@ -17,6 +17,7 @@ const dockerTwoHostRelay = fs.readFileSync(
 const turnRelaySmokePath = new URL("../scripts/turn-relay-smoke.mjs", import.meta.url);
 const turnRelaySmokeBrowserPath = new URL("../scripts/turn-relay-smoke-browser.mjs", import.meta.url);
 const torStreamSmokePath = new URL("../scripts/tor-stream-smoke.mjs", import.meta.url);
+const i2pStreamSmokePath = new URL("../scripts/i2p-stream-smoke.mjs", import.meta.url);
 const e2eSmoke = fs.readFileSync(new URL("../scripts/e2e-smoke.mjs", import.meta.url), "utf8");
 const ciWorkflow = fs.readFileSync(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 const packageJson = fs.readFileSync(new URL("../package.json", import.meta.url), "utf8");
@@ -91,6 +92,15 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(torStreamSmoke, /--socks5-hostname/);
     assert.match(torStreamSmoke, /HiddenServicePort 80/);
     assert.match(torStreamSmoke, /fallbackUsed: false/);
+    assert.match(packageJson, /"test:i2p-stream": "node scripts\/i2p-stream-smoke\.mjs"/);
+    assert.equal(fs.existsSync(i2pStreamSmokePath), true);
+    const i2pStreamSmoke = fs.readFileSync(i2pStreamSmokePath, "utf8");
+    assert.match(i2pStreamSmoke, /Proof i2p-http-stream/);
+    assert.match(i2pStreamSmoke, /i2pd/);
+    assert.match(i2pStreamSmoke, /\[httpproxy\]/);
+    assert.match(i2pStreamSmoke, /inbound\.length = 0/);
+    assert.match(i2pStreamSmoke, /--proxy/);
+    assert.match(i2pStreamSmoke, /fallbackUsed: false/);
     assert.match(ciWorkflow, /Install Chromium[\s\S]*npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /docker_public_relay_urls:/);
     assert.match(ciWorkflow, /docker-public-relay-uat:/);
