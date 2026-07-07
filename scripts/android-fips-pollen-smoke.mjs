@@ -56,11 +56,37 @@ try {
     assert.equal(state.pollenRoundTripText, "android-native-pollen-proof");
     assert.equal(state.pollenDescriptor.size, "android-native-pollen-proof".length);
     assert.match(state.pollenDescriptor.hash, /^[0-9a-f]{64}$/);
+    assert.equal(state.nativeRouteAdapterValidation.ok, true);
+    assert.equal(state.nativeRouteAdapterValidation.availability, "available");
+    assert.equal(state.nativeRouteReceivedText, "android-native-route-proof");
+    assert.equal(state.nativeRouteProofValidation.ok, true);
+    assert.equal(state.nativeRouteProof.senderRuntime, `android-webview:${new URL(state.backendBaseUrl).host}`);
+    assert.equal(state.nativeRouteProof.recipientRuntime, `android-webview:${new URL(state.backendBaseUrl).host}`);
+    assert.equal(state.nativeRouteProof.routeType, "pollen");
+    assert.equal(
+        state.nativeRouteProof.dataPlanePrimitive,
+        expectAndroidPln ? "android-native-pln" : "android-native-object-store"
+    );
+    assert.equal(state.nativeRouteProof.webRtcUsed, false);
+    assert.equal(state.nativeRouteProof.instanceRelayed, false);
+    assert.equal(state.nativeRouteProof.bytesSent, "android-native-route-proof".length);
+    assert.equal(state.nativeRouteProof.bytesReceived, "android-native-route-proof".length);
+    assert.equal(state.nativeRouteProof.hashMatched, true);
+    assert.equal(state.nativeRouteProof.fallbackUsed, false);
+    assert.equal(
+        state.nativeRouteAdapterCapabilities.find(capability => capability.routeType === "fips")?.transferSupported,
+        false
+    );
 
     console.log(
         `Proof android-fips-pollen: ${androidMainActivity} served ` +
         `FIPS status from ${state.fipsStatus.backend} with rustCore=${state.fipsStatus.rustCore}, ` +
-        `Pollen ${state.pollenStatus.backend} uploaded/downloaded ${state.pollenDescriptor.hash} ` +
+        `Pollen ${state.pollenStatus.backend} uploaded/downloaded ${state.pollenDescriptor.hash}, ` +
+        `routeProof sender=${state.nativeRouteProof.senderRuntime} recipient=${state.nativeRouteProof.recipientRuntime} ` +
+        `route=${state.nativeRouteProof.routeType} primitive=${state.nativeRouteProof.dataPlanePrimitive} ` +
+        `webrtc=${state.nativeRouteProof.webRtcUsed} instanceRelay=${state.nativeRouteProof.instanceRelayed} ` +
+        `bytes=${state.nativeRouteProof.bytesSent}/${state.nativeRouteProof.bytesReceived} ` +
+        `hashMatched=${state.nativeRouteProof.hashMatched} fallback=${state.nativeRouteProof.fallbackUsed} ` +
         `via ${state.backendBaseUrl} on ${device.serial}`
     );
 }
@@ -80,7 +106,9 @@ async function waitForNativeBackendState(cdp) {
             state.pollenSupported === true &&
             state.fipsStatus?.available === true &&
             state.pollenStatus?.available === true &&
-            state.pollenRoundTripText === "android-native-pollen-proof"
+            state.pollenRoundTripText === "android-native-pollen-proof" &&
+            state.nativeRouteProofValidation?.ok === true &&
+            state.nativeRouteReceivedText === "android-native-route-proof"
         ) {
             return state;
         }
@@ -107,6 +135,12 @@ async function nativeBackendProbe() {
     let pollenDescriptor = null;
     let pollenRoundTripText = "";
     let pollenTransferError = "";
+    let nativeRouteAdapterValidation = null;
+    let nativeRouteAdapterCapabilities = [];
+    let nativeRouteProof = null;
+    let nativeRouteProofValidation = null;
+    let nativeRouteReceivedText = "";
+    let nativeRouteError = "";
     try {
         pollenDescriptor = globalThis.meshdropPollenTransfer && backendBaseUrl
             ? await globalThis.meshdropPollenTransfer.uploadFile(file)
@@ -120,6 +154,28 @@ async function nativeBackendProbe() {
         pollenRoundTripText = pollenFile ? await pollenFile.text() : "";
     } catch (error) {
         pollenTransferError = error.message;
+    }
+    try {
+        const adapter = globalThis.meshdropAndroidNativeRouteAdapter;
+        await adapter?.refreshStatus?.();
+        nativeRouteAdapterValidation = globalThis.MeshDropRouteContract?.validateAdapter?.(adapter);
+        nativeRouteAdapterCapabilities = adapter?.capabilities?.() || [];
+        const routeFile = new File(["android-native-route-proof"], "android-native-route-proof.txt", {type: "text/plain"});
+        const sent = adapter
+            ? await adapter.send([routeFile], {
+                ownerPubkey: "c".repeat(64),
+                sessionId: "android-native-route-proof",
+                senderRuntime: adapter.protocol.runtimeId()
+            })
+            : null;
+        const received = sent
+            ? await adapter.receive(sent.descriptors, {recipientRuntime: adapter.protocol.runtimeId()})
+            : null;
+        nativeRouteProof = received?.proof || null;
+        nativeRouteProofValidation = globalThis.MeshDropRouteContract?.validateRouteProof?.(nativeRouteProof);
+        nativeRouteReceivedText = received?.files?.[0] ? await received.files[0].text() : "";
+    } catch (error) {
+        nativeRouteError = error.message;
     }
 
     return {
@@ -135,6 +191,12 @@ async function nativeBackendProbe() {
         pollenStatus,
         pollenTransferError,
         pollenDescriptor,
-        pollenRoundTripText
+        pollenRoundTripText,
+        nativeRouteAdapterValidation,
+        nativeRouteAdapterCapabilities,
+        nativeRouteProof,
+        nativeRouteProofValidation,
+        nativeRouteReceivedText,
+        nativeRouteError
     };
 }

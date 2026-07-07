@@ -52,6 +52,7 @@ for (const target of ["ios", "android"]) {
             assert.equal(result.target, target);
             assert(entries.includes(`${prefix}/app/index.html`));
             assert(entries.includes(`${prefix}/app/scripts/runtime-capabilities.js`));
+            assert(entries.includes(`${prefix}/app/scripts/android-native-routes.js`));
             assert(entries.includes(`${prefix}/app/service-worker.js`));
             assert(entries.includes(`${prefix}/meshdrop-target.json`));
             assert(entries.includes(`${prefix}/README-${target.toUpperCase()}.md`));
@@ -106,6 +107,7 @@ for (const target of ["ios", "android"]) {
             assert.equal(result.target, target);
             assert.equal(result.nativeSource, true);
             assert(entries.includes(`${prefix}/app/index.html`));
+            assert(entries.includes(`${prefix}/app/scripts/android-native-routes.js`));
             assert(entries.includes(`${prefix}/meshdrop-target.json`));
             assert(entries.includes(`${prefix}/README-${target.toUpperCase()}.md`));
             assert(entries.includes(`${prefix}/UAT-MOBILE.md`));
@@ -292,6 +294,7 @@ for (const target of ["ios", "android"]) {
                 assert.match(wrapperSource, /android-native-fipsctl/);
                 assert.match(wrapperSource, /ServerSocket\(0, 50, java\.net\.InetAddress\.getByName\("127\.0\.0\.1"\)\)/);
                 assert.match(wrapperSource, /__meshdropAndroidNativeBackend/);
+                assert.doesNotMatch(wrapperSource, /meshdropAndroidNativeRouteAdapter/);
                 assert.match(wrapperSource, /\/pollen\/status/);
                 assert.match(wrapperSource, /\/pollen\/upload/);
                 assert.match(wrapperSource, /\/pollen\/download\//);

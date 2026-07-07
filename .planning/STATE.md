@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.5.0
-milestone_name: SPA Route Honesty
+milestone: v0.6.0
+milestone_name: Android Native Route Adapter
 status: complete
-last_updated: "2026-07-07T14:37:15Z"
+last_updated: "2026-07-07T16:05:00Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** make backend-free SPA artifacts advertise and render only routes that the browser/static target can actually use.
+**Current focus:** make the installed Android WebView native backend available through the route adapter contract with native Pollen byte proof.
 
 ## Milestone Audit: 2026-07-06
 
@@ -64,6 +64,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-android-native-route-adapter` | complete | Android native route adapter contract/proof added; focused 8/8; `npm run test:android-fips-pollen` route proof bytes 26/26; `npm test` 333/333; diff/slop gates |
 | 2026-07-07 | `260707-spa-route-honesty` | complete | Backend-free SPA config/options fail closed for backend-only FIPS/Pollen/native claims; focused 64/64; `npm run test:spa-artifact`; `npm test` 330/330; diff/slop gates |
 | 2026-07-07 | `260707-i6u-add-external-uat-status-report-mode` | complete | External UAT status/final JSON reports added; focused 10/10; `npm test` 311/311; status/final blockers recorded; diff/changed-code slop gates |
 | 2026-07-07 | `260707-hq6-add-configurable-overlay-relay-ice-plumb` | complete | FIPS/Pollen relay ICE requires TURN/TURNS config and route selection uses route-specific relay-only RTC config; focused 82/82; `npm test` 306/306; e2e; diff/slop gates |
@@ -177,7 +178,7 @@ Closed during this audit branch:
 
 ## Current Position
 
-Phase: 09-spa-route-honesty complete
-Plan: `.planning/phases/09-spa-route-honesty/09-01-PLAN.md`
+Phase: 10-android-native-route-adapter complete
+Plan: `.planning/phases/10-android-native-route-adapter/10-01-PLAN.md`
 Status: Complete
-Last activity: 2026-07-07 — SPA route honesty implemented and verified
+Last activity: 2026-07-07 — Android native adapter implemented and verified
