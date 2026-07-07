@@ -35,6 +35,16 @@ npm run test:external-uat -- v0.1.5
 
 Do not call the finish line closed until this command prints `Proof external-uat-finishline`.
 
+For a non-mutating closeout checklist that can be saved before the final hardware/node run:
+
+```sh
+npm run status:external-uat -- v0.1.5 --report tmp/external-uat-status.json
+```
+
+This prints each external check, its current blocked/ready state, and the next command or authority action. The JSON
+report is safe to attach to handoffs because it records required environment variable names and commands, not secret
+values.
+
 ## Make GHCR Publicly Readable
 
 Refresh the GitHub CLI token with package-read access:
@@ -175,11 +185,12 @@ Proof external-uat-finishline
 Save the full command output for these checks:
 
 ```sh
+npm run status:external-uat -- v0.1.5 --report tmp/external-uat-status.json
 npm run verify:ghcr-anonymous -- v0.1.5
 MESHDROP_START9_UAT_URL=... npm run test:start9-deployed
 MESHDROP_UMBREL_UAT_URL=... npm run test:umbrel-deployed
 MESHDROP_IOS_DEVELOPMENT_TEAM=... MESHDROP_IOS_DEVICE_UDID=... npm run test:ios-signed-device
-npm run test:external-uat -- v0.1.5
+npm run test:external-uat -- v0.1.5 --report tmp/external-uat-final.json
 ```
 
 Record the final proof in the target UAT status ledger and release notes only after the final command passes.

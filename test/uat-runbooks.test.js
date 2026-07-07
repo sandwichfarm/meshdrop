@@ -255,14 +255,17 @@ test("target UAT runbooks cover shipped build surfaces without overclaiming", ()
     assert.match(targetStatus, /Desktop Chromium bundled shell and installer, iOS source\/native-source\/Simulator app\/device app, Android source\/native-source\/debug APK\/release APK tarballs/);
     assert.match(targetStatus, /release readback `npm run verify:ghcr-anonymous -- v0\.1\.5` returns GHCR `unauthorized`/);
     assert.match(targetStatus, /Make `ghcr\.io\/sandwichfarm\/meshdrop` public/);
+    assert.match(targetStatus, /npm run status:external-uat -- v0\.x\.y --report tmp\/external-uat-status\.json/);
     assert.match(targetStatus, /npm run test:external-uat -- v0\.x\.y/);
-    assert.match(targetStatus, /Start9 deployed UAT, Umbrel deployed UAT, iOS signed physical-device UAT, and anonymous GHCR readback/);
+    assert.match(targetStatus, /Start9 deployed UAT, Umbrel deployed\s+UAT, iOS signed physical-device UAT, and anonymous GHCR readback/);
     assert.match(targetStatus, /Proof external-uat-finishline/);
     assert.match(targetStatus, /docs\/uat\/external-finishline-closeout\.md/);
 
     const externalFinishline = readDoc("docs/uat/external-finishline-closeout.md");
     assert.match(externalFinishline, /MacBook/);
+    assert.match(externalFinishline, /npm run status:external-uat -- v0\.1\.5 --report tmp\/external-uat-status\.json/);
     assert.match(externalFinishline, /npm run test:external-uat -- v0\.1\.5/);
+    assert.match(externalFinishline, /npm run test:external-uat -- v0\.1\.5 --report tmp\/external-uat-final\.json/);
     assert.match(externalFinishline, /gh auth refresh -h github\.com -s read:packages/);
     assert.match(externalFinishline, /npm run verify:ghcr-anonymous -- v0\.1\.5/);
     assert.match(externalFinishline, /MESHDROP_START9_UAT_URL/);
