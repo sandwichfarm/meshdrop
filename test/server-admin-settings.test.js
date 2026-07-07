@@ -4,6 +4,7 @@ import {once} from "node:events";
 import {finalizeEvent, generateSecretKey, getPublicKey} from "nostr-tools";
 
 import {createAdminConfig} from "../server/admin-auth.js";
+import {createOverlayNetworkConfig} from "../server/overlay-network-adapters.js";
 import PairDropServer from "../server/server.js";
 
 async function withServer(config, runTest) {
@@ -19,6 +20,7 @@ async function withServer(config, runTest) {
         federation: {pollen: {room: "npub-network:test"}},
         pollenClient: {status: async () => ({enabled: false})},
         fipsClient: config.fipsClient,
+        overlayNetworks: config.overlayNetworks,
         admin: config.admin,
         buttons: {}
     });
@@ -58,6 +60,36 @@ test("/config exposes configured admin metadata", async () => {
         assert.match(config.admin.npub, /^npub1/);
         assert.equal(config.capabilities.runtime.hasBackend, true);
         assert.equal(config.capabilities.serverSettings.actions.fipsPeers, true);
+        assert.equal(config.capabilities.transports.tor.supported, false);
+        assert.equal(config.capabilities.transports.tor.unavailableReason, "overlay-adapter-not-configured");
+    });
+});
+
+test("/config exposes configured overlay stream adapter metadata", async () => {
+    await withServer({
+        admin: createAdminConfig({}),
+        fipsClient: {status: async () => ({enabled: true}), savePeers: async () => ({})},
+        overlayNetworks: createOverlayNetworkConfig({
+            TOR_STREAM_ENDPOINT: "https://meshdropabcd.onion/meshdrop",
+            TOR_STREAM_MAX_UPLOAD_BYTES: "4096"
+        })
+    }, async baseUrl => {
+        const response = await fetch(`${baseUrl}/config`);
+        const config = await response.json();
+
+        assert.deepEqual(config.capabilities.transports.tor, {
+            supported: true,
+            requiresBackend: true,
+            transportShape: "stream",
+            stream: {
+                supported: true,
+                primitive: "tor-http-stream",
+                endpointConfigured: true,
+                maxUploadBytes: 4096
+            }
+        });
+        assert.equal(config.capabilities.transports.i2p.supported, false);
+        assert.equal(config.capabilities.transports.loki.supported, false);
     });
 });
 

@@ -1,4 +1,5 @@
 import {normalizeNpubDiscoveryNetworkId} from "./npub-network.js";
+import {createOverlayNetworkCapabilities, createOverlayNetworkConfig} from "./overlay-network-adapters.js";
 import {normalizeRelayIceConfig} from "./relay-ice-config.js";
 
 const DEFAULT_RUNTIME_TARGET = "standalone";
@@ -35,6 +36,10 @@ export function createRuntimeCapabilities(conf = {}) {
     const fipsSupported = hasBackend && !!conf.fips?.enabled;
     const pollenSupported = hasBackend && !!conf.pollen?.enabled;
     const adminEnabled = hasBackend && !!conf.admin?.enabled;
+    const overlayNetworkCapabilities = createOverlayNetworkCapabilities(
+        hasBackend ? (conf.overlayNetworks || createOverlayNetworkConfig({})) : createOverlayNetworkConfig({}),
+        {hasBackend}
+    );
 
     return {
         schemaVersion: 1,
@@ -87,7 +92,8 @@ export function createRuntimeCapabilities(conf = {}) {
                     maxUploadBytes: conf.fipsStream?.maxUploadBytes || 0
                 },
                 relayIce: createRelayIceCapability("fips", fipsSupported, conf.fips)
-            }
+            },
+            ...overlayNetworkCapabilities
         },
         serverSettings: {
             supported: hasBackend && adminEnabled,

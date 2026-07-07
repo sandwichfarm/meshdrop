@@ -116,6 +116,9 @@ test("server connection falls back to static SPA config when backend config is u
     assert.equal(configEvent.detail.capabilities.transports.localDiscovery.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.fips.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.pollen.supported, false);
+    assert.equal(configEvent.detail.capabilities.transports.tor.supported, false);
+    assert.equal(configEvent.detail.capabilities.transports.i2p.supported, false);
+    assert.equal(configEvent.detail.capabilities.transports.loki.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.bluetooth.supported, false);
     assert.equal(configEvent.detail.capabilities.transports.bluetooth.transferSupported, false);
     assert.equal(configEvent.detail.capabilities.transports.bluetooth.apiAvailable, false);
@@ -228,7 +231,7 @@ test("static config applies target manifest runtime metadata when present", asyn
     assert.deepEqual(sockets, []);
 });
 
-test("static SPA config ignores backend-only FIPS and Pollen claims in target metadata", async () => {
+test("static SPA config ignores backend-only FIPS Pollen and overlay claims in target metadata", async () => {
     const {context, fired, opened, sockets} = createContext({
         responses: [
             {status: 200, body: "<!doctype html><title>MeshDrop</title>"},
@@ -250,12 +253,18 @@ test("static SPA config ignores backend-only FIPS and Pollen claims in target me
                         blossom: true,
                         hashtree: true,
                         pollen: true,
-                        fips: true
+                        fips: true,
+                        tor: true,
+                        i2p: true,
+                        loki: true
                     },
                     capabilities: {
                         transports: {
                             fips: {supported: true},
-                            pollen: {supported: true}
+                            pollen: {supported: true},
+                            tor: {supported: true},
+                            i2p: {supported: true},
+                            loki: {supported: true}
                         }
                     }
                 })
@@ -286,6 +295,12 @@ test("static SPA config ignores backend-only FIPS and Pollen claims in target me
     assert.equal(transports.fips.unavailableReason, "requires-instance-native-route");
     assert.equal(transports.pollen.supported, false);
     assert.equal(transports.pollen.unavailableReason, "requires-instance-native-route");
+    assert.equal(transports.tor.supported, false);
+    assert.equal(transports.tor.unavailableReason, "requires-instance-native-route");
+    assert.equal(transports.i2p.supported, false);
+    assert.equal(transports.i2p.unavailableReason, "requires-instance-native-route");
+    assert.equal(transports.loki.supported, false);
+    assert.equal(transports.loki.unavailableReason, "requires-instance-native-route");
     assert.deepEqual(sockets, []);
 });
 

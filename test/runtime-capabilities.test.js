@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {createRuntimeCapabilities, createServerRuntimeConfig} from "../server/runtime-capabilities.js";
+import {createOverlayNetworkConfig} from "../server/overlay-network-adapters.js";
 
 function assertBluetoothNegotiatedUnsupported(bluetooth, {apiAvailable = false, nativeBridgeAvailable = false} = {}) {
     assert.equal(bluetooth.supported, false);
@@ -42,7 +43,40 @@ test("runtime capabilities describe backend transport support", () => {
         supported: false,
         unavailableReason: "pollen-relay-ice-not-configured"
     });
+    assert.equal(capabilities.transports.tor.supported, false);
+    assert.equal(capabilities.transports.tor.unavailableReason, "overlay-adapter-not-configured");
+    assert.equal(capabilities.transports.i2p.supported, false);
+    assert.equal(capabilities.transports.loki.supported, false);
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
+});
+
+test("runtime capabilities expose configured overlay stream adapters without changing FIPS or Pollen", () => {
+    const capabilities = createRuntimeCapabilities({
+        runtime: {target: "standalone"},
+        fips: {enabled: true},
+        pollen: {enabled: true, maxUploadBytes: 1024},
+        overlayNetworks: createOverlayNetworkConfig({
+            TOR_STREAM_ENDPOINT: "https://meshdropabcd.onion/meshdrop",
+            TOR_STREAM_MAX_UPLOAD_BYTES: "4096"
+        })
+    });
+
+    assert.equal(capabilities.transports.fips.supported, true);
+    assert.equal(capabilities.transports.pollen.supported, true);
+    assert.deepEqual(capabilities.transports.tor, {
+        supported: true,
+        requiresBackend: true,
+        transportShape: "stream",
+        stream: {
+            supported: true,
+            primitive: "tor-http-stream",
+            endpointConfigured: true,
+            maxUploadBytes: 4096
+        }
+    });
+    assert.equal(capabilities.transports.i2p.supported, false);
+    assert.equal(capabilities.transports.i2p.unavailableReason, "overlay-adapter-not-configured");
+    assert.equal(capabilities.transports.loki.supported, false);
 });
 
 test("runtime capabilities require TURN relay config before advertising overlay relay ICE", () => {
@@ -166,6 +200,10 @@ test("runtime capabilities describe static SPA support without backend-only tran
         supported: false,
         unavailableReason: "pollen-relay-ice-not-configured"
     });
+    assert.equal(capabilities.transports.tor.supported, false);
+    assert.equal(capabilities.transports.tor.unavailableReason, "requires-instance-native-route");
+    assert.equal(capabilities.transports.i2p.supported, false);
+    assert.equal(capabilities.transports.loki.supported, false);
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
     assert.equal(capabilities.serverSettings.supported, false);
     assert.equal(capabilities.serverSettings.actions.fipsPeers, false);
@@ -195,6 +233,9 @@ test("runtime capabilities describe desktop source support without shared backen
     assert.equal(capabilities.transports.localDiscovery.supported, false);
     assert.equal(capabilities.transports.fips.supported, false);
     assert.equal(capabilities.transports.pollen.supported, false);
+    assert.equal(capabilities.transports.tor.supported, false);
+    assert.equal(capabilities.transports.i2p.supported, false);
+    assert.equal(capabilities.transports.loki.supported, false);
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
     assert.equal(capabilities.serverSettings.supported, false);
 });
@@ -223,6 +264,9 @@ test("runtime capabilities describe mobile source support without backend-only t
     assert.equal(capabilities.transports.localDiscovery.supported, false);
     assert.equal(capabilities.transports.fips.supported, false);
     assert.equal(capabilities.transports.pollen.supported, false);
+    assert.equal(capabilities.transports.tor.supported, false);
+    assert.equal(capabilities.transports.i2p.supported, false);
+    assert.equal(capabilities.transports.loki.supported, false);
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
     assert.equal(capabilities.serverSettings.supported, false);
 });

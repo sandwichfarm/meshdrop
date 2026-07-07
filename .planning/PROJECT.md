@@ -14,15 +14,16 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.9.0 FIPS Instance Relay
+## Current Milestone: v0.10.0 Overlay Network Adapters
 
-**Goal:** apply the generic instance-relay contract to the proven FIPS encrypted byte path so route proof says the sender instance relayed ciphertext over FIPS, while legacy FIPS stream metadata remains a compatibility fallback.
+**Goal:** add Tor, I2P, and Loki as first-class route adapter types without pretending they can transfer bytes before a local instance/native runtime proves it can dial those networks.
 
 **Target features:**
-- Build FIPS `transportShape=instance-relay` descriptors with owner/session/expiry binding, FIPS mesh URL validation, encrypted/private/fail-closed constraints, and `instanceRelay=true`.
-- Attach `fipsInstanceRelay` metadata to private FIPS transfers alongside the existing `fipsStream` fallback.
-- Prefer `fipsInstanceRelay` validation and final route proof on receipt, producing `instanceRelayed=true`, `webRtcUsed=false`, byte counts, and hash match.
-- Preserve current FIPS stream download behavior when old peers send only `fipsStream`.
+- Publish runtime capabilities for Tor, I2P, and Loki using the same transport map as FIPS/Pollen.
+- Keep Tor/I2P/Loki unsupported by default, with explicit unavailable reasons for SPA/source targets and unconfigured instances.
+- Accept configured local stream endpoints only through a shared overlay adapter catalog, with route type, primitive, transport shape, endpoint, and max byte metadata.
+- Reuse the generic v1 descriptor and scoring model for Tor/I2P/Loki stream candidates.
+- Document that this milestone is adapter readiness only; byte-transfer completion still requires real local Tor/I2P/Loki dial proof.
 
 ## Requirements
 
@@ -46,6 +47,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Show route attempts, choices, unavailable states, and privacy labels in the UI using proof-backed route status instead of optimistic transport badges.
 - [x] Make backend-free SPA artifacts fail closed for backend-only FIPS/Pollen/native routes while keeping pure-client routes available.
 - [x] Generalize instance relay so Pollen, FIPS, Tor, I2P, Loki, and future backend networks share descriptor, validation, and proof behavior instead of duplicating route contracts.
+- [x] Add Tor, I2P, and Loki route adapter capability surfaces that fail closed until a local instance/native runtime can prove dial support.
 - [ ] Implement WebRTC overlay relay candidates for FIPS and Pollen, or explicitly ship a differently named non-WebRTC live-transfer fallback where browser ICE cannot be constrained. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
@@ -71,7 +73,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - The browser client currently owns UI, peer list, route selection, WebRTC setup, and file transfer flow. The Node/Express server serves the app, owns WebSocket signaling, exposes runtime config, and can provide backend transport endpoints.
 - Current discovery/signaling surfaces include local instance rooms, secret/public rooms, Nostr mesh presence and encrypted WebRTC signaling, FIPS/Pollen pairwise route rooms derived from Nostr identities, and server federation over FIPS/Pollen HTTP descriptors.
 - Current transfer paths include direct WebRTC data channel transfer, local WebSocket fallback, Blossom encrypted object transfer, Hashtree object transfer, and Pollen upload/download descriptor transfer through backend endpoints.
-- FIPS currently has status/config surfaces, a control client, browser capability gating, route descriptors, server-side peer discovery, HTTP federation candidate handling, and encrypted byte transfer over its FIPS mesh IPv6 address. The next missing part is first-class generic instance-relay descriptor/proof semantics for that byte path.
+- FIPS currently has status/config surfaces, a control client, browser capability gating, route descriptors, server-side peer discovery, HTTP federation candidate handling, and encrypted byte transfer over its FIPS mesh IPv6 address. It now emits generic instance-relay descriptor/proof semantics for that byte path.
 - Pollen currently appears as both a browser-facing transfer endpoint and a server/native `pln` substrate where available. Its instance-relay proof is the baseline for the generic relay contract.
 - FIPS now has a first byte-transfer path through HTTP over the FIPS IPv6 adapter: the sender's MeshDrop server exposes a short-lived download URL on its FIPS mesh address, while the recipient fetches ciphertext through FIPS and validates the decrypted payload hash.
 - Instance federation can track peers, expose snapshots, receive remote peer/signaling events, discover HTTP federation endpoints, and bridge Pollen services/FIPS-reachable base URLs. Pollen instance relay and FIPS stream proof now provide concrete byte-transfer shapes that need shared descriptor/proof code before more networks are added.
@@ -109,6 +111,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Route attempts need user-facing explanations | Users need to understand why a route is selected, unavailable, failed, or complete without reading protocol internals | ✓ Good |
 | SPA artifacts must fail closed for backend-only routes | Static/browser-only targets can transfer only through browser-available primitives and must not inherit server/native claims | Active runtime-honesty requirement |
 | Generic instance relay comes before more networks | Pollen proved the first backend-mediated byte path; future FIPS/Tor/I2P/Loki routes need shared descriptor/proof semantics before more one-off adapters | ✓ Good |
+| Overlay networks start fail-closed | Tor/I2P/Loki need local dial proof before MeshDrop can claim transfer support | ✓ Good |
 
 ---
-*Last updated: 2026-07-07 after completing milestone v0.9.0 FIPS Instance Relay.*
+*Last updated: 2026-07-07 after completing milestone v0.10.0 Overlay Network Adapters.*

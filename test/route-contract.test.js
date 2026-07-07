@@ -189,6 +189,98 @@ test("scores trusted private routes without changing live signaling priority", (
     ]);
 });
 
+test("validates Tor I2P and Loki stream descriptors through the generic contract", () => {
+    const descriptors = [
+        privateFipsDescriptor({
+            routeId: "tor-route",
+            routeType: "tor",
+            endpoint: {
+                url: "https://meshdropabcd.onion/meshdrop",
+                primitive: "tor-http-stream"
+            },
+            overlayIdentity: {network: "tor", destination: "meshdropabcd.onion"}
+        }),
+        privateFipsDescriptor({
+            routeId: "i2p-route",
+            routeType: "i2p",
+            endpoint: {
+                url: "https://meshdropabcd.b32.i2p/meshdrop",
+                primitive: "i2p-http-stream"
+            },
+            overlayIdentity: {network: "i2p", destination: "meshdropabcd.b32.i2p"}
+        }),
+        privateFipsDescriptor({
+            routeId: "loki-route",
+            routeType: "loki",
+            endpoint: {
+                url: "https://meshdropabcd.loki/meshdrop",
+                primitive: "loki-http-stream"
+            },
+            overlayIdentity: {network: "loki", destination: "meshdropabcd.loki"}
+        })
+    ];
+
+    for (const descriptor of descriptors) {
+        const result = contract.validateDescriptor(descriptor, {
+            now: NOW,
+            expectedOwnerPubkey: OWNER,
+            expectedSessionId: "session-1"
+        });
+        assert.equal(result.ok, true);
+        assert.equal(result.descriptor.transportShape, "stream");
+        assert.equal(result.descriptor.constraints.private, true);
+    }
+});
+
+test("scores Tor I2P and Loki as ordinary private stream candidates", () => {
+    const ranked = contract.rankCandidates([
+        {
+            routeId: "tor-route",
+            routeType: "tor",
+            transportShape: "stream",
+            available: true,
+            trusted: true,
+            private: true,
+            encrypted: true,
+            relayCost: 3
+        },
+        {
+            routeId: "i2p-route",
+            routeType: "i2p",
+            transportShape: "stream",
+            available: true,
+            trusted: true,
+            private: true,
+            encrypted: true,
+            relayCost: 2
+        },
+        {
+            routeId: "loki-route",
+            routeType: "loki",
+            transportShape: "stream",
+            available: true,
+            trusted: true,
+            private: true,
+            encrypted: true,
+            runtimeSupported: false,
+            relayCost: 1
+        }
+    ], {preferredRouteType: "i2p"});
+
+    assert.equal(ranked[0].routeId, "i2p-route");
+    assert.equal(ranked[1].routeId, "tor-route");
+    assert.equal(ranked[2].routeId, "loki-route");
+    assert.deepEqual(ranked[0].reasons, [
+        "available",
+        "preferred",
+        "trusted",
+        "private",
+        "encrypted",
+        "relay-cost:2"
+    ]);
+    assert.equal(ranked[2].reasons.includes("runtime-unsupported"), true);
+});
+
 test("validates route proof fields for claimed byte transport", () => {
     const proof = {
         senderRuntime: "docker-a",
