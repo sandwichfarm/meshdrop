@@ -238,11 +238,21 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     text-transform: uppercase;
 }
 
+.availability-pill[data-tone="pending"] {
+    animation: route-pill-pulse 1400ms ease-in-out infinite;
+}
+
+.availability-pill[data-tone="blocked"],
+.availability-pill[data-tone="failed"] {
+    opacity: 0.42;
+    text-decoration: line-through;
+}
+
 .route-attempts {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     margin-top: 4px;
     max-width: var(--peer-width);
 }
@@ -252,42 +262,109 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
 }
 
 .route-attempt {
-    display: inline-grid;
-    grid-auto-flow: column;
+    --route-color: rgb(var(--text-color));
+    display: inline-flex;
     align-items: center;
-    max-width: 100%;
-    gap: 4px;
-    padding: 2px 6px;
-    border-radius: 6px;
-    background: rgba(var(--text-color), 0.07);
-    color: rgb(var(--text-color));
-    line-height: 1.25;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    max-width: 48px;
+    min-height: 18px;
+    padding: 1px 4px;
+    border: 1px solid color-mix(in srgb, var(--route-color) 55%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--route-color) 18%, transparent);
+    color: color-mix(in srgb, var(--route-color) 72%, white);
+    line-height: 1;
 }
 
-.route-attempt[data-state="disabled"],
-.route-attempt[data-state="unavailable"],
-.route-attempt[data-state="failed"],
-.route-attempt[data-state="timeout"],
-.route-attempt[data-state="expired"],
-.route-attempt[data-state="blocked-fallback"] {
-    background: rgba(245, 166, 35, 0.16);
+.route-attempt[data-route="ip"] {
+    --route-color: var(--primary-color);
 }
 
-.route-attempt[data-state="complete"],
-.route-attempt[data-state="connected"],
-.route-attempt[data-state="connection-connected"] {
+.route-attempt[data-route="secret"] {
+    --route-color: var(--paired-device-color);
+}
+
+.route-attempt[data-route="nostr"] {
+    --route-color: #4d7cff;
+}
+
+.route-attempt[data-route="fips"] {
+    --route-color: #00a69c;
+}
+
+.route-attempt[data-route="pollen"] {
+    --route-color: #6d8f00;
+}
+
+.route-attempt[data-route="public-id"] {
+    --route-color: var(--public-room-color);
+}
+
+.route-attempt-symbol {
+    position: relative;
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+}
+
+.route-attempt-symbol::before {
+    position: absolute;
+    inset: 2px;
+    border-radius: 50%;
+    background: currentColor;
+    content: "";
+}
+
+.route-attempt[data-tone="blocked"],
+.route-attempt[data-tone="failed"] {
+    background: rgba(var(--text-color), 0.05);
+    color: rgba(var(--text-color), 0.58);
+    text-decoration: line-through;
+    opacity: 0.58;
+}
+
+.route-attempt[data-tone="blocked"] .route-attempt-symbol::after,
+.route-attempt[data-tone="failed"] .route-attempt-symbol::after {
+    position: absolute;
+    left: -2px;
+    top: 2px;
+    width: 10px;
+    height: 1px;
+    border-radius: 999px;
+    background: currentColor;
+    content: "";
+    transform: rotate(-42deg);
+}
+
+.route-attempt[data-tone="pending"] {
+    animation: route-chip-pulse 1400ms ease-in-out infinite;
+}
+
+.route-attempt[data-tone="pending"] .route-attempt-symbol::after {
+    position: absolute;
+    inset: -4px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    content: "";
+    animation: route-ring-pulse 1400ms ease-out infinite;
+}
+
+.route-attempt[data-tone="complete"] {
     background: rgba(76, 175, 80, 0.16);
 }
 
-.route-attempt-state {
-    font-weight: 800;
-}
-
-.route-attempt-route,
-.route-attempt-reason {
+.route-attempt-route {
     min-width: 0;
-    overflow-wrap: anywhere;
-    opacity: 0.72;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
 }
 
 x-peer:not([status]):hover x-icon,
@@ -556,6 +633,18 @@ x-peer.ws-peer .highlight-wrapper {
     white-space: nowrap;
 }
 
+x-peer[status][data-route] .status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    border: 0;
+}
+
 x-peer:not([status]) .status,
 x-peer[status] .device-name {
     display: none;
@@ -567,6 +656,45 @@ x-peer[status] {
 
 x-peer x-icon {
     animation: pop 600ms ease-out 1;
+}
+
+@keyframes route-pill-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--badge-color) 45%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--badge-color) 0%, transparent);
+    }
+}
+
+@keyframes route-chip-pulse {
+    0%,
+    100% {
+        background: color-mix(in srgb, var(--route-color) 16%, transparent);
+    }
+    50% {
+        background: color-mix(in srgb, var(--route-color) 30%, transparent);
+    }
+}
+
+@keyframes route-ring-pulse {
+    0% {
+        opacity: 0.74;
+        transform: scale(0.75);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.75);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .availability-pill[data-tone="pending"],
+    .route-attempt[data-tone="pending"],
+    .route-attempt[data-tone="pending"] .route-attempt-symbol::after {
+        animation: none;
+    }
 }
 
 @keyframes pop {

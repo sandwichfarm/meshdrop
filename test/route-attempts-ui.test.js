@@ -87,6 +87,28 @@ test("route attempts combine available candidates with latest route status", () 
     ]);
 });
 
+test("route attempt visuals keep peer cards compact while preserving accessible detail", () => {
+    const attempts = [
+        routeStatus.attempt({route: "nostr", state: "disabled", reason: "clearnet-disabled"}),
+        routeStatus.attempt({route: "fips", state: "requested", reason: "private-route"}),
+        routeStatus.attempt({route: "pollen", state: "requested", reason: "private-route"})
+    ].map(attempt => routeStatus.visualAttempt(attempt));
+
+    assert.deepEqual(
+        attempts.map(attempt => [attempt.route, attempt.visibleLabel, attempt.tone]),
+        [
+            ["nostr", "Net", "blocked"],
+            ["fips", "FIPS", "pending"],
+            ["pollen", "Pollen", "pending"]
+        ]
+    );
+
+    const visibleCopy = attempts.map(attempt => attempt.visibleLabel).join(" ");
+    assert.doesNotMatch(visibleCopy, /Trying|Unavailable|Fallback|Descriptor|Request/);
+    assert.match(attempts[0].ariaLabel, /Clearnet unavailable/);
+    assert.match(attempts[1].ariaLabel, /Private route requested/);
+});
+
 test("route choice options can expose route-attempt metadata for renderers", () => {
     const options = availability.optionsFor({
         id: "peer",

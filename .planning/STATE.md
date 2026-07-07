@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v0.11.0
 milestone_name: TURN Relay Proof
 status: complete
-last_updated: "2026-07-07T18:24:24Z"
+last_updated: "2026-07-07T18:57:39Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
@@ -64,6 +64,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-route-status-icon-ui` | complete | Route status card copy replaced with compact animated badge chips; focused route UI test 6/6; dark mobile screenshot `/tmp/meshdrop-route-status-icons-mobile-dark.png`; visual verdict 92/pass; `npm test` 356/356; e2e transfer smoke; diff/changed-code slop exit 0; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-turn-relay-proof` | complete | Route proof contract requires `selectedIceCandidateType=relay` for `webrtc-relay-ice`; local coturn-backed TURN smoke transfers browser bytes with `iceTransportPolicy=relay`, selected relay/relay candidate pairs, 66/66 bytes, hash matched, fallback disabled; focused 58/58; `npm test` 355/355; `npm run test:turn-relay`; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-overlay-network-adapters` | complete | Tor/I2P/Loki runtime capability entries and shared overlay adapter catalog added; configured stream metadata exposed through `/config`; SPA/source targets fail closed for overlay claims; route descriptors/scoring reuse generic contract; focused 33/33; `npm test` 354/354; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-fips-instance-relay` | complete | FIPS `fipsInstanceRelay` descriptor/proof added while keeping legacy `fipsStream`; focused 17/17; FIPS two-instance runtime smoke reports `instanceRelay=true`, 43/43 bytes, hash matched, fips0 deltas; `npm test` 345/345; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |

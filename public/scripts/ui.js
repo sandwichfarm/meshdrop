@@ -413,6 +413,55 @@ const PeerRouteStatusProtocol = {
         "route-timeout": "Peer route timed out"
     },
 
+    visibleLabels: {
+        ip: "Inst",
+        nostr: "Net",
+        secret: "Pair",
+        fips: "FIPS",
+        pollen: "Pollen",
+        "public-id": "Room"
+    },
+
+    pendingStates: new Set([
+        "selected",
+        "requested",
+        "connecting",
+        "waiting",
+        "offer",
+        "answer",
+        "remote-offer",
+        "remote-answer",
+        "ice-checking",
+        "connection-connecting",
+        "transferring"
+    ]),
+
+    completeStates: new Set([
+        "complete",
+        "connected",
+        "ice-connected",
+        "ice-completed",
+        "connection-connected"
+    ]),
+
+    blockedStates: new Set([
+        "disabled",
+        "unavailable",
+        "blocked-fallback"
+    ]),
+
+    failedStates: new Set([
+        "rejected",
+        "expired",
+        "timeout",
+        "failed",
+        "error",
+        "connection-failed",
+        "ice-failed",
+        "connection-disconnected",
+        "ice-disconnected"
+    ]),
+
     text(status = {}) {
         const route = PeerAvailabilityProtocol.routeLabel(status.route || status.roomType);
 
@@ -504,6 +553,15 @@ const PeerRouteStatusProtocol = {
         return labels;
     },
 
+    visualTone(status = {}) {
+        const state = status.state || "candidate";
+        if (this.pendingStates.has(state)) return "pending";
+        if (this.completeStates.has(state)) return "complete";
+        if (this.blockedStates.has(state)) return "blocked";
+        if (this.failedStates.has(state)) return "failed";
+        return "available";
+    },
+
     attempt(status = {}) {
         const route = status.route || status.roomType || "unknown";
         return {
@@ -514,6 +572,28 @@ const PeerRouteStatusProtocol = {
             message: this.message(status),
             reason: this.reasonLabel(status.reason),
             privacyLabels: this.privacyLabels(status)
+        };
+    },
+
+    visualAttempt(attempt = {}) {
+        const route = attempt.route || "unknown";
+        const state = attempt.state || "candidate";
+        const routeLabel = attempt.routeLabel || PeerAvailabilityProtocol.routeLabel(route);
+        const title = [
+            attempt.message,
+            attempt.reason,
+            ...(attempt.privacyLabels || [])
+        ].filter(Boolean).join(" · ");
+
+        return {
+            ...attempt,
+            route,
+            routeLabel,
+            state,
+            visibleLabel: this.visibleLabels[route] || routeLabel,
+            tone: this.visualTone({state}),
+            title,
+            ariaLabel: title || `${routeLabel} ${this.stateLabel({state})}`
         };
     },
 
@@ -1490,32 +1570,26 @@ class PeerUI {
         }
 
         const nodes = attempts.map(attempt => {
+            const visual = PeerRouteStatusProtocol.visualAttempt(attempt);
             const item = document.createElement('span');
             item.className = 'route-attempt';
-            item.dataset.route = attempt.route;
-            item.dataset.state = attempt.state;
-            item.title = [
-                attempt.message,
-                attempt.reason,
-                ...attempt.privacyLabels
-            ].filter(Boolean).join(' · ');
+            item.dataset.route = visual.route;
+            item.dataset.state = visual.state;
+            item.dataset.tone = visual.tone;
+            item.title = visual.title;
+            item.setAttribute('role', 'img');
+            item.setAttribute('aria-label', visual.ariaLabel);
 
-            const state = document.createElement('span');
-            state.className = 'route-attempt-state';
-            state.textContent = attempt.stateLabel;
+            const symbol = document.createElement('span');
+            symbol.className = 'route-attempt-symbol';
+            symbol.setAttribute('aria-hidden', 'true');
 
             const route = document.createElement('span');
             route.className = 'route-attempt-route';
-            route.textContent = attempt.routeLabel;
+            route.textContent = visual.visibleLabel;
+            route.setAttribute('aria-hidden', 'true');
 
-            item.append(state, route);
-
-            if (attempt.reason) {
-                const reason = document.createElement('span');
-                reason.className = 'route-attempt-reason';
-                reason.textContent = attempt.reason;
-                item.append(reason);
-            }
+            item.append(symbol, route);
 
             return item;
         });
@@ -1601,11 +1675,23 @@ class PeerUI {
 
         const pills = PeerAvailabilityProtocol.availability(this._peer)
             .map(option => {
+                const visual = PeerRouteStatusProtocol.visualAttempt(PeerRouteStatusProtocol.attempt(
+                    PeerAvailabilityProtocol.statusForRoomType(this._peer, option.roomType)
+                    || {
+                        route: option.roomType,
+                        state: option.unavailable ? "disabled" : "candidate",
+                        reason: option.unavailableReason,
+                        backendOnly: option.backendOnly
+                    }
+                ));
                 const pill = document.createElement('span');
                 pill.className = `availability-pill ${option.className}`;
                 pill.dataset.transport = option.id;
+                pill.dataset.state = visual.state;
+                pill.dataset.tone = visual.tone;
                 pill.textContent = option.shortLabel;
-                pill.title = option.label;
+                pill.title = visual.title || option.label;
+                pill.setAttribute("aria-label", visual.ariaLabel);
                 return pill;
             });
 
