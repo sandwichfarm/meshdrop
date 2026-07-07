@@ -2626,7 +2626,41 @@ class PeersManager {
         return ClearnetRoutePolicy.allows(roomType);
     }
 
+    _routeRuntimeSupported(roomType) {
+        if (!this._config?.capabilities?.transports || !globalThis.RuntimeCapabilities?.transportSupported) return true;
+
+        if (roomType === "nostr") {
+            return globalThis.RuntimeCapabilities.transportSupported(this._config, "nostr", true)
+                && globalThis.RuntimeCapabilities.transportSupported(this._config, "webrtc", true);
+        }
+        const transport = {
+            ip: "localDiscovery",
+            fips: "fips",
+            pollen: "pollen"
+        }[roomType];
+        if (!transport) return true;
+
+        return globalThis.RuntimeCapabilities.transportSupported(this._config, transport, true);
+    }
+
+    _routeRuntimeBlockedReason(roomType) {
+        const transport = {
+            ip: "localDiscovery",
+            fips: "fips",
+            pollen: "pollen",
+            nostr: "nostr"
+        }[roomType];
+        const capabilityReason = transport
+            ? this._config?.capabilities?.transports?.[transport]?.unavailableReason
+            : "";
+        if (capabilityReason) return capabilityReason;
+        if (roomType === "fips" || roomType === "pollen") return "requires-instance-native-route";
+        if (roomType === "ip") return "requires-instance";
+        return "route-policy";
+    }
+
     _routeSelectionBlockedReason(roomType) {
+        if (!this._routeRuntimeSupported(roomType)) return this._routeRuntimeBlockedReason(roomType);
         if (!this._routeAllowed(roomType)) return "route-policy";
         if (!this._overlayRelayRequired(roomType)) return "";
         if (OverlayRelayPolicy.relayIceSupported(this._config, roomType)) return "";

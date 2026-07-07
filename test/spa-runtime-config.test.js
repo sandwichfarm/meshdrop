@@ -228,6 +228,67 @@ test("static config applies target manifest runtime metadata when present", asyn
     assert.deepEqual(sockets, []);
 });
 
+test("static SPA config ignores backend-only FIPS and Pollen claims in target metadata", async () => {
+    const {context, fired, opened, sockets} = createContext({
+        responses: [
+            {status: 200, body: "<!doctype html><title>MeshDrop</title>"},
+            {
+                status: 200,
+                body: JSON.stringify({
+                    target: "spa",
+                    nativeShellBuilt: true,
+                    runtime: {
+                        target: "spa",
+                        platform: "browser",
+                        hasBackend: false,
+                        sharedInstance: false
+                    },
+                    transports: {
+                        localDiscovery: true,
+                        webrtc: true,
+                        nostr: true,
+                        blossom: true,
+                        hashtree: true,
+                        pollen: true,
+                        fips: true
+                    },
+                    capabilities: {
+                        transports: {
+                            fips: {supported: true},
+                            pollen: {supported: true}
+                        }
+                    }
+                })
+            }
+        ]
+    });
+
+    new context.__meshdropTest.ServerConnection();
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+
+    const configEvent = fired.find(event => event.type === "config");
+    const transports = configEvent.detail.capabilities.transports;
+
+    assert.deepEqual(opened, [
+        {method: "GET", url: "config"},
+        {method: "GET", url: "/meshdrop-target.json"}
+    ]);
+    assert.equal(configEvent.detail.capabilities.runtime.target, "spa");
+    assert.equal(configEvent.detail.capabilities.runtime.hasBackend, false);
+    assert.equal(transports.webrtc.supported, true);
+    assert.equal(transports.nostr.supported, true);
+    assert.equal(transports.localDiscovery.supported, false);
+    assert.equal(configEvent.detail.fips.enabled, false);
+    assert.equal(configEvent.detail.pollen.enabled, false);
+    assert.equal(transports.fips.supported, false);
+    assert.equal(transports.fips.unavailableReason, "requires-instance-native-route");
+    assert.equal(transports.pollen.supported, false);
+    assert.equal(transports.pollen.unavailableReason, "requires-instance-native-route");
+    assert.deepEqual(sockets, []);
+});
+
 test("file-origin static config reads packaged target manifest beside app directory", async () => {
     const {context, fired, opened, sockets} = createContext({
         protocol: "file:",

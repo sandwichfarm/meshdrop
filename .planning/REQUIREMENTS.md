@@ -1,68 +1,66 @@
-# Requirements: MeshDrop v0.4.0 Route Attempts UX
+# Requirements: MeshDrop v0.5.0 SPA Route Honesty
 
 **Defined:** 2026-07-07
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
 
 ## Validated Baseline
 
-- Nostr WebRTC discovers followed npub peers without static room broadcast.
-- FIPS and Pollen discovery are network-based through npub contacts, not static rooms.
-- Claimed WebRTC, Blossom, Hashtree, Pollen storage, and Pollen instance-relay paths have deterministic transfer proof in automated smoke coverage.
-- Runtime capability negotiation gates GUI controls by target/runtime capability.
-- Route descriptor validation, adapter vocabulary, scoring reasons, and proof fields exist from v0.2.0.
-- Pollen instance relay proves encrypted bytes can cross two MeshDrop instances with `webRtcUsed: false`, `instanceRelayed: true`, matching byte counts, and hash match.
+- Nostr WebRTC, local WebRTC, Blossom, Hashtree, Pollen storage, and Pollen instance-relay paths have automated transfer proof in the appropriate runtime targets.
+- Runtime capability negotiation gates GUI controls by the current target's capabilities.
+- Route descriptor validation, adapter vocabulary, scoring reasons, route attempts, and proof-backed completion copy exist.
+- Backend-only FIPS/Pollen relay and native routes are not proven in browser-only SPA targets.
 
-## v0.4.0 Requirements
+## v0.5.0 Requirements
 
-### Route Attempts
+### Static Runtime Capabilities
 
-- [x] **UX-01**: User can see a compact list of candidate file routes for a peer or active transfer, including direct, Nostr, instance, FIPS, Pollen, and object-store routes when those routes are relevant.
-- [x] **UX-02**: User can see the current route attempt state using the route contract vocabulary: candidate, requested, accepted, connecting, transferring, complete, unavailable, rejected, expired, failed, or blocked fallback.
-- [x] **UX-03**: User can see clear failure or unavailable reasons without protocol jargon: needs Nostr sign-in, peer not trusted, requires instance, requires native app, overlay network unavailable, peer route expired, or fallback disabled by privacy policy.
+- [ ] **SPA-01**: Static SPA target manifests report pure-client browser routes as available only when the browser/runtime can exercise them: Nostr WebRTC over normal ICE and enabled browser/object-store transfer paths.
+- [ ] **SPA-02**: Static SPA target manifests do not report backend-only FIPS, Pollen instance relay, or native adapter transfer support from server status, build metadata, discovery descriptors, or protocol badges alone.
+- [ ] **SPA-03**: Static config negotiation preserves explicit unavailable reasons for backend-only routes, including "requires instance" and "requires native app".
 
-### Privacy And Proof
+### Route Choice Honesty
 
-- [x] **UX-04**: User can see privacy/data-path labels for each route attempt: end-to-end encrypted, direct data path, relayed by your instance, relayed by peer instance, backend-only route, public discovery enabled, or public discovery disabled.
-- [x] **UX-05**: Completed transfer UI uses route proof fields to show the route that actually carried bytes and does not show a route as successful from discovery, descriptor, or badge state alone.
+- [ ] **SPA-04**: Backend-free SPA route choice UI cannot offer FIPS, Pollen instance relay, or native-only routes as selectable file transports unless a reachable browser/OS route or instance/object-store primitive is present.
+- [ ] **SPA-05**: Backend-free SPA route attempts may show peer-advertised private routes as unavailable/instance-dependent, but cannot render those routes as connected, transferring, or complete without route proof.
 
-### Runtime Honesty
+### Proof And Regression Coverage
 
-- [x] **UX-06**: Unsupported backend-only routes are hidden or disabled unless runtime capabilities and transfer primitives prove they are usable in the current target.
-- [x] **UX-07**: Automated tests cover route-attempt copy and state mapping so stale or optimistic badges cannot regress into false transfer claims.
+- [ ] **SPA-06**: Automated SPA artifact tests prove pure-client routes still transfer files after backend-only routes are disabled or marked unavailable.
+- [ ] **SPA-07**: Automated tests fail if a backend-free SPA artifact claims FIPS/Pollen byte transfer support from discovery, descriptor exchange, badge state, or native build metadata alone.
 
 ## Future Requirements
 
 - **FIPS-01**: FIPS adapter transfers encrypted file bytes over a FIPS-backed data plane and reports route proof.
-- **SPA-01**: Backend-free SPA artifacts fail closed for backend-only routes and never claim FIPS/Pollen byte transfer without a reachable data plane.
 - **NATIVE-01**: Android native adapter exposes real native route status, descriptor, transfer primitive, and proof.
 - **INST-GENERIC-01**: The Pollen-specific relay path is generalized for FIPS, Tor, I2P, Loki, and future backends after one backend is proven.
+- **TURN-01**: WebRTC overlay relay candidates for FIPS/Pollen use TURN/TURNS routes only when the browser can dial the relay endpoint and relay-only ICE proof exists.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| FIPS byte transfer implementation | This milestone explains and displays route attempts; it does not add a new FIPS data plane. |
-| Replacing all transfer internals with a generic route engine | The UI can consume existing status/proof surfaces before the full engine rewrite. |
-| New transport protocols | Tor, I2P, Loki, TURN, and FIPS stream routes remain future adapter slices. |
-| Marketing-style protocol education | UI copy should explain user-visible state, not teach transport internals. |
+| FIPS byte-transfer implementation | This milestone prevents false SPA claims; the FIPS data plane remains a later transport slice. |
+| Android/iOS native transport adapters | Native adapters need runtime bridges and device proof; this milestone is static/browser SPA only. |
+| Generic route-engine replacement | Existing runtime config and route-attempt surfaces are enough to enforce SPA honesty. |
+| Public topology publication | Backend-only route availability must stay explicit, private, and proof-backed. |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UX-01 | Phase 8 | Complete |
-| UX-02 | Phase 8 | Complete |
-| UX-03 | Phase 8 | Complete |
-| UX-04 | Phase 8 | Complete |
-| UX-05 | Phase 8 | Complete |
-| UX-06 | Phase 8 | Complete |
-| UX-07 | Phase 8 | Complete |
+| SPA-01 | Phase 9 | Pending |
+| SPA-02 | Phase 9 | Pending |
+| SPA-03 | Phase 9 | Pending |
+| SPA-04 | Phase 9 | Pending |
+| SPA-05 | Phase 9 | Pending |
+| SPA-06 | Phase 9 | Pending |
+| SPA-07 | Phase 9 | Pending |
 
 **Coverage:**
-- v0.4.0 requirements: 7 total
+- v0.5.0 requirements: 7 total
 - Mapped to phases: 7
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 after implementing Phase 8 Route Attempts UX.*
+*Last updated: 2026-07-07 after starting Phase 9 SPA route honesty.*

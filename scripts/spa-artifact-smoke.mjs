@@ -147,7 +147,30 @@ async function runRuntimeCapabilityProof(browser, port, relayUrls) {
             clearnetTitle: document.getElementById("clearnet-routes")?.title,
             fipsHidden: document.getElementById("fips-discovery")?.hasAttribute("hidden"),
             pollenHidden: document.getElementById("pollen-transfer")?.hasAttribute("hidden"),
-            serverSettings: globalThis.__meshdropE2E.config.capabilities.serverSettings.supported
+            serverSettings: globalThis.__meshdropE2E.config.capabilities.serverSettings.supported,
+            routeOptionIds: globalThis.PeerAvailabilityProtocol.optionsFor({
+                id: "peer-static",
+                _peerIdsByRoomType: {
+                    nostr: "nostr-peer",
+                    fips: "fips-peer",
+                    pollen: "pollen-peer"
+                },
+                _roomIds: {
+                    nostr: "meshdrop-nostr",
+                    fips: "meshdrop-fips",
+                    pollen: "meshdrop-pollen"
+                },
+                routeCapabilities: ["fips", "pollen"]
+            }).map(option => option.id),
+            routeAttempts: globalThis.PeerRouteStatusProtocol.attemptsForPeer({
+                id: "peer-static",
+                _roomIds: {
+                    nostr: "meshdrop-nostr",
+                    fips: "meshdrop-fips",
+                    pollen: "meshdrop-pollen"
+                },
+                routeCapabilities: ["fips", "pollen"]
+            }).map(attempt => [attempt.route, attempt.state, attempt.reason])
         }));
 
         assert(state.target === "spa", `Expected SPA runtime, got ${state.target}`);
@@ -161,6 +184,26 @@ async function runRuntimeCapabilityProof(browser, port, relayUrls) {
         assert(state.fipsHidden === true, "FIPS discovery control must be hidden");
         assert(state.pollenHidden === true, "Pollen transfer control must be hidden");
         assert(state.serverSettings === false, "Server settings must be unsupported");
+        assert(state.routeOptionIds.includes("webrtc"), "SPA route options must keep Nostr WebRTC selectable");
+        assert(!state.routeOptionIds.includes("fips"), "SPA route options must not offer FIPS as selectable");
+        assert(!state.routeOptionIds.includes("pollen-mesh"), "SPA route options must not offer Pollen mesh as selectable");
+        assert(!state.routeOptionIds.includes("pollen"), "SPA route options must not offer Pollen storage as selectable");
+        assert(
+            state.routeAttempts.some(([route, routeState, reason]) => (
+                route === "fips"
+                && routeState === "disabled"
+                && reason === "Requires instance or native app"
+            )),
+            `SPA route attempts did not mark FIPS unavailable: ${JSON.stringify(state.routeAttempts)}`
+        );
+        assert(
+            state.routeAttempts.some(([route, routeState, reason]) => (
+                route === "pollen"
+                && routeState === "disabled"
+                && reason === "Requires instance or native app"
+            )),
+            `SPA route attempts did not mark Pollen unavailable: ${JSON.stringify(state.routeAttempts)}`
+        );
         assert(pageErrors.length === 0, `SPA smoke page errors:\n${pageErrors.join("\n")}`);
     }
     finally {

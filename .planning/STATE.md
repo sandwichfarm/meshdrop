@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.4.0
-milestone_name: Route Attempts UX
-status: verification
-last_updated: "2026-07-07T13:52:13.608Z"
+milestone: v0.5.0
+milestone_name: SPA Route Honesty
+status: complete
+last_updated: "2026-07-07T14:37:15Z"
 last_activity: 2026-07-07
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 1
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 100
 ---
 
 # GSD State
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** make route selection legible in the UI by showing route candidates, attempt states, failure reasons, privacy labels, and proof-backed completion.
+**Current focus:** make backend-free SPA artifacts advertise and render only routes that the browser/static target can actually use.
 
 ## Milestone Audit: 2026-07-06
 
@@ -64,6 +64,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-spa-route-honesty` | complete | Backend-free SPA config/options fail closed for backend-only FIPS/Pollen/native claims; focused 64/64; `npm run test:spa-artifact`; `npm test` 330/330; diff/slop gates |
 | 2026-07-07 | `260707-i6u-add-external-uat-status-report-mode` | complete | External UAT status/final JSON reports added; focused 10/10; `npm test` 311/311; status/final blockers recorded; diff/changed-code slop gates |
 | 2026-07-07 | `260707-hq6-add-configurable-overlay-relay-ice-plumb` | complete | FIPS/Pollen relay ICE requires TURN/TURNS config and route selection uses route-specific relay-only RTC config; focused 82/82; `npm test` 306/306; e2e; diff/slop gates |
 | 2026-07-07 | `260707-h8o-add-fail-closed-overlay-relay-capability` | complete | FIPS/Pollen relay ICE defaults unavailable; Clearnet-off FIPS/Pollen WebRTC fails closed without relay ICE and relay-enabled routes use relay-only RTC config; focused 78/78; `npm test` 302/302; e2e; Docker smoke; diff/slop gates |
@@ -176,7 +177,7 @@ Closed during this audit branch:
 
 ## Current Position
 
-Phase: 8 Route Attempts UX
-Plan: 08-01 implemented locally
-Status: Local verification complete; PR/CI/merge pending
-Last activity: 2026-07-07 — Route-attempt UX implementation, focused tests, broad tests, e2e, and visual probe added
+Phase: 09-spa-route-honesty complete
+Plan: `.planning/phases/09-spa-route-honesty/09-01-PLAN.md`
+Status: Complete
+Last activity: 2026-07-07 — SPA route honesty implemented and verified
