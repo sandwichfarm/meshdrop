@@ -71,7 +71,8 @@ Use GSD plus this loop for every non-trivial change. GSD is the durable project 
      - Use `$gsd-new-milestone` plus phase flow for multi-step, cross-surface, risky, or user-facing work.
      - Use `$gsd-discuss-phase` / `$gsd-plan-phase` when requirements or verification shape are not obvious.
    - State concise plan before edits.
-   - Keep scope narrow.
+   - Keep scope coherent and reviewable.
+   - Prefer larger vertical slices over many tiny CI-triggering slices when the work is related and safe to batch.
    - Prefer deleting bad code over adding layers.
    - Reuse existing helpers and patterns.
    - Add no dependency unless user explicitly asks.
@@ -87,7 +88,8 @@ Use GSD plus this loop for every non-trivial change. GSD is the durable project 
 
 5. Verify
    - Run focused test for changed behavior.
-   - Run broad repo gate.
+   - Run the lightest local gate that proves the changed behavior.
+   - Reserve full CI-class verification for larger slices, release work, cross-surface runtime changes, or explicit user requests.
    - Run runtime/manual check when user-facing behavior depends on browser, network, Docker, filesystem, or service state.
    - Run AI-slop gate.
    - Record verification in the active GSD quick task, phase summary, or milestone artifact.
@@ -133,21 +135,35 @@ Root-cause standard:
 
 ## Testing Contract
 
-Default verification for this repo:
+CI budget rule:
+- Full CI is expensive. Do larger coherent slices before spending a full CI run.
+- Do not split related code/test/doc adjustments into many small PRs or pushes that each trigger the full matrix.
+- For narrow slices, prove the behavior locally with focused tests plus the smallest relevant broad gate, then state what full CI-class coverage was intentionally deferred.
+- Run or wait for full CI-class coverage before merging release, packaging, Docker, mobile, cross-browser, or broad runtime slices.
+
+Default local verification for narrow slices:
+
+```sh
+git diff --check
+npx --yes aislop scan --changes .
+```
+
+Add the smallest relevant proof for the touched behavior:
+
+```sh
+npm test
+npm run build:service-worker
+npm run test:e2e
+npm run test:docker
+```
+
+Full local verification for larger slices:
 
 ```sh
 npm test
 git diff --check
 npx --yes aislop scan --changes .
 npx --yes aislop scan .
-```
-
-Add focused checks based on change:
-
-```sh
-npm run build:service-worker
-npm run test:e2e
-npm run test:docker
 ```
 
 Use `npm run test:e2e` for browser/user-flow changes. Use `npm run test:docker` for Docker, compose, service boot, or published-port changes. Use `npm run build:service-worker` when `public/service-worker.js` or cache/version behavior changes.
@@ -166,10 +182,9 @@ Run AI-slop scan before final:
 
 ```sh
 npx --yes aislop scan --changes .
-npx --yes aislop scan .
 ```
 
-Changed-code gate must be clean before commit. Full-repo scan must also run before final.
+Changed-code gate must be clean before commit. Run the full-repo scan before final for larger slices, cleanup/refactor work, release work, or when the touched code intersects known baseline risk. For narrow slices, it is acceptable to defer full-repo scan and report `Not run: full-repo slop scan deferred for CI budget`.
 
 If full-repo scan fails on pre-existing baseline outside touched files:
 - Do not call slop gate green.
