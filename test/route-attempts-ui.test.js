@@ -200,6 +200,16 @@ test("availability badge styles animate pending routes and strike blocked routes
     assert.match(styles, /\.availability-pill-symbol/);
 });
 
+test("peer route visuals remove fallback status words from the visible DOM", () => {
+    const source = fs.readFileSync(new URL("../public/scripts/ui.js", import.meta.url), "utf8");
+
+    assert.match(source, /const hasRouteVisual = this\._renderRouteAttempts\(\);/);
+    assert.match(source, /statusNode\.innerText = hasRouteVisual \? "" : title;/);
+    assert.match(source, /statusNode\.setAttribute\('aria-hidden', 'true'\);/);
+    assert.match(source, /row\.setAttribute\('role', 'group'\);/);
+    assert.match(source, /row\.setAttribute\('aria-label', attempts/);
+});
+
 test("route choice options can expose route-attempt metadata for renderers", () => {
     const options = availability.optionsFor({
         id: "peer",
