@@ -1,35 +1,34 @@
-# Roadmap: MeshDrop v0.7.0 FIPS Stream Route Proof
+# Roadmap: MeshDrop v0.8.0 Generic Instance Relay
 
-## Phase 11: FIPS Stream Route Proof
+## Phase 12: Generic Instance Relay
 
-Goal: transfer encrypted payload bytes over a FIPS-backed HTTP stream through the sender's FIPS mesh address and emit route proof.
+Goal: extract the proven Pollen instance-relay descriptor/proof semantics into a reusable generic protocol without changing live Pollen behavior or claiming new network support.
 
 Current status: complete.
 
-Requirements: FIPS-STREAM-01, FIPS-STREAM-02, FIPS-STREAM-03, FIPS-STREAM-04, FIPS-STREAM-05.
+Requirements: INST-GEN-01, INST-GEN-02, INST-GEN-03, INST-GEN-04, INST-GEN-05.
 
 Success criteria:
 
-1. Focused tests fail first because no FIPS stream store/protocol/request path exists.
-2. Server endpoints reject unavailable FIPS status and accept/download token-bound ciphertext only while the descriptor is live.
-3. Browser FIPS stream descriptors and proof seeds validate against `MeshDropRouteContract`.
-4. Recipient download/decrypt/hash verification emits route proof with `routeType=fips`, `dataPlanePrimitive=fips-http-stream`, `webRtcUsed=false`, `hashMatched=true`, and `fallbackUsed=false`.
-5. Docker smoke proves two real FIPS daemons connect, recipient B fetches bytes from sender A's FIPS mesh IPv6 URL, and proof validates.
+1. Focused tests fail first because no generic `InstanceRelayTransferProtocol` exists.
+2. Generic instance-relay descriptors validate owner/session/expiry/primitive/capability constraints through `MeshDropRouteContract`.
+3. Generic instance-relay proof seeds and finalized proofs reject fallback, WebRTC byte-path claims, missing runtimes, byte/hash mismatch, and missing instance relay flags.
+4. Pollen instance-relay tests still pass with the existing public request shape while delegating descriptor/proof validation to the generic protocol.
+5. ADR 0006 records the generic relay boundary and explicitly forbids new transport support claims without byte-transfer proof.
 
 Verification:
 
-- Focused: FIPS stream server/protocol tests.
-- Runtime: `npm run test:fips-stream`.
-- Broad local: `npm test`.
+- Focused: generic instance-relay protocol tests plus existing Pollen instance-relay tests.
+- Runtime: `npm run test:e2e` if browser transfer code or script load order changes.
+- Broad local: `npm test` before PR if code changes touch shared route contract or transfer flow.
 - Hygiene: `git diff --check`.
 - AI-slop: `npx --yes aislop scan --changes .`.
 
 ## Future Milestone Queue
 
-These are not part of v0.5.0. Start a new GSD milestone for each slice after the previous PR is merged.
-
-1. Generic instance relay: extend the Pollen-specific relay shape to FIPS, Tor, I2P, Loki, and future backends.
-2. Additional networks: add Tor/I2P/Loki/TURN adapters through the same descriptor/scoring/proof model.
+1. FIPS instance relay: move encrypted chunks sender instance -> recipient instance over FIPS using the generic relay contract.
+2. Additional networks: add Tor/I2P/Loki adapters through the same descriptor/scoring/proof model.
+3. TURN overlay relay: add relay-only ICE proof only where the browser can actually dial the relay path.
 
 ---
-*Roadmap initialized: 2026-07-07 for milestone v0.7.0 FIPS Stream Route Proof.*
+*Roadmap updated: 2026-07-07 after completing milestone v0.8.0 Generic Instance Relay.*

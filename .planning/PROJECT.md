@@ -14,15 +14,15 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.7.0 FIPS Stream Route Proof
+## Current Milestone: v0.8.0 Generic Instance Relay
 
-**Goal:** add the first real FIPS byte-transfer path: encrypted payload bytes are staged locally, fetched by the recipient over the sender's FIPS mesh address, hash-verified, and reported through the route proof contract.
+**Goal:** turn the proven Pollen instance-relay path into a reusable instance-relay contract so FIPS, Tor, I2P, Loki, and future backend-mediated routes can share descriptor, proof, and fail-closed rules.
 
 **Target features:**
-- Add backend `/fips/upload` and `/fips/download/:id` endpoints that are usable only when the local FIPS daemon reports an available mesh IPv6 address.
-- Add a browser FIPS stream protocol that builds short-lived, owner/session-bound route descriptors with `fips-http-stream` as the data-plane primitive.
-- Let the existing transfer flow send private encrypted payloads through the FIPS stream route and emit route proof after recipient hash verification.
-- Prove the path with two Docker containers connected by real FIPS daemons, fetching bytes over the sender's FIPS mesh address.
+- Add a generic browser instance-relay protocol for owner/session-bound descriptors, proof seeds, request validation, and route proof finalization.
+- Move the existing Pollen instance-relay descriptor/proof code onto the generic contract without changing live Pollen transfer behavior.
+- Document the generic instance-relay boundary in ADR form before adding more backend routes.
+- Keep new network adapters out of this slice; no FIPS/Tor/I2P/Loki route may claim support until it has byte-transfer proof.
 
 ## Requirements
 
@@ -45,6 +45,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Turn instance federation from discovery/signaling bridges into an encrypted file relay path under the same adapter contract.
 - [x] Show route attempts, choices, unavailable states, and privacy labels in the UI using proof-backed route status instead of optimistic transport badges.
 - [x] Make backend-free SPA artifacts fail closed for backend-only FIPS/Pollen/native routes while keeping pure-client routes available.
+- [x] Generalize instance relay so Pollen, FIPS, Tor, I2P, Loki, and future backend networks share descriptor, validation, and proof behavior instead of duplicating route contracts.
 - [ ] Implement WebRTC overlay relay candidates for FIPS and Pollen, or explicitly ship a differently named non-WebRTC live-transfer fallback where browser ICE cannot be constrained. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
@@ -71,9 +72,9 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - Current discovery/signaling surfaces include local instance rooms, secret/public rooms, Nostr mesh presence and encrypted WebRTC signaling, FIPS/Pollen pairwise route rooms derived from Nostr identities, and server federation over FIPS/Pollen HTTP descriptors.
 - Current transfer paths include direct WebRTC data channel transfer, local WebSocket fallback, Blossom encrypted object transfer, Hashtree object transfer, and Pollen upload/download descriptor transfer through backend endpoints.
 - FIPS currently has status/config surfaces, a control client, browser capability gating, route descriptors, server-side peer discovery, and HTTP federation candidate handling. The missing part is first-class encrypted byte transfer over FIPS with proof.
-- Pollen currently appears as both a browser-facing transfer endpoint and a server/native `pln` substrate where available. It needs the same descriptor, send/receive, proof, and fallback shape as other route adapters.
-- The next FIPS slice uses the FIPS IPv6 adapter as the data plane: the sender's MeshDrop server exposes a short-lived download URL on its FIPS mesh address, while the recipient fetches ciphertext through FIPS and validates the decrypted payload hash.
-- Instance federation can track peers, expose snapshots, receive remote peer/signaling events, discover HTTP federation endpoints, and bridge Pollen services/FIPS-reachable base URLs. It still needs to become an encrypted file relay path instead of only a discovery bridge.
+- Pollen currently appears as both a browser-facing transfer endpoint and a server/native `pln` substrate where available. Its instance-relay proof is the baseline for the generic relay contract.
+- FIPS now has a first byte-transfer path through HTTP over the FIPS IPv6 adapter: the sender's MeshDrop server exposes a short-lived download URL on its FIPS mesh address, while the recipient fetches ciphertext through FIPS and validates the decrypted payload hash.
+- Instance federation can track peers, expose snapshots, receive remote peer/signaling events, discover HTTP federation endpoints, and bridge Pollen services/FIPS-reachable base URLs. Pollen instance relay and FIPS stream proof now provide concrete byte-transfer shapes that need shared descriptor/proof code before more networks are added.
 - Runtime capability negotiation is baseline, not optional. SPA can use browser-available routes; it cannot claim backend-only FIPS/Pollen unless the host/browser can reach those networks directly or the transfer uses a reachable instance/object-store path.
 - Docker shared instance is multi-user and needs server-side admin control through a configured npub. SPA, native, and mobile are single-user contexts and should not inherit shared-instance admin assumptions.
 - Existing `.planning/codebase/` maps architecture, stack, testing, and integrations.
@@ -107,6 +108,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | FIPS stream proof uses the IPv6 adapter first | The shipped FIPS daemon already exposes mesh reachability to ordinary HTTP clients through `fips0`; a native FSP API can come later without blocking real byte proof | ✓ Good |
 | Route attempts need user-facing explanations | Users need to understand why a route is selected, unavailable, failed, or complete without reading protocol internals | ✓ Good |
 | SPA artifacts must fail closed for backend-only routes | Static/browser-only targets can transfer only through browser-available primitives and must not inherit server/native claims | Active runtime-honesty requirement |
+| Generic instance relay comes before more networks | Pollen proved the first backend-mediated byte path; future FIPS/Tor/I2P/Loki routes need shared descriptor/proof semantics before more one-off adapters | ✓ Good |
 
 ---
-*Last updated: 2026-07-07 after verifying milestone v0.7.0 FIPS Stream Route Proof.*
+*Last updated: 2026-07-07 after completing milestone v0.8.0 Generic Instance Relay.*

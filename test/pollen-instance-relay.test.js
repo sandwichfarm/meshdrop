@@ -5,6 +5,7 @@ import vm from "node:vm";
 import {webcrypto} from "node:crypto";
 
 const routeContractSource = fs.readFileSync(new URL("../public/scripts/route-contract.js", import.meta.url), "utf8");
+const instanceRelaySource = fs.readFileSync(new URL("../public/scripts/instance-relay-transfer.js", import.meta.url), "utf8");
 const blossomSource = fs.readFileSync(new URL("../public/scripts/blossom-transfer.js", import.meta.url), "utf8");
 const pollenSource = fs.readFileSync(new URL("../public/scripts/pollen-transfer.js", import.meta.url), "utf8");
 const networkSource = fs.readFileSync(new URL("../public/scripts/network.js", import.meta.url), "utf8");
@@ -63,6 +64,7 @@ function createHarness({localPubkey = "a".repeat(64), peerPubkey = "b".repeat(64
     context.globalThis = context;
 
     vm.runInNewContext(routeContractSource, context);
+    vm.runInNewContext(instanceRelaySource, context);
     vm.runInNewContext(blossomSource, context);
     vm.runInNewContext(pollenSource, context);
 

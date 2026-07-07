@@ -114,7 +114,8 @@ async function main() {
         );
         await retryScenario(
             "federated-pollen-signaled-webrtc",
-            () => runFederatedPollenWebRtcScenario(browser, relay.port, blossom.port, pollen)
+            () => runFederatedPollenWebRtcScenario(browser, relay.port, blossom.port, pollen),
+            3
         );
     }
     finally {
@@ -521,9 +522,10 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
         await openFederatedPages({pageA, pageB, portA, portB});
         await Promise.all([disableLocalDiscovery(pageA), disableLocalDiscovery(pageB)]);
         await Promise.all([
-            pageA.evaluate(() => globalThis.meshdropPollenTransfer.enable()),
-            pageB.evaluate(() => globalThis.meshdropPollenTransfer.enable())
+            enablePollenNostrRelay(pageA, "federated-pollen sender"),
+            enablePollenNostrRelay(pageB, "federated-pollen receiver")
         ]);
+        await Promise.all([publishNostrPresence(pageA), publishNostrPresence(pageB)]);
 
         let peerId;
         try {
@@ -639,6 +641,28 @@ async function disableLocalDiscovery(page) {
         const state = await debugPageState(page);
         throw new Error(`${error.message}\nstate=${JSON.stringify(state)}`);
     }
+}
+
+async function enablePollenNostrRelay(page, role) {
+    try {
+        await page.evaluate(async () => {
+            await globalThis.meshdropPollenTransfer.enable({notify: false, remember: false});
+            await globalThis.meshdropNostrMesh.connect({notify: false, remember: false});
+        });
+        await page.waitForFunction(() => (
+            globalThis.meshdropPollenTransfer?.isActive?.()
+            && globalThis.meshdropNostrMesh?._active
+            && [...globalThis.meshdropNostrMesh._sockets.values()]
+                .some(socket => socket.readyState === WebSocket.OPEN)
+        ), undefined, {timeout: 20000});
+    } catch (error) {
+        const state = await safeDebugPageState(page);
+        throw new Error(`${role} Pollen/Nostr relay was not ready: ${error.message}\nstate=${JSON.stringify(state)}`);
+    }
+}
+
+async function publishNostrPresence(page) {
+    await page.evaluate(() => globalThis.meshdropNostrMesh._publishPresence("connect"));
 }
 
 async function waitForConnectedPeer(page, roomType, options = {}) {

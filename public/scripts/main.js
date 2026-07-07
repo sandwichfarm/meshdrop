@@ -18,6 +18,7 @@ class PairDrop {
             "scripts/nostr-android-signer.js",
             "scripts/nostr-identity.js",
             "scripts/route-contract.js",
+            "scripts/instance-relay-transfer.js",
             "scripts/local-discovery.js",
             "scripts/nostr-mesh.js",
             "scripts/nostr-mesh-autostart.js",
