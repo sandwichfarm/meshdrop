@@ -38,6 +38,19 @@ test("CI gates baseline browser and Docker runtime smokes by change scope", () =
     assert.match(ciWorkflow, /docker-smoke:\n(?:    .+\n)+    timeout-minutes: 35/);
 });
 
+test("CI strips flaky runner Microsoft apt feeds before Playwright dependency installs", () => {
+    const installSteps = [...ciWorkflow.matchAll(/run: \|\n((?: {8}.+\n)+)/g)]
+        .map((match) => match[1])
+        .filter((block) => block.includes("npx playwright install --with-deps"));
+
+    assert.equal(installSteps.length, 8);
+    for (const block of installSteps) {
+        assert.match(block, /sudo rm -f/);
+        assert.match(block, /\/etc\/apt\/sources\.list\.d\/azure-cli\.list/);
+        assert.match(block, /\/etc\/apt\/sources\.list\.d\/microsoft-prod\.list/);
+    }
+});
+
 test("CI runs desktop and mobile target artifact transfer smoke", () => {
     assert.match(ciWorkflow, /Install desktop native shell dependencies/);
     assert.match(ciWorkflow, /libgtk-4-dev libwebkitgtk-6\.0-dev/);
