@@ -626,6 +626,7 @@ test("PeersManager falls back from direct Nostr to FIPS then Pollen on RTC failu
     manager._onPeerRouteFailed({peerId: "peer-a", reason: "test-failure"});
 
     assert.equal(manager.peers["peer-a"]._roomIds.nostr, undefined);
+    assert.equal(fired.some(event => event.type === "nostr-route-request-needed"), false);
     assert.deepEqual(switches, [{
         isCaller: false,
         roomType: "fips",
@@ -648,6 +649,121 @@ test("PeersManager falls back from direct Nostr to FIPS then Pollen on RTC failu
             && event.detail.state === "selected"),
         true
     );
+});
+
+test("PeersManager requests private route details only after direct Nostr route failure", () => {
+    const {PeersManager, fired} = createHarness();
+    const manager = new PeersManager({send() {}});
+    const pubkey = "e".repeat(64);
+
+    manager.peers["peer-a"] = {
+        rtcSupported: true,
+        _intentionalDisconnect: false,
+        _isCaller: true,
+        routeCapabilities: ["fips", "pollen"],
+        nostrIdentity: {pubkey},
+        _roomIds: {nostr: "nostr-room"},
+        _transportsByRoomType: {},
+        _peerIdsByRoomType: {nostr: pubkey},
+        _isCallerByRoomType: {},
+        _getRoomTypes() {
+            return Object.keys(this._roomIds);
+        },
+        _removeRoomType(roomType) {
+            delete this._roomIds[roomType];
+            delete this._peerIdsByRoomType[roomType];
+        },
+        _routePeerId(roomType) {
+            return this._peerIdsByRoomType?.[roomType] || this._peerId;
+        }
+    };
+
+    manager._onPeerRouteFailed({peerId: "peer-a", reason: "route-timeout"});
+
+    assert.equal(manager.peers["peer-a"]._roomIds.nostr, undefined);
+    assert.equal(manager.peers["peer-a"]._pendingPrivateRouteRequests.fips, true);
+    assert.equal(fired.some(event => event.type === "peer-disconnected"), false);
+    assert.deepEqual(
+        fired
+            .filter(event => event.type === "nostr-route-request-needed")
+            .map(event => ({
+                peerId: event.detail.peerId,
+                recipientPubkey: event.detail.recipientPubkey,
+                routeType: event.detail.routeType,
+                failedRoute: event.detail.failedRoute
+            })),
+        [{
+            peerId: "peer-a",
+            recipientPubkey: pubkey,
+            routeType: "fips",
+            failedRoute: "nostr"
+        }]
+    );
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === "peer-a"
+            && event.detail.route === "fips"
+            && event.detail.state === "requested"),
+        true
+    );
+});
+
+test("PeersManager selects route candidate returned after encrypted descriptor exchange", () => {
+    const {PeersManager} = createHarness();
+    const manager = new PeersManager({send() {}});
+    const pubkey = "e".repeat(64);
+    const switches = [];
+    const fipsTransport = {send() {}};
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager.peers["peer-a"] = {
+        rtcSupported: true,
+        _intentionalDisconnect: false,
+        _isCaller: true,
+        routeCapabilities: ["fips"],
+        nostrIdentity: {pubkey},
+        _roomIds: {},
+        _transportsByRoomType: {},
+        _peerIdsByRoomType: {},
+        _pendingPrivateRouteRequests: {fips: true},
+        _isCallerByRoomType: {},
+        _isConnected: () => false,
+        _getRoomTypes() {
+            return Object.keys(this._roomIds);
+        },
+        _updateRoomIds(roomType, roomId, routePeerId) {
+            this._roomIds[roomType] = roomId;
+            this._peerIdsByRoomType[roomType] = routePeerId;
+        },
+        _evaluateAutoAccept() {},
+        _routePeerId(roomType) {
+            return this._peerIdsByRoomType?.[roomType] || "peer-a";
+        },
+        switchSignalingRoute(isCaller, roomType, roomId, transport, routePeerId) {
+            switches.push({isCaller, roomType, roomId, transport, routePeerId});
+        }
+    };
+
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "fips",
+        roomId: "fips-room",
+        transport: fipsTransport,
+        peer: {
+            id: "fips-peer",
+            rtcSupported: true,
+            nostrIdentity: {pubkey}
+        }
+    });
+
+    assert.deepEqual(switches, [{
+        isCaller: false,
+        roomType: "fips",
+        roomId: "fips-room",
+        transport: fipsTransport,
+        routePeerId: "fips-peer"
+    }]);
+    assert.equal(manager.peers["peer-a"]._pendingPrivateRouteRequests.fips, undefined);
 });
 
 test("disabled local discovery ignores late IP peer announcements", () => {

@@ -220,11 +220,12 @@ const NpubNetworkProtocol = {
         const rooms = [];
         const explicitRoom = this.normalizeRoom(typeof config === "string" ? config : config.room);
         const discoveryMode = typeof config === "object" ? config.discoveryMode : "";
+        const includePairwise = typeof config !== "object" || config.pairwise !== false;
         if (discoveryMode === "public" && explicitRoom) rooms.push(explicitRoom);
 
         const localPubkey = this.normalizePubkey(identity?.pubkey);
         const trusted = this.trustedPubkeys(identity);
-        if (localPubkey && trusted.length) {
+        if (includePairwise && localPubkey && trusted.length) {
             rooms.push(...await Promise.all(trusted.map(pubkey => this.pairwiseRoom(localPubkey, pubkey))));
         }
 

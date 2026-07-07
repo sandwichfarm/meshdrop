@@ -117,7 +117,7 @@ class FipsDiscoveryController {
         }
 
         if (remember) this._setPreferredActive(true);
-        Events.fire("join-fips-room", {rooms: await this._runtimeRooms()});
+        Events.fire("join-fips-room", {rooms: await this._runtimeRooms({pairwise: false})});
     }
 
     disable(notify = true, remember = notify) {
@@ -200,14 +200,46 @@ class FipsDiscoveryController {
         await this.enable({notify: false, remember: false});
     }
 
-    async _runtimeRooms() {
+    async routeDescriptorFor(peerPubkey) {
+        if (!this._active || !this._available) return null;
+
+        const identityController = globalThis.meshdropNostrIdentity;
+        const identity = identityController?.getIdentity?.();
+        if (!identity?.pubkey || !globalThis.NpubNetworkProtocol?.pairwiseRoom) return null;
+
+        const pairwiseRoom = await globalThis.NpubNetworkProtocol.pairwiseRoom(identity.pubkey, peerPubkey);
+        const rooms = [pairwiseRoom].filter(Boolean);
+        const explicitRoom = this._config?.fips?.discoveryMode === "public"
+            ? FipsDiscoveryProtocol.roomFromConfig(this._config)
+            : "";
+        if (explicitRoom) rooms.push(explicitRoom);
+
+        return {
+            routeType: "fips",
+            rooms: [...new Set(rooms)]
+        };
+    }
+
+    joinRouteDescriptor(descriptor = {}) {
+        if (!this._active || !this._available) return false;
+        const rooms = [...new Set((descriptor.rooms || [])
+            .map(room => globalThis.NpubNetworkProtocol?.normalizeRoom?.(room) || "")
+            .filter(Boolean))];
+        if (!rooms.length) return false;
+
+        Events.fire("join-fips-room", {rooms});
+        return true;
+    }
+
+    async _runtimeRooms(options = {}) {
         const identityController = globalThis.meshdropNostrIdentity;
         const identity = await identityController?.ensureFollowListLoaded?.()
             || identityController?.getIdentity?.();
         return globalThis.NpubNetworkProtocol?.roomsForIdentity
             ? globalThis.NpubNetworkProtocol.roomsForIdentity(identity, {
                 room: FipsDiscoveryProtocol.roomFromConfig(this._config),
-                discoveryMode: this._config?.fips?.discoveryMode
+                discoveryMode: this._config?.fips?.discoveryMode,
+                pairwise: options.pairwise !== false
             })
             : [];
     }

@@ -3,7 +3,14 @@
 const NostrMeshProtocol = {
     kind: 25050,
     presenceHeartbeatMs: 25000,
+    presenceTtlSeconds: 90,
+    routeDescriptorTtlSeconds: 60,
     storageKey: "meshdrop_nostr_mesh_enabled",
+    routeTypes: ["fips", "pollen"],
+    routeCapabilityTagsByType: {
+        fips: "fips-route",
+        pollen: "pollen-route"
+    },
 
     readEnabled(storage = globalThis.localStorage) {
         return storage?.getItem?.(this.storageKey) === "true";
@@ -89,7 +96,7 @@ const NostrMeshProtocol = {
         return (event.tags || []).some(tag => tag[0] === tagName && tag[1] === value);
     },
 
-    presenceCapabilityTags() {
+    meshTags() {
         return [
             ["client", "meshdrop"],
             ["protocol", "nip100-webrtc"],
@@ -98,10 +105,49 @@ const NostrMeshProtocol = {
         ];
     },
 
+    presenceCapabilityTags(routeCapabilities = [], sessionPeerId = "", expiresAt = 0) {
+        const tags = [...this.meshTags()];
+        const normalizedRouteTypes = [...new Set(routeCapabilities
+            .map(routeType => this.normalizeRouteType(routeType))
+            .filter(Boolean))];
+        for (const routeType of normalizedRouteTypes) {
+            tags.push(["capability", this.routeCapabilityTagsByType[routeType]]);
+        }
+        if (sessionPeerId) tags.push(["peer", sessionPeerId]);
+        if (expiresAt) tags.push(["expiration", String(expiresAt)]);
+        return tags;
+    },
+
     advertisesMeshDropWebRtc(event) {
         return this.hasTag(event, "client", "meshdrop")
             && this.hasTag(event, "capability", "meshdrop")
             && this.hasTag(event, "capability", "webrtc");
+    },
+
+    normalizeRouteType(routeType) {
+        return this.routeTypes.includes(routeType) ? routeType : "";
+    },
+
+    routeCapabilities(event) {
+        return this.routeTypes.filter(routeType => this.hasTag(
+            event,
+            "capability",
+            this.routeCapabilityTagsByType[routeType]
+        ));
+    },
+
+    eventExpired(event, nowSeconds = Math.floor(Date.now() / 1000)) {
+        const expiresAt = Number(this.tagValue(event, "expiration") || 0);
+        return Number.isFinite(expiresAt) && expiresAt > 0 && expiresAt < nowSeconds;
+    },
+
+    expiry(seconds = this.routeDescriptorTtlSeconds, nowSeconds = Math.floor(Date.now() / 1000)) {
+        return nowSeconds + seconds;
+    },
+
+    sessionPeerId() {
+        if (globalThis.crypto?.randomUUID) return `meshdrop-${globalThis.crypto.randomUUID()}`;
+        return `meshdrop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     },
 
     peerFromEvent(event, profile = null) {
@@ -110,6 +156,8 @@ const NostrMeshProtocol = {
         return {
             id: event.pubkey,
             rtcSupported: true,
+            sessionPeerId: this.tagValue(event, "peer"),
+            routeCapabilities: this.routeCapabilities(event),
             nostrIdentity: {
                 type: "nostr",
                 pubkey: event.pubkey,
@@ -158,6 +206,8 @@ class NostrMeshConnection {
         this._preferredActive = NostrMeshProtocol.readEnabled();
         this._connecting = false;
         this._configLoaded = false;
+        this._sessionPeerId = NostrMeshProtocol.sessionPeerId();
+        this._pendingRouteRequests = new Map();
 
         if (this.$button) {
             this.$button.addEventListener("click", _ => this.toggle());
@@ -175,6 +225,11 @@ class NostrMeshConnection {
         Events.on("nostr-signer-available-changed", _ => {
             this._render();
             this._restorePreferredActive();
+        });
+        Events.on("nostr-route-request-needed", e => {
+            this._requestPrivateRoute(e.detail).catch(error => {
+                this._trace("encrypted route request rejected", `reason=${error.message || "publish-failed"}`);
+            });
         });
         Events.on("relay-settings-changed", _ => this._onRelaySettingsChanged());
         Events.on("pagehide", _ => this.disconnect(false));
@@ -369,10 +424,11 @@ class NostrMeshConnection {
     }
 
     async _publishPresence(type, socket = null) {
+        const routeCapabilities = this._routeCapabilities();
+        const expiresAt = NostrMeshProtocol.expiry(NostrMeshProtocol.presenceTtlSeconds);
         const tags = [
             ["type", type],
-            ...NostrMeshProtocol.presenceCapabilityTags(),
-            ["name", this._identity.displayName || `npub ${this._identity.pubkey.slice(0, 8)}`]
+            ...NostrMeshProtocol.presenceCapabilityTags(routeCapabilities, this._sessionPeerId, expiresAt)
         ];
         if (this._room) tags.splice(1, 0, ["r", this._room]);
 
@@ -383,6 +439,13 @@ class NostrMeshConnection {
             content: ""
         });
 
+        this._trace(
+            "minimal presence published",
+            `type=${type}`,
+            `peer=${this._sessionPeerId}`,
+            `routes=${routeCapabilities.join(",") || "none"}`,
+            `expires=${expiresAt}`
+        );
         this._publishEvent(event, socket);
     }
 
@@ -394,9 +457,8 @@ class NostrMeshConnection {
                 created_at: Math.floor(Date.now() / 1000),
                 tags: [
                     ["type", type],
-                    ...NostrMeshProtocol.presenceCapabilityTags(),
-                    ["p", recipient],
-                    ["name", this._identity.displayName || `npub ${this._identity.pubkey.slice(0, 8)}`]
+                    ...NostrMeshProtocol.meshTags(),
+                    ["p", recipient]
                 ].concat(this._room ? [["r", this._room]] : []),
                 content: encryptedContent
             });
@@ -405,6 +467,22 @@ class NostrMeshConnection {
         } catch (error) {
             console.error("Nostr mesh signal publish failed", error);
         }
+    }
+
+    async _publishEncryptedRouteEvent(type, recipient, content) {
+        const encryptedContent = await this._identityController.encryptNip44To(recipient, JSON.stringify(content));
+        const event = await this._signEvent({
+            kind: NostrMeshProtocol.kind,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [
+                ["type", type],
+                ...NostrMeshProtocol.meshTags(),
+                ["p", recipient]
+            ].concat(this._room ? [["r", this._room]] : []),
+            content: encryptedContent
+        });
+
+        this._publishEvent(event);
     }
 
     async _signEvent(event) {
@@ -471,6 +549,12 @@ class NostrMeshConnection {
         else if (type === "offer" || type === "answer" || type === "candidate") {
             this._onSignalEvent(event, type);
         }
+        else if (type === "route-request") {
+            this._onRouteRequestEvent(event);
+        }
+        else if (type === "route-response") {
+            this._onRouteResponseEvent(event);
+        }
     }
 
     _onRelayPublishResult(relayMessage) {
@@ -503,14 +587,23 @@ class NostrMeshConnection {
         if (!trusted && !publicRoomMode) return {accepted: false, reason: "untrusted-author"};
 
         if (type === "connect" || type === "disconnect") {
+            if (NostrMeshProtocol.eventExpired(event)) {
+                return {accepted: false, reason: "expired-presence"};
+            }
             if (!NostrMeshProtocol.advertisesMeshDropWebRtc(event)) {
                 return {accepted: false, reason: "missing-meshdrop-webrtc-capability"};
             }
             return {accepted: true, reason: trusted ? "trusted-presence" : "explicit-room-presence"};
         }
 
+        if (!["offer", "answer", "candidate", "route-request", "route-response"].includes(type)) {
+            return {accepted: false, reason: "unsupported-type"};
+        }
         if (!NostrMeshProtocol.isAddressedTo(event, this._identity?.pubkey)) {
             return {accepted: false, reason: "not-addressed"};
+        }
+        if ((type === "route-request" || type === "route-response") && !event.content) {
+            return {accepted: false, reason: "missing-encrypted-route-body"};
         }
         return {accepted: true, reason: trusted ? "trusted-signal" : "explicit-room-signal"};
     }
@@ -567,6 +660,215 @@ class NostrMeshConnection {
         } catch (error) {
             console.error("Nostr mesh signal handling failed", error);
         }
+    }
+
+    async _requestPrivateRoute(detail = {}) {
+        if (!this._active) return false;
+        const recipient = detail.recipientPubkey || detail.peerPubkey || detail.peerId;
+        const routeType = NostrMeshProtocol.normalizeRouteType(detail.routeType);
+        if (!NostrDiscoveryProtocol.pubkeyRegex.test(recipient || "")) {
+            throw new Error("invalid-recipient");
+        }
+        if (!routeType) throw new Error("invalid-route-type");
+        if (!this._identityController?.canNip44?.()) throw new Error("nip44-unavailable");
+
+        const nonce = this._createRouteNonce();
+        const expiresAt = NostrMeshProtocol.expiry();
+        const pending = {
+            nonce,
+            routeType,
+            sessionId: this._sessionPeerId,
+            peerId: detail.peerId || recipient,
+            recipient,
+            expiresAt
+        };
+        const requestKey = this._routeRequestKey(recipient, routeType);
+        this._pendingRouteRequests.set(requestKey, pending);
+        try {
+            await this._publishEncryptedRouteEvent("route-request", recipient, {
+                version: 1,
+                type: "route-request",
+                routeType,
+                nonce,
+                sessionId: pending.sessionId,
+                requesterPubkey: this._identity.pubkey,
+                recipientPubkey: recipient,
+                expiresAt
+            });
+        } catch (error) {
+            this._pendingRouteRequests.delete(requestKey);
+            throw error;
+        }
+        this._trace(
+            "encrypted route request sent",
+            `route=${routeType}`,
+            `peer=${recipient.slice(0, 8)}`,
+            `expires=${expiresAt}`
+        );
+        return true;
+    }
+
+    async _onRouteRequestEvent(event) {
+        let content;
+        try {
+            content = await this._decryptRouteEvent(event);
+        } catch (error) {
+            this._trace("encrypted route request rejected", `peer=${event.pubkey?.slice(0, 8) || "unknown"}`, `reason=${error.message || "decrypt-failed"}`);
+            return;
+        }
+
+        const decision = this._routeRequestDecision(event, content);
+        if (!decision.accepted) {
+            this._trace("encrypted route request rejected", `peer=${event.pubkey.slice(0, 8)}`, `reason=${decision.reason}`);
+            return;
+        }
+
+        const descriptor = await this._localRouteDescriptor(content.routeType, event.pubkey);
+        if (!descriptor) {
+            this._trace("encrypted route request rejected", `peer=${event.pubkey.slice(0, 8)}`, `route=${content.routeType}`, "reason=route-unavailable");
+            return;
+        }
+
+        const expiresAt = NostrMeshProtocol.expiry();
+        const responseDescriptor = {
+            ...descriptor,
+            expiresAt
+        };
+        if (!this._joinPrivateRoute(content.routeType, responseDescriptor)) {
+            this._trace("encrypted route request rejected", `peer=${event.pubkey.slice(0, 8)}`, `route=${content.routeType}`, "reason=local-route-inactive");
+            return;
+        }
+        await this._publishEncryptedRouteEvent("route-response", event.pubkey, {
+            version: 1,
+            type: "route-response",
+            routeType: content.routeType,
+            nonce: content.nonce,
+            sessionId: content.sessionId,
+            responderPubkey: this._identity.pubkey,
+            recipientPubkey: event.pubkey,
+            expiresAt,
+            descriptor: responseDescriptor
+        });
+        this._trace("encrypted route response sent", `peer=${event.pubkey.slice(0, 8)}`, `route=${content.routeType}`, `expires=${expiresAt}`);
+    }
+
+    async _onRouteResponseEvent(event) {
+        let content;
+        try {
+            content = await this._decryptRouteEvent(event);
+        } catch (error) {
+            this._trace("encrypted route response rejected", `peer=${event.pubkey?.slice(0, 8) || "unknown"}`, `reason=${error.message || "decrypt-failed"}`);
+            return;
+        }
+
+        const decision = this._routeResponseDecision(event, content);
+        if (!decision.accepted) {
+            this._trace("encrypted route response rejected", `peer=${event.pubkey.slice(0, 8)}`, `reason=${decision.reason}`);
+            return;
+        }
+
+        if (!this._joinPrivateRoute(content.routeType, decision.descriptor)) {
+            this._trace("encrypted route response rejected", `peer=${event.pubkey.slice(0, 8)}`, `route=${content.routeType}`, "reason=local-route-inactive");
+            return;
+        }
+        this._pendingRouteRequests.delete(this._routeRequestKey(event.pubkey, content.routeType));
+        this._trace("encrypted route response accepted", `peer=${event.pubkey.slice(0, 8)}`, `route=${content.routeType}`);
+    }
+
+    async _decryptRouteEvent(event) {
+        if (!this._identityController?.canNip44?.()) throw new Error("nip44-unavailable");
+        const plaintext = await this._identityController.decryptNip44From(event.pubkey, event.content);
+        return JSON.parse(plaintext);
+    }
+
+    _routeRequestDecision(event, content = {}) {
+        const routeType = NostrMeshProtocol.normalizeRouteType(content.routeType);
+        if (content.type && content.type !== "route-request") return {accepted: false, reason: "wrong-body-type"};
+        if (!routeType) return {accepted: false, reason: "invalid-route-type"};
+        if (!content.nonce || typeof content.nonce !== "string") return {accepted: false, reason: "missing-nonce"};
+        if (!content.sessionId || typeof content.sessionId !== "string") return {accepted: false, reason: "missing-session"};
+        if (content.requesterPubkey && content.requesterPubkey !== event.pubkey) {
+            return {accepted: false, reason: "requester-mismatch"};
+        }
+        if (content.recipientPubkey !== this._identity?.pubkey) return {accepted: false, reason: "recipient-mismatch"};
+        if (this._isExpired(content.expiresAt)) return {accepted: false, reason: "expired-descriptor"};
+        return {accepted: true, reason: "route-request"};
+    }
+
+    _routeResponseDecision(event, content = {}) {
+        const routeType = NostrMeshProtocol.normalizeRouteType(content.routeType);
+        if (content.type && content.type !== "route-response") return {accepted: false, reason: "wrong-body-type"};
+        if (!routeType) return {accepted: false, reason: "invalid-route-type"};
+        const pending = this._pendingRouteRequests.get(this._routeRequestKey(event.pubkey, routeType));
+        if (!pending) return {accepted: false, reason: "unsolicited-response"};
+        if (content.nonce !== pending.nonce) return {accepted: false, reason: "nonce-mismatch"};
+        if (content.sessionId !== pending.sessionId) return {accepted: false, reason: "session-mismatch"};
+        if (content.responderPubkey && content.responderPubkey !== event.pubkey) {
+            return {accepted: false, reason: "responder-mismatch"};
+        }
+        if (content.recipientPubkey !== this._identity?.pubkey) return {accepted: false, reason: "recipient-mismatch"};
+        if (this._isExpired(content.expiresAt)) return {accepted: false, reason: "expired-descriptor"};
+        const descriptor = this._normalizeRouteDescriptor(routeType, content.descriptor);
+        if (!descriptor) return {accepted: false, reason: "invalid-descriptor"};
+        if (this._isExpired(descriptor.expiresAt)) return {accepted: false, reason: "expired-descriptor"};
+        return {accepted: true, reason: "route-response", descriptor};
+    }
+
+    _normalizeRouteDescriptor(routeType, descriptor = {}) {
+        if (!descriptor || typeof descriptor !== "object") return null;
+        if (descriptor.routeType && descriptor.routeType !== routeType) return null;
+        const rooms = [...new Set((descriptor.rooms || [])
+            .map(room => globalThis.NpubNetworkProtocol?.normalizeRoom?.(room) || "")
+            .filter(Boolean))];
+        if (!rooms.length) return null;
+        return {
+            routeType,
+            rooms,
+            expiresAt: Number(descriptor.expiresAt || 0)
+        };
+    }
+
+    _isExpired(expiresAt, nowSeconds = Math.floor(Date.now() / 1000)) {
+        const normalized = Number(expiresAt || 0);
+        return !Number.isFinite(normalized) || normalized <= nowSeconds;
+    }
+
+    async _localRouteDescriptor(routeType, peerPubkey) {
+        const controller = this._routeController(routeType);
+        if (!controller?.routeDescriptorFor) return null;
+
+        const descriptor = await controller.routeDescriptorFor(peerPubkey);
+        return this._normalizeRouteDescriptor(routeType, {
+            ...descriptor,
+            expiresAt: NostrMeshProtocol.expiry()
+        });
+    }
+
+    _joinPrivateRoute(routeType, descriptor) {
+        const controller = this._routeController(routeType);
+        return controller?.joinRouteDescriptor?.(descriptor) === true;
+    }
+
+    _routeController(routeType) {
+        if (routeType === "fips") return globalThis.meshdropFipsDiscovery;
+        if (routeType === "pollen") return globalThis.meshdropPollenTransfer;
+        return null;
+    }
+
+    _routeCapabilities() {
+        const capabilities = [];
+        if (globalThis.meshdropFipsDiscovery?.isActive?.()) capabilities.push("fips");
+        if (globalThis.meshdropPollenTransfer?.isActive?.()) capabilities.push("pollen");
+        return capabilities;
+    }
+
+    _routeRequestKey(pubkey, routeType) {
+        return `${pubkey}:${routeType}`;
+    }
+
+    _createRouteNonce() {
+        if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+        return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     }
 
     async _hydratePeerProfile(pubkey) {
