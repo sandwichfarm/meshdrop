@@ -308,3 +308,32 @@ test("validates route proof fields for claimed byte transport", () => {
         {ok: false, reason: "fallback-used"}
     );
 });
+
+test("validates relay WebRTC proof only when selected ICE candidate is relay", () => {
+    const proof = {
+        senderRuntime: "browser-a",
+        recipientRuntime: "browser-b",
+        routeType: "turn-relay",
+        dataPlanePrimitive: "webrtc-relay-ice",
+        webRtcUsed: true,
+        instanceRelayed: false,
+        bytesSent: 4096,
+        bytesReceived: 4096,
+        hashMatched: true,
+        fallbackUsed: false,
+        selectedIceCandidateType: "relay"
+    };
+
+    assert.deepEqual(contract.validateRouteProof(proof), {
+        ok: true,
+        proof
+    });
+    assert.deepEqual(
+        contract.validateRouteProof({...proof, selectedIceCandidateType: "host"}),
+        {ok: false, reason: "non-relay-ice-candidate"}
+    );
+    assert.deepEqual(
+        contract.validateRouteProof({...proof, selectedIceCandidateType: ""}),
+        {ok: false, reason: "missing-proof-field:selectedIceCandidateType"}
+    );
+});

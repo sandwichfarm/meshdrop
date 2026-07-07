@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.10.0
-milestone_name: Overlay Network Adapters
+milestone: v0.11.0
+milestone_name: TURN Relay Proof
 status: complete
-last_updated: "2026-07-07T17:43:53.000Z"
+last_updated: "2026-07-07T18:24:24Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** Tor/I2P/Loki adapter capability surfaces are complete; next route gap is real byte-transfer proof with local daemon/proxy dial evidence.
+**Current focus:** TURN relay-only WebRTC proof is the next buildable route gap; Tor/I2P/Loki byte-transfer proof is blocked on absent local daemon/proxy dial surfaces and a disabled GitHub issue tracker.
 
 ## Milestone Audit: 2026-07-06
 
@@ -64,6 +64,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-turn-relay-proof` | complete | Route proof contract requires `selectedIceCandidateType=relay` for `webrtc-relay-ice`; local coturn-backed TURN smoke transfers browser bytes with `iceTransportPolicy=relay`, selected relay/relay candidate pairs, 66/66 bytes, hash matched, fallback disabled; focused 58/58; `npm test` 355/355; `npm run test:turn-relay`; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-overlay-network-adapters` | complete | Tor/I2P/Loki runtime capability entries and shared overlay adapter catalog added; configured stream metadata exposed through `/config`; SPA/source targets fail closed for overlay claims; route descriptors/scoring reuse generic contract; focused 33/33; `npm test` 354/354; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-fips-instance-relay` | complete | FIPS `fipsInstanceRelay` descriptor/proof added while keeping legacy `fipsStream`; focused 17/17; FIPS two-instance runtime smoke reports `instanceRelay=true`, 43/43 bytes, hash matched, fips0 deltas; `npm test` 345/345; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-generic-instance-relay` | complete | Generic `InstanceRelayTransferProtocol`; Pollen delegates descriptor/proof semantics without public shape change; focused 15/15; `npm test` 344/344; `npm run test:e2e`; `npm run test:docker`; diff/slop gates |
@@ -182,7 +183,8 @@ None.
 
 ## Current Position
 
-Phase: 14 Overlay Network Adapters
-Plan: `.planning/phases/14-overlay-network-adapters/14-01-PLAN.md`
+Phase: 15 TURN Relay Proof
+Plan: `.planning/phases/15-turn-relay-proof/15-01-PLAN.md`
+Summary: `.planning/phases/15-turn-relay-proof/15-01-SUMMARY.md`
 Status: Complete
-Last activity: 2026-07-07 — Phase 14 Overlay Network Adapters completed
+Last activity: 2026-07-07 — TURN relay-only WebRTC byte proof complete; Tor/I2P/Loki byte proof remains blocked by missing local daemon/proxy surfaces and disabled GitHub issues.

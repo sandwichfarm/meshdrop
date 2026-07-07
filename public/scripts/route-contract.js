@@ -188,6 +188,10 @@ const validateRouteProof = proof => {
     if (proof.bytesSent !== proof.bytesReceived) return failure("byte-count-mismatch");
     if (proof.hashMatched !== true) return failure("hash-mismatch");
     if (proof.fallbackUsed === true) return failure("fallback-used");
+    if (proof.dataPlanePrimitive === "webrtc-relay-ice") {
+        if (!isNonEmptyString(proof.selectedIceCandidateType)) return failure("missing-proof-field:selectedIceCandidateType");
+        if (proof.selectedIceCandidateType !== "relay") return failure("non-relay-ice-candidate");
+    }
 
     return {
         ok: true,

@@ -14,6 +14,8 @@ const dockerTwoHostRelay = fs.readFileSync(
     new URL("../scripts/docker-two-host-relay-smoke.mjs", import.meta.url),
     "utf8"
 );
+const turnRelaySmokePath = new URL("../scripts/turn-relay-smoke.mjs", import.meta.url);
+const turnRelaySmokeBrowserPath = new URL("../scripts/turn-relay-smoke-browser.mjs", import.meta.url);
 const e2eSmoke = fs.readFileSync(new URL("../scripts/e2e-smoke.mjs", import.meta.url), "utf8");
 const ciWorkflow = fs.readFileSync(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 const packageJson = fs.readFileSync(new URL("../package.json", import.meta.url), "utf8");
@@ -56,6 +58,16 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(packageJson, /"test:docker:two-host": "node scripts\/docker-two-host-relay-smoke\.mjs"/);
     assert.match(e2eSmoke, /retryScenario\(\s*"generic-fips-route-candidate"/);
     assert.match(e2eSmoke, /generic FIPS peers created MeshDrop browser peers/);
+    assert.match(packageJson, /"test:turn-relay": "node scripts\/turn-relay-smoke\.mjs"/);
+    assert.equal(fs.existsSync(turnRelaySmokePath), true);
+    assert.equal(fs.existsSync(turnRelaySmokeBrowserPath), true);
+    const turnRelaySmoke = [
+        fs.readFileSync(turnRelaySmokePath, "utf8"),
+        fs.readFileSync(turnRelaySmokeBrowserPath, "utf8")
+    ].join("\n");
+    assert.match(turnRelaySmoke, /Proof turn-relay-webrtc/);
+    assert.match(turnRelaySmoke, /selectedIceCandidateType/);
+    assert.match(turnRelaySmoke, /iceTransportPolicy.*relay/s);
     assert.match(ciWorkflow, /Install Chromium[\s\S]*npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /docker_public_relay_urls:/);
     assert.match(ciWorkflow, /docker-public-relay-uat:/);
