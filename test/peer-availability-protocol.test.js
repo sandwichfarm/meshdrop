@@ -216,10 +216,57 @@ test("Nostr identity keys normalize pubkey case before grouping peers", () => {
 
 test("route status text names the active network and phase", () => {
     assert.equal(routeStatus.text({route: "nostr", state: "connecting"}), "Connecting on Clearnet...");
+    assert.equal(routeStatus.text({route: "fips", state: "requested"}), "Trying FIPS...");
     assert.equal(routeStatus.text({route: "fips", state: "ice-checking"}), "Checking FIPS ICE...");
     assert.equal(routeStatus.text({route: "pollen", state: "timeout"}), "Pollen timed out");
     assert.equal(routeStatus.text({route: "ip", state: "failed"}), "Clearnet failed");
     assert.equal(routeStatus.text({route: "nostr", state: "connected"}), "Connected on Clearnet");
     assert.equal(routeStatus.text({route: "nostr", state: "disabled"}), "Clearnet disabled");
     assert.equal(routeStatus.statusKey({route: "fips", state: "ice-checking"}), "route-fips-ice-checking");
+});
+
+test("pending private route status shows FIPS or Pollen instead of Clearnet", () => {
+    assert.deepEqual(
+        protocol.availability({
+            _roomIds: {},
+            routeStatus: {route: "fips", state: "requested"}
+        }).map(option => [option.id, option.shortLabel]),
+        [["fips", "FIPS"]]
+    );
+
+    assert.deepEqual(
+        protocol.availability({
+            _roomIds: {},
+            routeStatus: {route: "nostr", state: "disabled"}
+        }).map(option => [option.id, option.shortLabel]),
+        []
+    );
+});
+
+test("PeersUI maps disabled Nostr discovery with private capability to pending FIPS route", () => {
+    const originalPolicy = globalThis.ClearnetRoutePolicy;
+    const ui = Object.create(globalThis.PeersUI.prototype);
+    globalThis.ClearnetRoutePolicy = {
+        allows: roomType => roomType !== "nostr"
+    };
+
+    try {
+        assert.equal(ui._routeAllowed("nostr"), false);
+        assert.deepEqual(ui._pendingPrivateRouteStatus({
+            id: "peer-pubkey",
+            routeCapabilities: ["fips", "pollen"],
+            nostrIdentity: {pubkey: "peer-pubkey"}
+        }), {
+            peerId: "peer-pubkey",
+            route: "fips",
+            roomType: "fips",
+            routePeerId: "peer-pubkey",
+            state: "requested",
+            reason: "clearnet-disabled",
+            routes: []
+        });
+    }
+    finally {
+        globalThis.ClearnetRoutePolicy = originalPolicy;
+    }
 });
