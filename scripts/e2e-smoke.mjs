@@ -104,7 +104,7 @@ async function main() {
             () => runGenericFipsRouteCandidateScenario(browser, relay.port, blossom.port, pollen)
         );
         await retryScenario(
-            "federated-pollen-public-webrtc",
+            "federated-pollen-signaled-webrtc",
             () => runFederatedPollenWebRtcScenario(browser, relay.port, blossom.port, pollen)
         );
     }
