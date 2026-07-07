@@ -11,6 +11,7 @@ Status: complete
 - Peer-advertised FIPS/Pollen routes can still render as unavailable route attempts with "Requires instance or native app".
 - `PeersManager` refuses runtime-unsupported backend-only route candidates before RTC peer creation or route switching.
 - SPA artifact smoke now proves backend-free Nostr WebRTC transfer and checks backend-only route options stay unavailable.
+- Browser transfer smoke keeps the default 20s route wait but gives federated Pollen discovery 60s because CI can need extra federation poll cycles before remote snapshots contain peers.
 - ADR 0004 records the static/browser route boundary.
 
 ## Requirements
@@ -27,6 +28,7 @@ Status: complete
 
 - `node --test test/spa-runtime-config.test.js test/spa-artifact.test.js test/peer-availability-protocol.test.js test/rtc-peer-signaling.test.js test/route-attempts-ui.test.js` -> 64/64 passed
 - `npm run test:spa-artifact` -> passed; `Proof backend-free-spa-nostr-webrtc:chromium: nostr delivered meshdrop-spa-proof.txt`
+- `npm run test:e2e` -> passed; includes local, Blossom, Hashtree, Pollen storage, Nostr WebRTC, FIPS-candidate, federated Pollen WebRTC, and Pollen instance-relay proofs
 - `npm test` -> 330/330 passed
 - `git diff --check` -> passed
 - `npx --yes aislop scan --changes .` -> exit 0; AI Slop/security/lint 0 issues; code-quality warnings remain for pre-existing large files and duplicate blocks in touched large modules

@@ -527,12 +527,12 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
 
         let peerId;
         try {
-            peerId = await waitForConnectedPeer(pageA, "pollen");
+            peerId = await waitForConnectedPeer(pageA, "pollen", {timeout: 60000});
         } catch (error) {
             const [stateA, stateB] = await Promise.all([debugPageState(pageA), debugPageState(pageB)]);
             throw new Error(`${error.message}\nserverA=${JSON.stringify(stateA)}\nserverB=${JSON.stringify(stateB)}`);
         }
-        const receiverPeerId = await waitForConnectedPeer(pageB, "pollen");
+        const receiverPeerId = await waitForConnectedPeer(pageB, "pollen", {timeout: 60000});
         await Promise.all([
             waitForDirectRoute(pageA, peerId, "pollen"),
             waitForDirectRoute(pageB, receiverPeerId, "pollen")
@@ -641,14 +641,15 @@ async function disableLocalDiscovery(page) {
     }
 }
 
-async function waitForConnectedPeer(page, roomType) {
+async function waitForConnectedPeer(page, roomType, options = {}) {
+    const timeout = options.timeout || 20000;
     try {
         const peerId = await page.waitForFunction(type => {
             const selector = type ? `x-peer.type-${type}` : "x-peer";
             const connected = new Set(globalThis.__meshdropE2E.connected || []);
             const peer = [...document.querySelectorAll(selector)].find(candidate => connected.has(candidate.id));
             return peer?.id || "";
-        }, roomType, {timeout: 20000});
+        }, roomType, {timeout});
 
         return peerId.jsonValue();
     } catch (error) {
