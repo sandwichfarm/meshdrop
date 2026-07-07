@@ -45,6 +45,62 @@ test("runtime capabilities describe backend transport support", () => {
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
 });
 
+test("runtime capabilities require TURN relay config before advertising overlay relay ICE", () => {
+    const bare = createRuntimeCapabilities({
+        runtime: {target: "standalone"},
+        fips: {enabled: true, relayIce: {supported: true}},
+        pollen: {enabled: true, relayIce: {supported: true}},
+        admin: {enabled: false}
+    });
+
+    assert.deepEqual(bare.transports.fips.relayIce, {
+        supported: false,
+        unavailableReason: "fips-relay-ice-not-configured"
+    });
+    assert.deepEqual(bare.transports.pollen.relayIce, {
+        supported: false,
+        unavailableReason: "pollen-relay-ice-not-configured"
+    });
+
+    const configured = createRuntimeCapabilities({
+        runtime: {target: "standalone"},
+        fips: {
+            enabled: true,
+            relayIce: {
+                supported: true,
+                rtcConfig: {
+                    iceServers: [{urls: "turn:fips-relay.test:3478", username: "fips", credential: "secret"}]
+                }
+            }
+        },
+        pollen: {
+            enabled: true,
+            relayIce: {
+                supported: true,
+                rtcConfig: {
+                    iceServers: [{urls: ["stun:ignored.test:19302", "turns:pollen-relay.test:5349"]}]
+                }
+            }
+        },
+        admin: {enabled: false}
+    });
+
+    assert.deepEqual(configured.transports.fips.relayIce, {
+        supported: true,
+        rtcConfig: {
+            iceServers: [{urls: "turn:fips-relay.test:3478", username: "fips", credential: "secret"}],
+            iceTransportPolicy: "relay"
+        }
+    });
+    assert.deepEqual(configured.transports.pollen.relayIce, {
+        supported: true,
+        rtcConfig: {
+            iceServers: [{urls: ["turns:pollen-relay.test:5349"]}],
+            iceTransportPolicy: "relay"
+        }
+    });
+});
+
 test("server runtime config reports the configured deployment target", () => {
     assert.deepEqual(createServerRuntimeConfig({}), {
         target: "standalone",

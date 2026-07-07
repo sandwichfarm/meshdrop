@@ -1,4 +1,5 @@
 import {normalizeNpubDiscoveryNetworkId} from "./npub-network.js";
+import {normalizeRelayIceConfig} from "./relay-ice-config.js";
 
 const DEFAULT_RUNTIME_TARGET = "standalone";
 
@@ -24,14 +25,8 @@ function createBluetoothCapabilities(conf = {}) {
 }
 
 function createRelayIceCapability(routeType, transportSupported, conf = {}) {
-    if (transportSupported && conf.relayIce?.supported === true) {
-        return {supported: true};
-    }
-
-    return {
-        supported: false,
-        unavailableReason: `${routeType}-relay-ice-not-configured`
-    };
+    if (!transportSupported) return normalizeRelayIceConfig(routeType);
+    return normalizeRelayIceConfig(routeType, conf.relayIce);
 }
 
 export function createRuntimeCapabilities(conf = {}) {

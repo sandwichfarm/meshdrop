@@ -6,6 +6,7 @@ import PairDropWsServer from "./ws-server.js";
 import FipsControlClient, {createFipsConfig} from "./fips-control.js";
 import PollenTransferClient, {createPollenConfig} from "./pollen-transfer.js";
 import MeshFederation, {createFederationConfig} from "./federation.js";
+import {createRelayIceConfig} from "./relay-ice-config.js";
 
 const writeStdout = (...parts) => process.stdout.write(`${parts.join(" ")}\n`);
 const writeStderr = value => process.stderr.write(`${value}\n`);
@@ -71,13 +72,17 @@ conf.blossom = {
         .filter(Boolean)
 };
 
-conf.pollen = createPollenConfig();
+conf.pollen = {
+    ...createPollenConfig(),
+    relayIce: createRelayIceConfig("pollen")
+};
 conf.pollenClient = new PollenTransferClient(conf.pollen);
 
 conf.federation = createFederationConfig();
 conf.fips = {
     ...createFipsConfig(),
-    room: conf.federation.fips.room
+    room: conf.federation.fips.room,
+    relayIce: createRelayIceConfig("fips")
 };
 conf.fipsClient = new FipsControlClient(conf.fips);
 conf.federationClient = new MeshFederation(conf.federation, {

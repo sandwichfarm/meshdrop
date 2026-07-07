@@ -47,6 +47,32 @@ MeshDrop's goal is a robust, self-healing, easy-to-use sharing application that 
    - Do not auto-fallback to excluded Clearnet.
    - Auto mode may fallback only to allowed routes.
 
+## Configurable Relay ICE Hook
+
+MeshDrop can advertise overlay relay ICE only when the target has a TURN/TURNS RTC config for that route:
+
+- `FIPS_RELAY_ICE_CONFIG=/path/to/rtc-config.json`
+- `POLLEN_RELAY_ICE_CONFIG=/path/to/rtc-config.json`
+- `FIPS_RELAY_ICE_URLS=turn:fips-relay.example:3478,turns:fips-relay.example:5349`
+- `POLLEN_RELAY_ICE_URLS=turn:pollen-relay.example:3478,turns:pollen-relay.example:5349`
+- Optional credentials: `<ROUTE>_RELAY_ICE_USERNAME`, `<ROUTE>_RELAY_ICE_CREDENTIAL`, `<ROUTE>_RELAY_ICE_CREDENTIAL_TYPE`
+
+The JSON config uses the browser `RTCPeerConnection` shape, for example:
+
+```json
+{
+  "iceServers": [
+    {
+      "urls": "turn:fips-relay.example:3478",
+      "username": "meshdrop",
+      "credential": "secret"
+    }
+  ]
+}
+```
+
+STUN-only config does not count. This hook is configuration plumbing only: the relay still has to be deployed so that browser stats prove the selected candidate pair is constrained to the intended FIPS or Pollen path.
+
 ## Acceptance Tests
 
 - Unit: disabling Clearnet leaves Nostr discovery/signaling active but rejects direct Nostr Clearnet transfer routes.

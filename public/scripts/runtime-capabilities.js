@@ -156,13 +156,55 @@ const RuntimeCapabilities = {
     relayIceCapability(routeType, transportSupported, targetManifest = null) {
         const relayIce = targetManifest?.capabilities?.transports?.[routeType]?.relayIce || {};
         if (transportSupported && relayIce.supported === true) {
-            return {supported: true};
+            const relayRtcConfig = this.relayIceRtcConfig(relayIce);
+            if (relayRtcConfig) {
+                return {
+                    supported: true,
+                    rtcConfig: relayRtcConfig
+                };
+            }
         }
 
         return {
             supported: false,
             unavailableReason: `${routeType}-relay-ice-not-configured`
         };
+    },
+
+    relayIceRtcConfig(relayIce = {}) {
+        const rtcConfig = relayIce.rtcConfig || {};
+        if (!Array.isArray(rtcConfig.iceServers)) return null;
+
+        const iceServers = rtcConfig.iceServers
+            .map(server => this.relayIceServer(server))
+            .filter(Boolean);
+        if (iceServers.length === 0) return null;
+
+        return {
+            ...rtcConfig,
+            iceServers,
+            iceTransportPolicy: "relay"
+        };
+    },
+
+    relayIceServer(server = {}) {
+        const urls = this.relayIceUrls(server.urls);
+        if (!urls) return null;
+
+        const normalized = {urls};
+        for (const key of ["username", "credential", "credentialType"]) {
+            if (server[key]) normalized[key] = server[key];
+        }
+        return normalized;
+    },
+
+    relayIceUrls(urls) {
+        const list = Array.isArray(urls) ? urls : [urls];
+        const relayUrls = list
+            .map(url => String(url || "").trim())
+            .filter(url => /^turns?:/i.test(url));
+        if (relayUrls.length === 0) return null;
+        return Array.isArray(urls) ? relayUrls : relayUrls[0];
     },
 
     bluetoothApiAvailable() {
@@ -185,7 +227,12 @@ const RuntimeCapabilities = {
     },
 
     relayIceSupported(config, transport) {
-        return this.transports(config)[transport]?.relayIce?.supported === true;
+        const relayIce = this.transports(config)[transport]?.relayIce;
+        return relayIce?.supported === true && !!this.relayIceRtcConfig(relayIce);
+    },
+
+    relayIceConfig(config, transport) {
+        return this.relayIceRtcConfig(this.transports(config)[transport]?.relayIce);
     },
 
     serverActionSupported(config, action) {

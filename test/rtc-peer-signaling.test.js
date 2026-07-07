@@ -896,12 +896,17 @@ test("disabled clearnet uses relay-only RTC config when FIPS relay ICE is availa
         capabilities: {
             transports: {
                 fips: {
-                    relayIce: {supported: true}
+                    relayIce: {
+                        supported: true,
+                        rtcConfig: {
+                            iceServers: [{urls: "turn:fips-relay.test"}]
+                        }
+                    }
                 }
             }
         }
     });
-    manager._onWsConfig({rtcConfig: {iceServers: [{urls: "turn:fips-relay.test"}]}, wsFallback: false});
+    manager._onWsConfig({rtcConfig: {iceServers: [{urls: "stun:default.example:19302"}]}, wsFallback: false});
     manager._onPeerJoined({
         peer: {
             id: pubkey,
@@ -1002,7 +1007,12 @@ test("disabling clearnet allows FIPS fallback when relay ICE is available", () =
         capabilities: {
             transports: {
                 fips: {
-                    relayIce: {supported: true}
+                    relayIce: {
+                        supported: true,
+                        rtcConfig: {
+                            iceServers: [{urls: "turn:fips-relay.test"}]
+                        }
+                    }
                 }
             }
         }

@@ -79,7 +79,8 @@ const OverlayRelayPolicy = {
         if (globalThis.RuntimeCapabilities?.relayIceSupported) {
             return globalThis.RuntimeCapabilities.relayIceSupported(config, roomType);
         }
-        return config?.capabilities?.transports?.[roomType]?.relayIce?.supported === true;
+        const relayIce = config?.capabilities?.transports?.[roomType]?.relayIce;
+        return relayIce?.supported === true && Array.isArray(relayIce.rtcConfig?.iceServers);
     }
 };
 
@@ -2578,8 +2579,12 @@ class PeersManager {
             return rtcConfig;
         }
 
+        const relayRtcConfig = globalThis.RuntimeCapabilities?.relayIceConfig?.(this._config, roomType)
+            || this._config?.capabilities?.transports?.[roomType]?.relayIce?.rtcConfig
+            || {};
         return {
             ...rtcConfig,
+            ...relayRtcConfig,
             iceTransportPolicy: "relay"
         };
     }
