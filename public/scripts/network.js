@@ -2116,6 +2116,13 @@ class PeersManager {
 
         if (peerInfo.name) peer.name = peerInfo.name;
         if (peerInfo.rtcSupported !== undefined) peer.rtcSupported = peerInfo.rtcSupported;
+        if (Array.isArray(peerInfo.routeCapabilities)) {
+            peer.routeCapabilities = [...new Set([
+                ...(peer.routeCapabilities || []),
+                ...peerInfo.routeCapabilities
+            ])];
+        }
+        if (peerInfo.sessionPeerId) peer.sessionPeerId = peerInfo.sessionPeerId;
         return peer;
     }
 
@@ -2139,7 +2146,10 @@ class PeersManager {
             this._rememberPeerRoute(peer, isCaller, roomType, transport || this._server, peerId);
             const currentRoomType = SignalingRoomPriority.primary(peer._roomIds);
             const connected = peer._isConnected?.() === true;
-            const preferNewRoute = SignalingRoomPriority.shouldPrefer(currentRoomType, roomType, connected);
+            const awaitingPrivateRoute = peer._pendingPrivateRouteRequests?.[roomType] === true;
+            const preferNewRoute = !currentRoomType
+                || awaitingPrivateRoute
+                || SignalingRoomPriority.shouldPrefer(currentRoomType, roomType, connected);
             this._traceRoute(
                 "route candidate",
                 `peer=${canonicalPeerId}`,
@@ -2156,6 +2166,7 @@ class PeersManager {
                     routePeerId: peerId,
                     routes: peer._getRoomTypes()
                 });
+                if (peer._pendingPrivateRouteRequests) delete peer._pendingPrivateRouteRequests[roomType];
                 peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server, peerId);
             }
             return;
@@ -2293,8 +2304,71 @@ class PeersManager {
         const peerId = this._resolvePeerId(detail.peerId);
         const peer = this.peers[peerId];
         if (peer && !peer._intentionalDisconnect && this._tryFallbackRoute(peerId, peer)) return;
+        if (peer && !peer._intentionalDisconnect && this._requestPrivateRouteDescriptor(peerId, peer, detail)) return;
 
         Events.fire('peer-disconnected', peerId);
+    }
+
+    _requestPrivateRouteDescriptor(peerId, peer, detail = {}) {
+        const failedRoomType = SignalingRoomPriority.primary(peer._roomIds);
+        const routeType = this._nextPrivateRouteType(peer, failedRoomType);
+        if (!routeType) return false;
+
+        const recipientPubkey = peer.nostrIdentity?.pubkey || (failedRoomType === "nostr" ? peer._routePeerId?.("nostr") : "");
+        if (!recipientPubkey) return false;
+
+        const failedRoomId = failedRoomType ? peer._roomIds[failedRoomType] : "";
+        const failedRoutePeerId = failedRoomType
+            ? peer._peerIdsByRoomType?.[failedRoomType] || recipientPubkey
+            : recipientPubkey;
+        if (failedRoomType) {
+            peer._removeRoomType(failedRoomType);
+            delete peer._transportsByRoomType?.[failedRoomType];
+            delete peer._isCallerByRoomType?.[failedRoomType];
+            this._traceRoute(
+                "route failed",
+                `peer=${peerId}`,
+                `route=${failedRoomType}`,
+                `room=${failedRoomId || "unknown"}`,
+                `reason=${detail.reason || "unknown"}`
+            );
+            this._emitRouteStatus(peerId, failedRoomType, "failed", "descriptor-request", {
+                routePeerId: failedRoutePeerId,
+                roomId: failedRoomId,
+                routes: peer._getRoomTypes()
+            });
+        }
+
+        peer._pendingPrivateRouteRequests = {
+            ...peer._pendingPrivateRouteRequests,
+            [routeType]: true
+        };
+        this._traceRoute("route descriptor requested", `peer=${peerId}`, `route=${routeType}`, `reason=${detail.reason || "fallback"}`);
+        this._emitRouteStatus(peerId, routeType, "requested", "descriptor-request", {
+            routePeerId: recipientPubkey,
+            routes: peer._getRoomTypes()
+        });
+        Events.fire("nostr-route-request-needed", {
+            peerId,
+            recipientPubkey,
+            routeType,
+            failedRoute: failedRoomType,
+            reason: detail.reason || "route-failed"
+        });
+        return true;
+    }
+
+    _nextPrivateRouteType(peer, failedRoomType = "") {
+        const capabilities = new Set(peer.routeCapabilities || []);
+        for (const routeType of ["fips", "pollen"]) {
+            if (routeType === failedRoomType) continue;
+            if (!capabilities.has(routeType)) continue;
+            if (!this._routeAllowed(routeType)) continue;
+            if (peer._pendingPrivateRouteRequests?.[routeType]) continue;
+            if (meshdropNetworkHasOwn(peer._roomIds, routeType)) continue;
+            return routeType;
+        }
+        return "";
     }
 
     _tryFallbackRoute(peerId, peer) {

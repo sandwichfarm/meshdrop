@@ -118,7 +118,7 @@ class PollenTransferController {
         this._active = true;
         this._render();
         if (remember) this._setPreferredActive(true);
-        Events.fire("join-pollen-room", {rooms: await this._runtimeRooms()});
+        Events.fire("join-pollen-room", {rooms: await this._runtimeRooms({pairwise: false})});
         if (notify) Events.fire("notify-user", Localization.getTranslation("notifications.pollen-transfer-enabled"));
     }
 
@@ -234,14 +234,46 @@ class PollenTransferController {
         await this.enable({notify: false, remember: false});
     }
 
-    async _runtimeRooms() {
+    async routeDescriptorFor(peerPubkey) {
+        if (!this._active || !this._available) return null;
+
+        const identityController = globalThis.meshdropNostrIdentity;
+        const identity = identityController?.getIdentity?.();
+        if (!identity?.pubkey || !globalThis.NpubNetworkProtocol?.pairwiseRoom) return null;
+
+        const pairwiseRoom = await globalThis.NpubNetworkProtocol.pairwiseRoom(identity.pubkey, peerPubkey);
+        const rooms = [pairwiseRoom].filter(Boolean);
+        const explicitRoom = this._config?.pollen?.discoveryMode === "public"
+            ? globalThis.NpubNetworkProtocol.normalizeRoom(this._config?.pollen?.room)
+            : "";
+        if (explicitRoom) rooms.push(explicitRoom);
+
+        return {
+            routeType: "pollen",
+            rooms: [...new Set(rooms)]
+        };
+    }
+
+    joinRouteDescriptor(descriptor = {}) {
+        if (!this._active || !this._available) return false;
+        const rooms = [...new Set((descriptor.rooms || [])
+            .map(room => globalThis.NpubNetworkProtocol?.normalizeRoom?.(room) || "")
+            .filter(Boolean))];
+        if (!rooms.length) return false;
+
+        Events.fire("join-pollen-room", {rooms});
+        return true;
+    }
+
+    async _runtimeRooms(options = {}) {
         const identityController = globalThis.meshdropNostrIdentity;
         const identity = await identityController?.ensureFollowListLoaded?.()
             || identityController?.getIdentity?.();
         return globalThis.NpubNetworkProtocol?.roomsForIdentity
             ? globalThis.NpubNetworkProtocol.roomsForIdentity(identity, {
                 room: this._config?.pollen?.room,
-                discoveryMode: this._config?.pollen?.discoveryMode
+                discoveryMode: this._config?.pollen?.discoveryMode,
+                pairwise: options.pairwise !== false
             })
             : [];
     }

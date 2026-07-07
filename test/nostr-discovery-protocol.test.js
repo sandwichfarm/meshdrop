@@ -162,6 +162,19 @@ test("npub network rooms are pairwise and derived from the loaded follow set", a
     assert(rooms.includes(firstRoom));
 });
 
+test("npub network public mode can omit private pairwise rooms for staged route discovery", async () => {
+    const rooms = await globalThis.NpubNetworkProtocol.roomsForIdentity({
+        pubkey: "e".repeat(64),
+        followPubkeys: ["f".repeat(64)]
+    }, {
+        room: "npub-network:public-room",
+        discoveryMode: "public",
+        pairwise: false
+    });
+
+    assert.deepEqual(rooms, ["npub-network:public-room"]);
+});
+
 test("follow policy only allows pubkeys in the loaded contact list", () => {
     const followed = "c".repeat(64);
     const stranger = "d".repeat(64);
