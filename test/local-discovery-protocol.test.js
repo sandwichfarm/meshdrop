@@ -16,15 +16,22 @@ globalThis.localStorage = {
 
 await import("../public/scripts/local-discovery.js");
 
-test("local discovery defaults to enabled", () => {
+test("clearnet routes default to enabled", () => {
     storage.clear();
 
     assert.equal(globalThis.LocalDiscoveryProtocol.readEnabled(), true);
+    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("ip"), true);
+    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("nostr"), true);
+    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("fips"), true);
 });
 
-test("local discovery persists explicit disabled state", () => {
+test("clearnet routes gate direct IP and Nostr room types", () => {
     storage.clear();
     globalThis.LocalDiscoveryProtocol.writeEnabled(false);
 
     assert.equal(globalThis.LocalDiscoveryProtocol.readEnabled(), false);
+    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("ip"), false);
+    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("nostr"), false);
+    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("fips"), true);
+    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("pollen"), true);
 });

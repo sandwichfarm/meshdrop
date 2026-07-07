@@ -19,17 +19,17 @@ const PeerAvailabilityProtocol = {
     roomTypeMeta: {
         "ip": {
             id: "local",
-            label: "Instance",
-            shortLabel: "Instance",
+            label: "Clearnet",
+            shortLabel: "Clearnet",
             className: "badge-room-ip",
-            description: "Same MeshDrop instance discovery with a direct peer data channel",
+            description: "Clearnet WebRTC path through same-instance discovery",
             group: "Network routes",
-            privacy: "Direct peer path",
+            privacy: "Direct clearnet path",
             privacyTone: "strong",
             details: [
                 ["Discovery", "same MeshDrop instance"],
-                ["Data path", "WebRTC ICE direct"],
-                ["Best case", "local network candidate"]
+                ["Data path", "clearnet WebRTC ICE"],
+                ["Exclude with", "Clearnet toggle"]
             ]
         },
         "secret": {
@@ -49,17 +49,17 @@ const PeerAvailabilityProtocol = {
         },
         "nostr": {
             id: "webrtc",
-            label: "Nostr",
-            shortLabel: "Nostr",
+            label: "Clearnet via Nostr",
+            shortLabel: "Clearnet",
             className: "badge-room-nostr",
-            description: "Nostr discovery with a direct peer data channel when negotiation succeeds",
+            description: "Direct clearnet WebRTC route discovered and signaled by Nostr",
             group: "Network routes",
-            privacy: "P2P after Nostr discovery",
+            privacy: "Direct clearnet path",
             privacyTone: "direct",
             details: [
                 ["Discovery", "Nostr WOT"],
-                ["Data path", "WebRTC ICE direct"],
-                ["Nostr events", "signaling only"]
+                ["Data path", "clearnet WebRTC ICE"],
+                ["Nostr events", "discovery/signaling only"]
             ]
         },
         "fips": {
@@ -278,13 +278,13 @@ const PeerRouteStatusProtocol = {
             case "selected":
                 return `Trying ${route}...`;
             case "connecting":
-                return `Connecting via ${route}...`;
+                return `Connecting on ${route}...`;
             case "waiting":
-                return `Waiting via ${route}...`;
+                return `Waiting on ${route}...`;
             case "offer":
                 return `Sending ${route} offer...`;
             case "answer":
-                return `Answering via ${route}...`;
+                return `Answering on ${route}...`;
             case "remote-offer":
                 return `Received ${route} offer...`;
             case "remote-answer":
@@ -296,7 +296,7 @@ const PeerRouteStatusProtocol = {
             case "ice-completed":
             case "connection-connected":
             case "connected":
-                return `Connected via ${route}`;
+                return `Connected on ${route}`;
             case "ice-failed":
             case "connection-failed":
             case "failed":
@@ -308,8 +308,10 @@ const PeerRouteStatusProtocol = {
             case "connection-disconnected":
             case "ice-disconnected":
                 return `${route} disconnected`;
+            case "disabled":
+                return `${route} disabled`;
             default:
-                return route ? `Connecting via ${route}...` : meshdropLocalization.getTranslation("notifications.connecting");
+                return route ? `Connecting on ${route}...` : meshdropLocalization.getTranslation("notifications.connecting");
         }
     },
 

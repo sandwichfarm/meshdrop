@@ -2,6 +2,7 @@
 
 const LocalDiscoveryProtocol = {
     storageKey: "meshdrop_local_discovery_enabled",
+    clearnetRoomTypes: new Set(["ip", "nostr"]),
 
     readEnabled(storage = globalThis.localStorage) {
         const value = storage?.getItem?.(this.storageKey);
@@ -16,6 +17,11 @@ const LocalDiscoveryProtocol = {
         return globalThis.RuntimeCapabilities
             ? globalThis.RuntimeCapabilities.transportSupported(config, "localDiscovery", true)
             : true;
+    },
+
+    allowsRoomType(roomType, storage = globalThis.localStorage) {
+        if (!this.clearnetRoomTypes.has(roomType)) return true;
+        return this.readEnabled(storage);
     }
 };
 
@@ -66,6 +72,7 @@ class LocalDiscoveryController {
             this.leave();
         }
 
+        Events.fire("clearnet-routes-changed", {enabled: this.isEnabled()});
         this._render();
     }
 
@@ -100,8 +107,8 @@ class LocalDiscoveryController {
         this.$button.classList.toggle("selected", this.isEnabled());
         this.$button.setAttribute("aria-pressed", String(this.isEnabled()));
         this.$button.title = this.isEnabled()
-            ? "Same MeshDrop instance discovery enabled. WebRTC still chooses the best direct path when peers connect."
-            : "Same MeshDrop instance discovery disabled.";
+            ? "Clearnet routes enabled. Auto selection may use same-instance or direct Nostr-signaled WebRTC."
+            : "Clearnet routes disabled. Auto selection skips same-instance and direct Nostr-signaled WebRTC.";
         if (this.isEnabled()) {
             this.$button.setAttribute("data-badge", String(typeof userCount === "number" ? userCount : 0));
         } else {

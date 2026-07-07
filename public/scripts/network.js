@@ -37,6 +37,23 @@ const SignalingRoomPriority = {
 
 globalThis.SignalingRoomPriority = SignalingRoomPriority;
 
+const ClearnetRoutePolicy = {
+    roomTypes: new Set(["ip", "nostr"]),
+
+    allows(roomType) {
+        if (!this.roomTypes.has(roomType)) return true;
+        if (globalThis.meshdropLocalDiscovery?.isEnabled) {
+            return globalThis.meshdropLocalDiscovery.isEnabled() !== false;
+        }
+        if (globalThis.LocalDiscoveryProtocol?.allowsRoomType) {
+            return globalThis.LocalDiscoveryProtocol.allowsRoomType(roomType);
+        }
+        return true;
+    }
+};
+
+globalThis.ClearnetRoutePolicy = ClearnetRoutePolicy;
+
 const ServerConnectionIdentityProtocol = {
     key(identity = null) {
         if (!identity?.pubkey) return "";
@@ -2032,6 +2049,7 @@ class PeersManager {
         Events.on('leave-ip-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('ip'));
         Events.on('leave-fips-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('fips'));
         Events.on('leave-pollen-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('pollen'));
+        Events.on('clearnet-routes-changed', e => this._onClearnetRoutesChanged(e.detail));
 
         // this device closes connection
         Events.on('room-secrets-deleted', e => this._onRoomSecretsDeleted(e.detail));
@@ -2102,7 +2120,7 @@ class PeersManager {
     }
 
     _createOrRefreshPeer(isCaller, peerId, roomType, roomId, rtcSupported, transport = this._server, peerInfo = null) {
-        if (roomType === "ip" && globalThis.meshdropLocalDiscovery?.isEnabled?.() === false) return;
+        if (!this._routeAllowed(roomType)) return;
 
         if (!this._wsConfig) {
             this._pendingPeerMessages.push([isCaller, peerId, roomType, roomId, rtcSupported, transport, peerInfo]);
@@ -2289,6 +2307,7 @@ class PeersManager {
         peer._removeRoomType(failedRoomType);
         delete peer._transportsByRoomType?.[failedRoomType];
         delete peer._isCallerByRoomType?.[failedRoomType];
+        this._dropDisallowedRoutes(peerId, peer);
 
         const nextRoomType = SignalingRoomPriority.primary(peer._roomIds);
         if (!nextRoomType) return false;
@@ -2319,6 +2338,48 @@ class PeersManager {
         });
         peer.switchSignalingRoute(nextIsCaller, nextRoomType, nextRoomId, nextTransport, nextRoutePeerId);
         return true;
+    }
+
+    _routeAllowed(roomType) {
+        return ClearnetRoutePolicy.allows(roomType);
+    }
+
+    _dropDisallowedRoutes(peerId, peer) {
+        for (const roomType of peer._getRoomTypes()) {
+            if (this._routeAllowed(roomType)) continue;
+            peer._removeRoomType(roomType);
+            delete peer._transportsByRoomType?.[roomType];
+            delete peer._isCallerByRoomType?.[roomType];
+            this._emitRouteStatus(peerId, roomType, "disabled", "route-policy", {
+                routePeerId: peer._peerIdsByRoomType?.[roomType] || peer._peerId || peerId,
+                routes: peer._getRoomTypes()
+            });
+        }
+    }
+
+    _onClearnetRoutesChanged(detail = {}) {
+        if (detail.enabled !== false) return;
+
+        this._disableRouteType("ip");
+        this._disableRouteType("nostr");
+    }
+
+    _disableRouteType(roomType) {
+        const peerIds = Object.keys(this.peers).filter(peerId => meshdropNetworkHasOwn(this.peers[peerId]._roomIds, roomType));
+        for (const peerId of peerIds) {
+            this._disableRouteTypeForPeer(peerId, roomType);
+        }
+    }
+
+    _disableRouteTypeForPeer(peerId, roomType) {
+        const resolvedPeerId = this._resolvePeerId(peerId);
+        const peer = this.peers[resolvedPeerId];
+        if (!peer) return;
+
+        const activeRoomType = SignalingRoomPriority.primary(peer._roomIds);
+        if (activeRoomType === roomType && this._tryFallbackRoute(resolvedPeerId, peer)) return;
+
+        this._disconnectOrRemoveRoomTypeByPeerId(resolvedPeerId, roomType);
     }
 
     _onRoomSecretsDeleted(roomSecrets) {
