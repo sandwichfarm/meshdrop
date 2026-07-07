@@ -1,4 +1,4 @@
-# Requirements: MeshDrop v0.10.0 Overlay Network Adapters
+# Requirements: MeshDrop v0.11.0 TURN Relay Proof
 
 **Defined:** 2026-07-07
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
@@ -35,7 +35,17 @@
 
 ## Future Requirements
 
-- **TURN-01**: WebRTC overlay relay candidates for FIPS/Pollen use TURN/TURNS routes only when the browser can dial the relay endpoint and relay-only ICE proof exists.
+- **TOR-BYTE-01**: Tor, I2P, and Loki adapters transfer encrypted bytes only after a local instance/native runtime can prove daemon/proxy dial support, selected route type, byte counts, hash match, and fallback disabled. GitHub issues are disabled for this repository, so this blocker is tracked in GSD until issues can be enabled.
+
+## v0.11.0 Requirements
+
+### TURN Relay Proof
+
+- [x] **TURN-01**: A local TURN/coturn smoke starts a relay endpoint and a MeshDrop target configured with TURN credentials through the existing RTC config surface.
+- [x] **TURN-02**: Relay-only WebRTC transfer proof verifies a browser-to-browser payload through `iceTransportPolicy=relay`, with WebRTC stats showing the selected candidate pair is `relay` and not host/srflx/prflx.
+- [x] **TURN-03**: The relay proof names sender runtime, recipient runtime, selected route type, data-plane primitive, `webRtcUsed=true`, `instanceRelayed=false`, bytes sent/received, hash match, and `fallbackUsed=false`.
+- [x] **TURN-04**: Runtime capability and route-selection tests keep FIPS/Pollen overlay WebRTC unavailable unless relay ICE config exists, and prevent fallback to excluded Clearnet when relay-only policy fails.
+- [x] **TURN-05**: ADR/docs state that TURN relay proof is the generic browser WebRTC relay prerequisite; FIPS/Pollen/Tor/I2P/Loki overlay labels remain unavailable until their configured relay path has route-specific proof.
 
 ## v0.9.0 Requirements
 
@@ -77,12 +87,17 @@
 | ONA-03 | Phase 14 | Complete |
 | ONA-04 | Phase 14 | Complete |
 | ONA-05 | Phase 14 | Complete |
+| TURN-01 | Phase 15 | Complete |
+| TURN-02 | Phase 15 | Complete |
+| TURN-03 | Phase 15 | Complete |
+| TURN-04 | Phase 15 | Complete |
+| TURN-05 | Phase 15 | Complete |
 
 **Coverage:**
-- v0.10.0 requirements: 5 total
+- v0.11.0 requirements: 5 total
 - Mapped to phases: 5
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 after completing Phase 14 Overlay Network Adapters.*
+*Last updated: 2026-07-07 completing Phase 15 TURN Relay Proof.*
