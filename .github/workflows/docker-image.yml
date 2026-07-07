@@ -134,8 +134,8 @@ jobs:
       - name: Install Chromium
         run: |
           sudo rm -f \
-            /etc/apt/sources.list.d/azure-cli.list \
-            /etc/apt/sources.list.d/microsoft-prod.list
+            /etc/apt/sources.list.d/azure-cli.* \
+            /etc/apt/sources.list.d/microsoft-prod.*
           npx playwright install --with-deps chromium
 
       - name: Run browser transfer smoke
@@ -169,8 +169,8 @@ jobs:
       - name: Install browser
         run: |
           sudo rm -f \
-            /etc/apt/sources.list.d/azure-cli.list \
-            /etc/apt/sources.list.d/microsoft-prod.list
+            /etc/apt/sources.list.d/azure-cli.* \
+            /etc/apt/sources.list.d/microsoft-prod.*
           npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run SPA artifact smoke
@@ -201,8 +201,8 @@ jobs:
       - name: Install Chromium
         run: |
           sudo rm -f \
-            /etc/apt/sources.list.d/azure-cli.list \
-            /etc/apt/sources.list.d/microsoft-prod.list
+            /etc/apt/sources.list.d/azure-cli.* \
+            /etc/apt/sources.list.d/microsoft-prod.*
           npx playwright install --with-deps chromium
 
       - name: Run target artifact transfer smoke
@@ -231,8 +231,8 @@ jobs:
       - name: Install Chromium
         run: |
           sudo rm -f \
-            /etc/apt/sources.list.d/azure-cli.list \
-            /etc/apt/sources.list.d/microsoft-prod.list
+            /etc/apt/sources.list.d/azure-cli.* \
+            /etc/apt/sources.list.d/microsoft-prod.*
           npx playwright install --with-deps chromium
 
       - name: Run Desktop Chromium shell transfer smoke
@@ -437,8 +437,8 @@ jobs:
       - name: Install browser
         run: |
           sudo rm -f \
-            /etc/apt/sources.list.d/azure-cli.list \
-            /etc/apt/sources.list.d/microsoft-prod.list
+            /etc/apt/sources.list.d/azure-cli.* \
+            /etc/apt/sources.list.d/microsoft-prod.*
           npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run SPA public relay UAT
@@ -470,8 +470,8 @@ jobs:
       - name: Install WebKit
         run: |
           sudo rm -f \
-            /etc/apt/sources.list.d/azure-cli.list \
-            /etc/apt/sources.list.d/microsoft-prod.list
+            /etc/apt/sources.list.d/azure-cli.* \
+            /etc/apt/sources.list.d/microsoft-prod.*
           npx playwright install --with-deps webkit
 
       - name: Run SPA WebKit transfer UAT
@@ -503,8 +503,8 @@ jobs:
       - name: Install Chromium
         run: |
           sudo rm -f \
-            /etc/apt/sources.list.d/azure-cli.list \
-            /etc/apt/sources.list.d/microsoft-prod.list
+            /etc/apt/sources.list.d/azure-cli.* \
+            /etc/apt/sources.list.d/microsoft-prod.*
           npx playwright install --with-deps chromium
 
       - name: Run Docker smoke
@@ -533,8 +533,8 @@ jobs:
       - name: Install Chromium
         run: |
           sudo rm -f \
-            /etc/apt/sources.list.d/azure-cli.list \
-            /etc/apt/sources.list.d/microsoft-prod.list
+            /etc/apt/sources.list.d/azure-cli.* \
+            /etc/apt/sources.list.d/microsoft-prod.*
           npx playwright install --with-deps chromium
 
       - name: Run Docker public relay UAT

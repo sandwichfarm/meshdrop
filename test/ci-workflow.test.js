@@ -46,8 +46,8 @@ test("CI strips flaky runner Microsoft apt feeds before Playwright dependency in
     assert.equal(installSteps.length, 8);
     for (const block of installSteps) {
         assert.match(block, /sudo rm -f/);
-        assert.match(block, /\/etc\/apt\/sources\.list\.d\/azure-cli\.list/);
-        assert.match(block, /\/etc\/apt\/sources\.list\.d\/microsoft-prod\.list/);
+        assert.match(block, /\/etc\/apt\/sources\.list\.d\/azure-cli\.\*/);
+        assert.match(block, /\/etc\/apt\/sources\.list\.d\/microsoft-prod\.\*/);
     }
 });
 

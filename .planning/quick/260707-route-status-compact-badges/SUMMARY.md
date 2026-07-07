@@ -16,6 +16,7 @@ Verification:
 - Browser proof on local `node server/index.js --localhost-only` passed with no page errors: status text visually hidden, active availability row hidden, 3 visible route-attempt icons, no visible chip text, Clearnet blocked, FIPS/Pollen pending.
 - Screenshot written to `/tmp/meshdrop-route-status-compact-20260707.png`.
 - `npm test` passed 360/360 after the CI workflow hardening test was added.
+- `node --test test/ci-workflow.test.js` failed red again after CI showed the runner used `azure-cli.sources`; the workflow now strips `azure-cli.*` and `microsoft-prod.*`.
 - `node --test test/ci-workflow.test.js test/docker-smoke-script.test.js test/spa-artifact.test.js` passed 15/15 after stripping flaky runner Microsoft apt feeds before Playwright dependency installs in `.github/workflows/docker-image.yml`.
 - `git diff --check` passed.
 - `npx --yes aislop scan --changes --base origin/master .` exited 0 with 0 AI-slop/security/lint issues; it still reports pre-existing `public/scripts/ui.js` size/duplicate code-quality warnings.
