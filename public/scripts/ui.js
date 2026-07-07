@@ -1556,8 +1556,14 @@ class PeerUI {
             } else {
                 this.$el.removeAttribute('data-route-state');
             }
-            this.$el.querySelector('.status').innerText = title;
-            this._renderRouteAttempts();
+            const hasRouteVisual = this._renderRouteAttempts();
+            const statusNode = this.$el.querySelector('.status');
+            statusNode.innerText = hasRouteVisual ? "" : title;
+            if (hasRouteVisual) {
+                statusNode.setAttribute('aria-hidden', 'true');
+            } else {
+                statusNode.removeAttribute('aria-hidden');
+            }
             this.currentStatus = this._routeStatus
                 ? PeerRouteStatusProtocol.statusKey(this._routeStatus)
                 : 'connecting';
@@ -1586,19 +1592,22 @@ class PeerUI {
 
     _clearRouteAttempts() {
         const row = this.$el.querySelector('.route-attempts');
-        if (!row) return;
+        if (!row) return false;
         row.replaceChildren();
         row.setAttribute('hidden', true);
+        row.removeAttribute('role');
+        row.removeAttribute('aria-label');
+        this.$el.querySelector('.status')?.removeAttribute('aria-hidden');
         delete this.$el.dataset.routeVisual;
+        return false;
     }
 
     _renderRouteAttempts() {
         const row = this.$el.querySelector('.route-attempts');
-        if (!row) return;
+        if (!row) return false;
         const attempts = PeerRouteStatusProtocol.attemptsForPeer(this._peer).slice(0, 3);
         if (!attempts.length) {
-            this._clearRouteAttempts();
-            return;
+            return this._clearRouteAttempts();
         }
 
         const nodes = attempts.map(attempt => {
@@ -1607,7 +1616,13 @@ class PeerUI {
 
         row.replaceChildren(...nodes);
         row.hidden = false;
+        row.setAttribute('role', 'group');
+        row.setAttribute('aria-label', attempts
+            .map(attempt => PeerRouteStatusProtocol.visualAttempt(attempt).ariaLabel)
+            .filter(Boolean)
+            .join(' | '));
         this.$el.dataset.routeVisual = 'true';
+        return true;
     }
 
     _createCallbacks() {
