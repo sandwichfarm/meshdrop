@@ -24,10 +24,12 @@ class PairDrop {
             "scripts/blossom-transfer.js",
             "scripts/hashtree-transfer.js",
             "scripts/pollen-transfer.js",
+            "scripts/fips-stream-transfer.js",
             "scripts/android-native-routes.js",
             "scripts/fips-discovery.js",
             "scripts/network.js",
             "scripts/ui.js",
+            "scripts/fips-stream-integration.js",
             "scripts/native-share-inbox.js",
             "scripts/nostr-login-dialog.js",
             "scripts/libs/heic2any.min.js",
@@ -222,6 +224,7 @@ class PairDrop {
         this.hashtreeTransfer = new globalThis.HashtreeTransferController();
         this.pollenTransfer = new globalThis.PollenTransferController();
         this.fipsDiscovery = new globalThis.FipsDiscoveryController();
+        this.fipsStreamTransfer = new globalThis.FipsStreamTransferController();
         this.server = new globalThis.ServerConnection();
         this.peers = new globalThis.PeersManager(this.server);
         if (globalThis.__meshdropE2E) {

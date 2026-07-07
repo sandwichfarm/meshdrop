@@ -76,6 +76,11 @@ const RuntimeCapabilities = {
                         requiresBackend: true,
                         room: "",
                         unavailableReason: this.backendOnlyUnavailableReason(staticTransports.fips),
+                        stream: {
+                            supported: false,
+                            primitive: "fips-http-stream",
+                            maxUploadBytes: 0
+                        },
                         relayIce: this.relayIceCapability("fips", staticTransports.fips, targetManifest)
                     }
                 },

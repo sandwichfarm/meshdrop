@@ -81,6 +81,11 @@ export function createRuntimeCapabilities(conf = {}) {
                 supported: fipsSupported,
                 requiresBackend: true,
                 room: normalizeNpubDiscoveryNetworkId(conf.fips?.room),
+                stream: {
+                    supported: fipsSupported && conf.fipsStream?.enabled !== false,
+                    primitive: "fips-http-stream",
+                    maxUploadBytes: conf.fipsStream?.maxUploadBytes || 0
+                },
                 relayIce: createRelayIceCapability("fips", fipsSupported, conf.fips)
             }
         },

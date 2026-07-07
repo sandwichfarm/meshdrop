@@ -4,6 +4,7 @@ import fs from "fs";
 import PairDropServer from "./server.js";
 import PairDropWsServer from "./ws-server.js";
 import FipsControlClient, {createFipsConfig} from "./fips-control.js";
+import FipsStreamTransferClient, {createFipsStreamConfig} from "./fips-stream-transfer.js";
 import PollenTransferClient, {createPollenConfig} from "./pollen-transfer.js";
 import MeshFederation, {createFederationConfig} from "./federation.js";
 import {createRelayIceConfig} from "./relay-ice-config.js";
@@ -85,6 +86,8 @@ conf.fips = {
     relayIce: createRelayIceConfig("fips")
 };
 conf.fipsClient = new FipsControlClient(conf.fips);
+conf.fipsStream = createFipsStreamConfig();
+conf.fipsStreamClient = new FipsStreamTransferClient(conf.fipsStream);
 conf.federationClient = new MeshFederation(conf.federation, {
     fipsClient: conf.fipsClient,
     pollenClient: conf.pollenClient

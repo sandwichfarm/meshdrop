@@ -1,4 +1,4 @@
-# Requirements: MeshDrop v0.6.0 Android Native Route Adapter
+# Requirements: MeshDrop v0.7.0 FIPS Stream Route Proof
 
 **Defined:** 2026-07-07
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
@@ -10,33 +10,33 @@
 - Route descriptor validation, adapter vocabulary, scoring reasons, route attempts, and proof-backed completion copy exist.
 - Backend-free SPA artifacts fail closed for backend-only FIPS/Pollen/native route claims while keeping pure-client Nostr WebRTC available.
 - Installed Android APKs already expose a loopback native backend for FIPS status and Pollen upload/download.
+- Pollen instance relay already proves encrypted payload bytes through an object-store primitive and emits route proof.
 
-## v0.6.0 Requirements
+## v0.7.0 Requirements
 
-### Android Native Adapter
+### FIPS Stream Transfer
 
-- [x] **ANDROID-NATIVE-01**: Android WebView runtime registers a route adapter that passes `MeshDropRouteContract.validateAdapter` only when the loopback native backend is alive.
-- [x] **ANDROID-NATIVE-02**: The adapter exposes native Pollen status, descriptor, send, receive, and proof behavior using the Android backend upload/download primitive.
-- [x] **ANDROID-NATIVE-03**: The adapter reports FIPS native status without claiming FIPS byte-transfer proof until the FIPS data plane is implemented.
+- [x] **FIPS-STREAM-01**: MeshDrop exposes `/fips/upload` and `/fips/download/:id` only when FIPS is enabled, available, and reports a mesh IPv6 address; uploads are size-limited, token-bound, and short-lived.
+- [x] **FIPS-STREAM-02**: The browser FIPS stream protocol builds a v1 route descriptor with route type `fips`, transport shape `stream`, primitive `fips-http-stream`, owner/session bindings, expiry, FIPS mesh base URL, and encrypted/private/fail-closed constraints.
+- [x] **FIPS-STREAM-03**: Private FIPS stream transfer uploads ciphertext to the sender instance, sends only descriptor/proof metadata through the control channel, fetches ciphertext from the recipient over the sender's FIPS mesh address, decrypts locally, verifies SHA-256 against the original payload, and emits route proof.
+- [x] **FIPS-STREAM-04**: FIPS stream proof rejects missing runtime IDs, bad owner/session binding, expired descriptors, non-FIPS base URLs, byte mismatches, hash mismatches, and fallback flags.
 
-### Installed APK Proof
+### Runtime Proof
 
-- [x] **ANDROID-NATIVE-04**: Installed APK smoke sends and receives bytes through the native Pollen route adapter, verifies byte count and SHA-256 hash, and validates route proof fields: sender runtime, recipient runtime, route type, data-plane primitive, WebRTC flag, instance relay flag, bytes sent/received, hash match, and fallback false.
-- [x] **ANDROID-NATIVE-05**: Android source/APK packaging includes the adapter script without changing source-only artifact honesty.
+- [x] **FIPS-STREAM-05**: A Docker runtime smoke starts two real FIPS daemons, connects them as peers, uploads bytes on sender A, downloads them from recipient B via A's FIPS mesh IPv6 URL, validates the route proof contract, and reads FIPS counters/status as runtime evidence.
 
 ## Future Requirements
 
-- **FIPS-01**: FIPS adapter transfers encrypted file bytes over a FIPS-backed data plane and reports route proof.
-- **NATIVE-01**: Android native adapter exposes real native route status, descriptor, transfer primitive, and proof.
 - **INST-GENERIC-01**: The Pollen-specific relay path is generalized for FIPS, Tor, I2P, Loki, and future backends after one backend is proven.
 - **TURN-01**: WebRTC overlay relay candidates for FIPS/Pollen use TURN/TURNS routes only when the browser can dial the relay endpoint and relay-only ICE proof exists.
+- **FIPS-NATIVE-01**: Replace or augment HTTP-over-fips0 with a native FSP API when the FIPS daemon exposes an application byte-stream API.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| FIPS byte-transfer implementation | This milestone exposes FIPS status only; the FIPS data plane remains a later transport slice. |
-| iOS native transport adapter | This slice is Android-only. |
+| Native FSP daemon API | Current FIPS release exposes ordinary IPv6/TCP through `fips0`; this slice proves that data plane first. |
+| TURN overlay relay | Separate route type with different WebRTC proof needs. |
 | Generic route-engine replacement | Existing runtime config and route-attempt surfaces are enough to enforce SPA honesty. |
 | Public topology publication | Backend-only route availability must stay explicit, private, and proof-backed. |
 
@@ -44,17 +44,17 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ANDROID-NATIVE-01 | Phase 10 | Complete |
-| ANDROID-NATIVE-02 | Phase 10 | Complete |
-| ANDROID-NATIVE-03 | Phase 10 | Complete |
-| ANDROID-NATIVE-04 | Phase 10 | Complete |
-| ANDROID-NATIVE-05 | Phase 10 | Complete |
+| FIPS-STREAM-01 | Phase 11 | Complete |
+| FIPS-STREAM-02 | Phase 11 | Complete |
+| FIPS-STREAM-03 | Phase 11 | Complete |
+| FIPS-STREAM-04 | Phase 11 | Complete |
+| FIPS-STREAM-05 | Phase 11 | Complete |
 
 **Coverage:**
-- v0.6.0 requirements: 5 total
+- v0.7.0 requirements: 5 total
 - Mapped to phases: 5
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 after completing Phase 10 Android native route adapter.*
+*Last updated: 2026-07-07 after verifying Phase 11 FIPS stream route proof.*
