@@ -674,12 +674,31 @@ test("disabled clearnet routes ignore direct Nostr peer announcements", () => {
 
     manager._onPeerJoined({
         peer: {id: "peer-a", rtcSupported: true},
+        isCaller: true,
         roomType: "nostr",
         roomId: "nostr-room"
     });
 
     assert.deepEqual(Object.keys(manager.peers), []);
     assert.equal(connections.length, 0);
+});
+
+test("clearnet preference allows Nostr routes when local discovery is unsupported", () => {
+    const {PeersManager, context} = createHarness();
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.meshdropLocalDiscovery = {isEnabled: () => false};
+    const manager = new PeersManager({send() {}});
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+
+    manager._onPeerJoined({
+        peer: {id: "peer-a", rtcSupported: true},
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room"
+    });
+
+    assert.deepEqual(Object.keys(manager.peers), ["peer-a"]);
+    assert.equal(manager.peers["peer-a"]._roomIds.nostr, "nostr-room");
 });
 
 test("disabling clearnet switches auto route from Nostr to FIPS", () => {

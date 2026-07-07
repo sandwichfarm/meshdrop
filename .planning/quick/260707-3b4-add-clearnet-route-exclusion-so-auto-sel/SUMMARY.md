@@ -17,3 +17,8 @@ Nostr copy now distinguishes discovery/signaling from byte transport. Route stat
 
 - The clearnet toggle reuses the existing local discovery control and storage key. That preserves user intent but means an older disabled local-discovery preference now disables direct Nostr-signaled clearnet routes too.
 - Full-repo aislop baseline is still failing outside this task.
+
+## Follow-up Correction
+
+- Clearnet exclusion must not block Nostr discovery. It blocks clearnet file-sharing routes: same-instance IP and direct Nostr-signaled WebRTC byte paths.
+- Static/backend-free targets may lack same-instance local discovery support, but that must not make the clearnet preference look disabled. The route policy now reads the persisted clearnet preference before falling back to controller runtime support.
