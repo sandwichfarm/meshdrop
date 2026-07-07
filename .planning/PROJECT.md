@@ -6,7 +6,9 @@ MeshDrop is a multi-transport file sharing system where each instance can mesh w
 
 ## Core Value
 
-Files must transfer between peers reliably over every negotiated transport that claims to support the path.
+Files must transfer between peers reliably over every negotiated transport that claims to support the path. The product target is signaling and WebRTC over every useful topology when that is what the user's network conditions require, without hiding hard relay requirements behind optimistic labels.
+
+For MeshDrop, "WebRTC over FIPS/Pollen" means more than discovery or SDP exchange through those networks. It means the selected WebRTC ICE candidate path carries file bytes through a FIPS- or Pollen-backed relay/candidate. Until that relay exists, FIPS and Pollen must be described as discovery/signaling routes with browser ICE data paths, not as forced byte transports.
 
 ## Requirements
 
@@ -23,6 +25,7 @@ Files must transfer between peers reliably over every negotiated transport that 
 
 ### Active
 
+- [ ] Implement WebRTC overlay relay candidates for FIPS and Pollen, or explicitly ship a differently named non-WebRTC live-transfer fallback where browser ICE cannot be constrained. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
 - [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services.
 - [ ] Run the signed iOS device-install harness on macOS hardware, then complete iOS device file-picker/share-sheet/native
@@ -56,6 +59,7 @@ Files must transfer between peers reliably over every negotiated transport that 
 |----------|-----------|---------|
 | Npub-network discovery replaces FIPS/Pollen room envs | Static rooms do not represent the user’s intended peer network | ✓ Good |
 | Runtime transfer proof is required for WebRTC claims | Prior “fixed” claims failed without transfer proof | ✓ Good |
+| Discovery/signaling is not byte transport proof | FIPS/Pollen can currently discover and signal peers while browser ICE still carries bytes over direct candidates | Active relay requirement |
 | Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | ✓ Good |
 
 ---

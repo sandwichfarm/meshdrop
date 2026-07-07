@@ -499,9 +499,9 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
         await assertRouteChoice(pageA, peerId, {
             id: "pollen-mesh",
             label: "Pollen",
-            privacy: "P2P over Pollen route",
-            discoveryDetail: "RoutePollen substrate",
-            dataPathDetail: "Data pathWebRTC ICE direct"
+            privacy: "Pollen signaling, ICE data path",
+            discoveryDetail: "SignalingPollen substrate",
+            dataPathDetail: "Data pathbrowser WebRTC ICE"
         });
         await sendProofIcon(pageA, peerId, "pollen-mesh");
 
@@ -512,7 +512,7 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
             contents: [PROOF_ICON]
         }, received);
         assert(!logs.pageErrors.length, `federated-pollen: page errors: ${logs.pageErrors.join("\n")}`);
-        console.log("Proof federated-pollen-public-webrtc: explicit public discovery delivered meshdrop-proof-icon.svg across two MeshDrop servers");
+        console.log("Proof federated-pollen-signaled-webrtc: Pollen discovery/signaling delivered meshdrop-proof-icon.svg across two MeshDrop servers using browser ICE data path");
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close(), appA.close(), appB.close()]);

@@ -85,11 +85,13 @@ test("transfer options expose privacy and encryption metadata", () => {
             id: "visible-peer",
             _roomIds: {
                 ip: "127.0.0.1",
+                fips: "meshdrop-fips",
                 pollen: "meshdrop-pollen",
                 nostr: "mesh:example"
             }
         });
         const local = options.find(option => option.id === "local");
+        const fipsMesh = options.find(option => option.id === "fips");
         const pollenMesh = options.find(option => option.id === "pollen-mesh");
         const webrtc = options.find(option => option.id === "webrtc");
         const hashtree = options.find(option => option.id === "hashtree");
@@ -103,9 +105,20 @@ test("transfer options expose privacy and encryption metadata", () => {
             ["Data path", "clearnet WebRTC ICE"],
             ["Exclude with", "Clearnet toggle"]
         ]);
+        assert.equal(fipsMesh.group, "Network routes");
+        assert.equal(fipsMesh.privacy, "FIPS signaling, ICE data path");
+        assert.deepEqual(fipsMesh.details, [
+            ["Signaling", "FIPS substrate"],
+            ["Data path", "browser WebRTC ICE"],
+            ["Clearnet bytes", "possible unless relay-only ICE exists"]
+        ]);
         assert.equal(pollenMesh.group, "Network routes");
-        assert.equal(pollenMesh.privacy, "P2P over Pollen route");
-        assert.deepEqual(pollenMesh.details.at(-1), ["Best case", "local network candidate"]);
+        assert.equal(pollenMesh.privacy, "Pollen signaling, ICE data path");
+        assert.deepEqual(pollenMesh.details, [
+            ["Signaling", "Pollen substrate"],
+            ["Data path", "browser WebRTC ICE"],
+            ["Clearnet bytes", "possible unless relay-only ICE exists"]
+        ]);
         assert.equal(webrtc.label, "Clearnet via Nostr");
         assert.equal(webrtc.privacy, "Direct clearnet path");
         assert.deepEqual(webrtc.details.at(0), ["Discovery", "Nostr WOT"]);

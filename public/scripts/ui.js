@@ -67,14 +67,14 @@ const PeerAvailabilityProtocol = {
             label: "FIPS",
             shortLabel: "FIPS",
             className: "badge-room-fips",
-            description: "FIPS route substrate for trusted Nostr-discovered peers",
+            description: "WebRTC route discovered and signaled through FIPS",
             group: "Network routes",
-            privacy: "P2P over FIPS route",
+            privacy: "FIPS signaling, ICE data path",
             privacyTone: "direct",
             details: [
-                ["Route", "FIPS substrate"],
-                ["Data path", "WebRTC ICE direct"],
-                ["Best case", "local network candidate"]
+                ["Signaling", "FIPS substrate"],
+                ["Data path", "browser WebRTC ICE"],
+                ["Clearnet bytes", "possible unless relay-only ICE exists"]
             ]
         },
         "pollen": {
@@ -82,14 +82,14 @@ const PeerAvailabilityProtocol = {
             label: "Pollen",
             shortLabel: "Pollen",
             className: "badge-room-pollen",
-            description: "Pollen route substrate for trusted Nostr-discovered peers",
+            description: "WebRTC route discovered and signaled through Pollen",
             group: "Network routes",
-            privacy: "P2P over Pollen route",
+            privacy: "Pollen signaling, ICE data path",
             privacyTone: "direct",
             details: [
-                ["Route", "Pollen substrate"],
-                ["Data path", "WebRTC ICE direct"],
-                ["Best case", "local network candidate"]
+                ["Signaling", "Pollen substrate"],
+                ["Data path", "browser WebRTC ICE"],
+                ["Clearnet bytes", "possible unless relay-only ICE exists"]
             ]
         },
         "public-id": {
