@@ -117,7 +117,7 @@ class FipsDiscoveryController {
         }
 
         if (remember) this._setPreferredActive(true);
-        Events.fire("join-fips-room");
+        Events.fire("join-fips-room", {rooms: await this._runtimeRooms()});
     }
 
     disable(notify = true, remember = notify) {
@@ -198,6 +198,18 @@ class FipsDiscoveryController {
         if (!FipsDiscoveryProtocol.enabledFromConfig(this._config) || !this._available) return;
 
         await this.enable({notify: false, remember: false});
+    }
+
+    async _runtimeRooms() {
+        const identityController = globalThis.meshdropNostrIdentity;
+        const identity = await identityController?.ensureFollowListLoaded?.()
+            || identityController?.getIdentity?.();
+        return globalThis.NpubNetworkProtocol?.roomsForIdentity
+            ? globalThis.NpubNetworkProtocol.roomsForIdentity(identity, {
+                room: FipsDiscoveryProtocol.roomFromConfig(this._config),
+                discoveryMode: this._config?.fips?.discoveryMode
+            })
+            : [];
     }
 
     _render() {

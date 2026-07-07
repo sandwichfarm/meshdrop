@@ -7,7 +7,6 @@ import os from "node:os";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 
-import {getPublicKey} from "nostr-tools";
 import {WebSocketServer} from "ws";
 
 const repoRoot = new URL("..", import.meta.url);
@@ -105,7 +104,7 @@ async function main() {
             () => runGenericFipsRouteCandidateScenario(browser, relay.port, blossom.port, pollen)
         );
         await retryScenario(
-            "federated-pollen-webrtc",
+            "federated-pollen-public-webrtc",
             () => runFederatedPollenWebRtcScenario(browser, relay.port, blossom.port, pollen)
         );
     }
@@ -454,16 +453,16 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
         serverId: "pollen-a",
         federationPollMs: 200,
         nostrSecretKey: secretA,
-        discoveryNpubs: getPublicKey(hexToBytes(secretB)),
-        pollenNostrBootstrap: "true"
+        pollenNostrBootstrap: "true",
+        publicDiscovery: "true"
     });
     const appB = startApp(portB, relayPort, blossomPort, fipsB.port, pollen, {
         args: [],
         serverId: "pollen-b",
         federationPollMs: 200,
         nostrSecretKey: secretB,
-        discoveryNpubs: getPublicKey(hexToBytes(secretA)),
-        pollenNostrBootstrap: "true"
+        pollenNostrBootstrap: "true",
+        publicDiscovery: "true"
     });
     helpers.push(appA, appB);
 
@@ -513,7 +512,7 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
             contents: [PROOF_ICON]
         }, received);
         assert(!logs.pageErrors.length, `federated-pollen: page errors: ${logs.pageErrors.join("\n")}`);
-        console.log("Proof federated-pollen-webrtc: pollen-mesh delivered meshdrop-proof-icon.svg across two MeshDrop servers");
+        console.log("Proof federated-pollen-public-webrtc: explicit public discovery delivered meshdrop-proof-icon.svg across two MeshDrop servers");
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close(), appA.close(), appB.close()]);
@@ -778,7 +777,6 @@ function startApp(port, relayPort, blossomPort, fipsPort, pollen, options = {}) 
             PORT: String(port),
             MESHDROP_SERVER_ID: options.serverId || `e2e-${port}`,
             NOSTR_RELAYS: `ws://127.0.0.1:${relayPort}`,
-            MESHDROP_DISCOVERY_NPUBS: options.discoveryNpubs || "",
             MESHDROP_NOSTR_SECRET_KEY: options.nostrSecretKey
                 || "0000000000000000000000000000000000000000000000000000000000000001",
             BLOSSOM_SERVERS: `http://127.0.0.1:${blossomPort}`,
@@ -789,6 +787,7 @@ function startApp(port, relayPort, blossomPort, fipsPort, pollen, options = {}) 
             PLN_BIN: pollen.bin,
             PLN_DIR: pollen.dir,
             POLLEN_NOSTR_BOOTSTRAP: options.pollenNostrBootstrap || "false",
+            MESHDROP_PUBLIC_DISCOVERY: options.publicDiscovery || "false",
             RTC_CONFIG: "false"
         },
         stdio: ["ignore", "pipe", "pipe"]
@@ -1177,14 +1176,6 @@ function delay(ms) {
 
 function assert(condition, message) {
     if (!condition) throw new Error(message);
-}
-
-function hexToBytes(hex) {
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < bytes.length; i++) {
-        bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-    }
-    return bytes;
 }
 
 main()

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 await import("../public/scripts/ui.js");
 
 const protocol = globalThis.PeerAvailabilityProtocol;
+const routeStatus = globalThis.PeerRouteStatusProtocol;
 
 test("peer availability exposes instance, FIPS, Pollen, and Nostr room types", () => {
     const peer = {
@@ -197,4 +198,12 @@ test("Nostr identity keys normalize pubkey case before grouping peers", () => {
         }, "ip"),
         [`nostr:${"a".repeat(64)}`]
     );
+});
+
+test("route status text names the active network and phase", () => {
+    assert.equal(routeStatus.text({route: "nostr", state: "connecting"}), "Connecting via Nostr...");
+    assert.equal(routeStatus.text({route: "fips", state: "ice-checking"}), "Checking FIPS ICE...");
+    assert.equal(routeStatus.text({route: "pollen", state: "timeout"}), "Pollen timed out");
+    assert.equal(routeStatus.text({route: "ip", state: "failed"}), "Instance failed");
+    assert.equal(routeStatus.statusKey({route: "fips", state: "ice-checking"}), "route-fips-ice-checking");
 });

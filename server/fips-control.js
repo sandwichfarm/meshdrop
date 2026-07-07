@@ -2,7 +2,6 @@ import net from "net";
 import {
     createNpubDiscoveryNetwork,
     normalizeNpubDiscoveryNetworkId,
-    parseNostrPubkeys,
     pubkeyFromSecret
 } from "./npub-network.js";
 
@@ -17,7 +16,7 @@ export function createFipsConfig(env = process.env) {
     const enabled = env.FIPS_DISCOVERY !== "false" || !!env.FIPS_CONTROL_SOCKET;
     const network = createNpubDiscoveryNetwork({
         localPubkey: pubkeyFromSecret(env.MESHDROP_NOSTR_SECRET_KEY),
-        peerPubkeys: parseNostrPubkeys(env.MESHDROP_DISCOVERY_NPUBS || env.MESHDROP_NPUBS || "")
+        peerPubkeys: []
     });
 
     return {

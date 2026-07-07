@@ -14,8 +14,6 @@ const adminSecretKey = generateSecretKey();
 const adminSecretKeyHex = bytesToHex(adminSecretKey);
 const adminPubkey = getPublicKey(adminSecretKey);
 const adminNpub = nip19.npubEncode(adminPubkey);
-const discoverySecretKey = generateSecretKey();
-const discoveryNpub = nip19.npubEncode(getPublicKey(discoverySecretKey));
 const fipsPeerNpub = nip19.npubEncode(getPublicKey(generateSecretKey()));
 let composeOverridePath = "";
 
@@ -62,7 +60,6 @@ function composeOverride() {
     environment:
       MESHDROP_ADMIN_NPUB: ${adminNpub}
       MESHDROP_NOSTR_SECRET_KEY: ${adminSecretKeyHex}
-      MESHDROP_DISCOVERY_NPUBS: ${discoveryNpub}
       NOSTR_RELAYS: ${relayUrls}
       FIPS_DISCOVERY: "true"
       FIPS_CONTROL_TIMEOUT_MS: "5000"
@@ -82,7 +79,7 @@ function composeOverride() {
 async function assertComposeDeployment(baseUrl) {
     const env = await inspectContainerEnv();
     assert(env.MESHDROP_ADMIN_NPUB === adminNpub, "compose did not configure the admin npub");
-    assert(env.MESHDROP_DISCOVERY_NPUBS === discoveryNpub, "compose did not configure discovery npubs");
+    assert(!Object.keys(env).some(key => staticDiscoveryNpubsPattern().test(key)), "compose still exposes static discovery npubs");
     assert(env.NOSTR_RELAYS === relayUrls, "compose did not configure Nostr relays");
     assert(!("NOSTR_ROOM" in env), "compose deployment still exposes NOSTR_ROOM");
     assert(!("FIPS_ROOM" in env), "compose deployment still exposes FIPS_ROOM");
@@ -96,8 +93,8 @@ async function assertComposeDeployment(baseUrl) {
     assert(config.capabilities?.serverSettings?.actions?.fipsPeers === true, "signed FIPS settings action is not exposed");
     assert(config.fips?.enabled === true, "compose FIPS is not enabled");
     assert(config.pollen?.enabled === true, "compose Pollen is not enabled");
-    assert(isConfiguredNpubNetwork(config.fips?.room), `FIPS room did not use configured npub network: ${config.fips?.room}`);
-    assert(isConfiguredNpubNetwork(config.pollen?.room), `Pollen room did not use configured npub network: ${config.pollen?.room}`);
+    assert(config.fips?.room === "", `FIPS room should be runtime-derived, got: ${config.fips?.room}`);
+    assert(config.pollen?.room === "", `Pollen room should be runtime-derived, got: ${config.pollen?.room}`);
 }
 
 async function inspectContainerEnv() {
@@ -114,8 +111,8 @@ async function getJson(url) {
     return response.json();
 }
 
-function isConfiguredNpubNetwork(value) {
-    return typeof value === "string" && value.startsWith("npub-network:") && value !== "npub-network:unconfigured";
+function staticDiscoveryNpubsPattern() {
+    return new RegExp(["DISCOVERY", "NPUBS"].join("_"));
 }
 
 async function runCompose(args, options = {}) {

@@ -35,15 +35,22 @@ test("Umbrel package builder creates app manifest and compose artifact", async (
         assert.match(compose, /APP_HOST: meshdrop_server_1/);
         assert.match(compose, /image: ghcr\.io\/sandwichfarm\/meshdrop:v0\.0\.0-umbrel/);
         assert.match(compose, /MESHDROP_TARGET=umbrel/);
-        assert.match(compose, /MESHDROP_DISCOVERY_NPUBS=/);
+        assert.doesNotMatch(compose, staticDiscoveryNpubsPattern());
         assert.match(compose, /MESHDROP_ADMIN_NPUB=/);
         assert.match(compose, /POLLEN_TRANSFER=true/);
         assert.doesNotMatch(compose, /NOSTR_ROOM|FIPS_ROOM|POLLEN_ROOM/);
+
+        const target = await readTarEntry(result.artifactPath, `${prefix}/meshdrop-target.json`);
+        assert.match(target, /"discovery": "browser-nostr-wot"/);
     }
     finally {
         await fs.rm(tempDir, {recursive: true, force: true});
     }
 });
+
+function staticDiscoveryNpubsPattern() {
+    return new RegExp(["DISCOVERY", "NPUBS"].join("_"));
+}
 
 test("Umbrel package smoke command runs the rendered compose package", () => {
     const packageJson = JSON.parse(fsSync.readFileSync(new URL("../package.json", import.meta.url), "utf8"));

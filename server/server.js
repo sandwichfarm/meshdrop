@@ -68,11 +68,13 @@ export default class PairDropServer {
                 pollen: {
                     enabled: conf.pollen.enabled,
                     maxUploadBytes: conf.pollen.maxUploadBytes,
-                    room: pollenRoom
+                    room: pollenRoom,
+                    discoveryMode: conf.federation?.nostr?.discoveryMode || "wot"
                 },
                 fips: {
                     enabled: conf.fips.enabled,
-                    room: fipsRoom
+                    room: fipsRoom,
+                    discoveryMode: conf.federation?.nostr?.discoveryMode || "wot"
                 },
                 admin: adminPublicConfig(admin),
                 capabilities: createRuntimeCapabilities({

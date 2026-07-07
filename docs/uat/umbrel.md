@@ -13,7 +13,7 @@ Use this runbook for the Umbrel app package artifact built from `packaging/umbre
 1. Confirm `umbrel-app.yml` uses `manifestVersion: 1`, `id: meshdrop`, `port: 3000`, and the requested version.
 2. Confirm `docker-compose.yml` uses the `ghcr.io/sandwichfarm/meshdrop:<tag>-umbrel` image.
 3. Confirm compose sets `MESHDROP_TARGET=umbrel`.
-4. Confirm compose exposes `MESHDROP_DISCOVERY_NPUBS` and does not set `NOSTR_ROOM`, `FIPS_ROOM`, or `POLLEN_ROOM`.
+4. Confirm compose does not expose static discovery npubs and does not set `NOSTR_ROOM`, `FIPS_ROOM`, or `POLLEN_ROOM`.
 5. Confirm compose exposes `MESHDROP_ADMIN_NPUB` for shared-instance server settings.
 6. Confirm Pollen is enabled and persistent state is mounted under `${APP_DATA_DIR}/data`.
 
@@ -23,7 +23,7 @@ Use this runbook for the Umbrel app package artifact built from `packaging/umbre
 2. Open MeshDrop from the Umbrel UI without SSH or manual file edits.
 3. Confirm `/config` reports `capabilities.runtime.target` as `umbrel`.
 4. Configure a Nostr identity and transfer a small file over Nostr WebRTC.
-5. Configure `MESHDROP_DISCOVERY_NPUBS` for a second MeshDrop instance and confirm Pollen peers appear through npub-network discovery.
+5. Sign in with a Nostr identity that follows the target user, confirm NIP-65 relays are loaded from bootstrap relays, and confirm Pollen peers appear through runtime npub-network discovery.
 6. Transfer a small file over Pollen before claiming Pollen works on Umbrel.
 7. If `MESHDROP_ADMIN_NPUB` is configured, confirm admin settings appear only for the configured npub and the backend rejects other signers.
 
@@ -59,8 +59,8 @@ npm run build:umbrel -- --version 0.0.0-smoke --out-dir /tmp/meshdrop-umbrel-smo
 node --test test/umbrel-package.test.js
 ```
 
-This smoke proves package artifact shape, manifest rendering, compose image/target metadata, npub-discovery environment,
-admin-npub environment, and the absence of legacy static room environment variables.
+This smoke proves package artifact shape, manifest rendering, compose image/target metadata, browser Nostr WOT discovery
+metadata, admin-npub environment, and the absence of static discovery room environment variables.
 
 ## Not Proven
 

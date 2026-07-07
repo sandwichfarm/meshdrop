@@ -38,23 +38,16 @@ if [ "${POLLEN_TRANSFER:-true}" != "false" ]; then
         export PLN_DIR="${PLN_DIR:-/var/lib/meshdrop/pln}"
         mkdir -p "$PLN_DIR"
 
-        if [ "${POLLEN_NOSTR_CLUSTER_BOOTSTRAP:-true}" != "false" ] \
-            && [ -n "${MESHDROP_DISCOVERY_NPUBS:-${MESHDROP_NPUBS:-}}" ] \
-            && [ ! -f "$PLN_DIR/keys/delegation.cert.pb" ]; then
-            export POLLEN_DAEMON_DEFERRED=1
-            echo "Deferring Pollen daemon: waiting for MeshDrop Nostr cluster bootstrap"
-        else
-            echo "Starting Pollen daemon with PLN_DIR=$PLN_DIR"
-            set -- up --name "${POLLEN_NAME:-meshdrop}" --port "${POLLEN_PORT:-60611}"
-            if [ "${POLLEN_PUBLIC:-false}" = "true" ]; then
-                set -- "$@" --public
-            fi
-            if [ -n "${POLLEN_IPS:-}" ]; then
-                set -- "$@" --ips "${POLLEN_IPS}"
-            fi
-            pln "$@" &
-            pollen_pid="$!"
+        echo "Starting Pollen daemon with PLN_DIR=$PLN_DIR"
+        set -- up --name "${POLLEN_NAME:-meshdrop}" --port "${POLLEN_PORT:-60611}"
+        if [ "${POLLEN_PUBLIC:-false}" = "true" ]; then
+            set -- "$@" --public
         fi
+        if [ -n "${POLLEN_IPS:-}" ]; then
+            set -- "$@" --ips "${POLLEN_IPS}"
+        fi
+        pln "$@" &
+        pollen_pid="$!"
     else
         echo "Pollen daemon not started: pln binary is missing"
     fi

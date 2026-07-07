@@ -23,8 +23,8 @@ test("relay settings expose browser dialog globals with non-empty client default
 
     assert.deepEqual(settings.bootstrapRelays, ["wss://purplepag.es", "wss://nos.lol"]);
     assert.deepEqual(settings.webRtcRelays, ["wss://bucket.coracle.social"]);
-    assert.deepEqual(settings.inboxRelays, ["wss://purplepag.es", "wss://nos.lol"]);
-    assert.deepEqual(settings.outboxRelays, ["wss://purplepag.es", "wss://nos.lol"]);
+    assert.deepEqual(settings.inboxRelays, []);
+    assert.deepEqual(settings.outboxRelays, []);
 });
 
 test("NIP-65 relay list parses read and write relay markers", () => {
@@ -70,6 +70,96 @@ test("kind 3 contact list parses followed pubkeys", () => {
     });
 
     assert.deepEqual(follows, [first, second]);
+});
+
+test("Nostr relay lookup reads NIP-65 from bootstrap and follows from bootstrap plus inbox and outbox", async () => {
+    const pubkey = "a".repeat(64);
+    const followed = "b".repeat(64);
+    const calls = [];
+    const pool = new globalThis.NostrRelayPool({bootstrapRelays: ["wss://bootstrap.example"]});
+    pool.fetchLatestEvent = async (relayUrls, filter) => {
+        calls.push({relayUrls, filter});
+        if (filter.kinds[0] === protocol.relayListKind) {
+            return {
+                kind: protocol.relayListKind,
+                pubkey,
+                created_at: 1,
+                tags: [
+                    ["r", "wss://read.example", "read"],
+                    ["r", "wss://write.example", "write"]
+                ]
+            };
+        }
+        if (filter.kinds[0] === protocol.contactListKind) {
+            return {
+                kind: protocol.contactListKind,
+                pubkey,
+                created_at: 1,
+                tags: [["p", followed]]
+            };
+        }
+        return null;
+    };
+
+    const discovery = await pool.lookupUser(pubkey);
+    const relayListCall = calls.find(call => call.filter.kinds[0] === protocol.relayListKind);
+    const followListCall = calls.find(call => call.filter.kinds[0] === protocol.contactListKind);
+
+    assert.deepEqual(discovery.relays.read, ["wss://read.example"]);
+    assert.deepEqual(discovery.relays.write, ["wss://write.example"]);
+    assert.equal(discovery.relays.status, "found");
+    assert.deepEqual(discovery.followPubkeys, [followed]);
+    assert.deepEqual(relayListCall.relayUrls, ["wss://bootstrap.example"]);
+    assert.deepEqual(followListCall.relayUrls, [
+        "wss://bootstrap.example",
+        "wss://read.example",
+        "wss://write.example"
+    ]);
+});
+
+test("Nostr relay lookup keeps missing NIP-65 distinct from bootstrap fallback", async () => {
+    const pubkey = "c".repeat(64);
+    const followed = "d".repeat(64);
+    const calls = [];
+    const pool = new globalThis.NostrRelayPool({bootstrapRelays: ["wss://bootstrap.example"]});
+    pool.fetchLatestEvent = async (relayUrls, filter) => {
+        calls.push({relayUrls, filter});
+        if (filter.kinds[0] === protocol.contactListKind) {
+            return {
+                kind: protocol.contactListKind,
+                pubkey,
+                created_at: 1,
+                tags: [["p", followed]]
+            };
+        }
+        return null;
+    };
+
+    const discovery = await pool.lookupUser(pubkey);
+    const followListCall = calls.find(call => call.filter.kinds[0] === protocol.contactListKind);
+
+    assert.deepEqual(discovery.relays.read, []);
+    assert.deepEqual(discovery.relays.write, []);
+    assert.equal(discovery.relays.status, "missing");
+    assert.deepEqual(discovery.followPubkeys, [followed]);
+    assert.deepEqual(followListCall.relayUrls, ["wss://bootstrap.example"]);
+});
+
+test("npub network rooms are pairwise and derived from the loaded follow set", async () => {
+    const local = "e".repeat(64);
+    const first = "f".repeat(64);
+    const second = "1".repeat(64);
+    const rooms = await globalThis.NpubNetworkProtocol.roomsForIdentity({
+        pubkey: local,
+        followPubkeys: [first, second, "not-a-pubkey", local]
+    });
+    const firstRoom = await globalThis.NpubNetworkProtocol.pairwiseRoom(local, first);
+    const firstRoomReversed = await globalThis.NpubNetworkProtocol.pairwiseRoom(first, local);
+
+    assert.equal(rooms.length, 2);
+    assert(rooms.every(room => /^npub-network:[a-f0-9]{32}$/.test(room)));
+    assert.equal(firstRoom, firstRoomReversed);
+    assert(rooms.includes(firstRoom));
 });
 
 test("follow policy only allows pubkeys in the loaded contact list", () => {

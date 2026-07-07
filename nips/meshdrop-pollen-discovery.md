@@ -134,9 +134,11 @@ When an operator explicitly enables public/lobby/debug discovery, clients MAY al
 
 ## Default network
 
-When `MESHDROP_DISCOVERY_NPUBS` is empty, MeshDrop does not synthesize a shared discovery room. `npub-network:unconfigured`
-is reserved for explicit public/lobby/debug mode, for example when `MESHDROP_PUBLIC_DISCOVERY=true` is configured. It MUST
-NOT be used as the default MeshDrop discovery model or for automatic Pollen invite issuance.
+By default, MeshDrop clients derive discovery rooms at runtime from the logged-in user's kind 3 follow list after loading
+NIP-65 relay lists from bootstrap relays. Server/static npub configuration MUST NOT create default discovery rooms.
+`npub-network:unconfigured` is reserved for explicit public/lobby/debug mode, for example when
+`MESHDROP_PUBLIC_DISCOVERY=true` is configured. It MUST NOT be used as the default MeshDrop discovery model or for
+automatic Pollen invite issuance.
 
 ## Receiver behavior
 

@@ -28,7 +28,7 @@ Use this runbook for the StartOS package source artifact built from `packaging/s
    `x86_64` plus `aarch64` architectures.
 2. Confirm `startos/interfaces.ts` exposes the MeshDrop web UI and Pollen peer interface.
 3. Confirm `startos/main.ts` sets `MESHDROP_TARGET=start9`.
-4. Confirm `startos/main.ts` exposes `MESHDROP_DISCOVERY_NPUBS` and does not set `NOSTR_ROOM`, `FIPS_ROOM`, or
+4. Confirm `startos/main.ts` does not expose static discovery npubs and does not set `NOSTR_ROOM`, `FIPS_ROOM`, or
    `POLLEN_ROOM`.
 5. Confirm `startos/main.ts` exposes `MESHDROP_ADMIN_NPUB` for shared-instance server settings.
 6. Confirm Pollen is enabled and FIPS is disabled until a StartOS-specific FIPS path is tested.
@@ -39,8 +39,8 @@ Use this runbook for the StartOS package source artifact built from `packaging/s
 2. Open MeshDrop from the StartOS web interface without SSH or manual file edits.
 3. Confirm `/config` reports `capabilities.runtime.target` as `start9`.
 4. Configure a Nostr identity and transfer a small file over Nostr WebRTC.
-5. Configure `MESHDROP_DISCOVERY_NPUBS` for a second MeshDrop instance and confirm Pollen peers appear through
-   npub-network discovery.
+5. Sign in with a Nostr identity that follows the target user, confirm NIP-65 relays are loaded from bootstrap relays,
+   and confirm Pollen peers appear through runtime npub-network discovery.
 6. Transfer a small file over Pollen before claiming Pollen works on Start9.
 7. If `MESHDROP_ADMIN_NPUB` is configured, confirm admin settings appear only for the configured npub and the backend
    rejects other signers.
@@ -79,8 +79,8 @@ node --test test/start9-package.test.js
 ```
 
 This smoke proves package source artifact shape, root package icon, root license, manifest/version rendering, bundled
-`tar2sqfs` fallback executable, image/target metadata, vendored StartOS make plumbing, npub-discovery environment,
-admin-npub environment, Pollen enablement, absence of legacy static room environment variables, and generated source
+`tar2sqfs` fallback executable, image/target metadata, vendored StartOS make plumbing, browser Nostr WOT discovery
+metadata, admin-npub environment, Pollen enablement, absence of static discovery room environment variables, and generated source
 `npm run check` plus `npm run build` against `@start9labs/start-sdk@1.5.3`.
 
 Current local package proof on 2026-07-04:

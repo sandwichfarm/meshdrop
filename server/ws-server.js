@@ -3,6 +3,7 @@ import crypto from "crypto"
 
 import Peer from "./peer.js";
 import {hasher, randomizer} from "./helper.js";
+import {normalizeNpubDiscoveryNetworkId} from "./npub-network.js";
 
 const writeStderr = value => process.stderr.write(`${value?.stack || value?.message || value}\n`);
 
@@ -68,13 +69,13 @@ export default class PairDropWsServer {
                 this._leaveIpRoom(sender);
                 break;
             case 'join-fips-room':
-                this._onJoinFipsRoom(sender);
+                this._onJoinFipsRoom(sender, message);
                 break;
             case 'leave-fips-room':
                 this._leaveFipsRoom(sender);
                 break;
             case 'join-pollen-room':
-                this._onJoinPollenRoom(sender);
+                this._onJoinPollenRoom(sender, message);
                 break;
             case 'leave-pollen-room':
                 this._leavePollenRoom(sender);
@@ -340,7 +341,7 @@ export default class PairDropWsServer {
         this._joinRoom(peer, 'ip', peer.ip);
     }
 
-    async _onJoinFipsRoom(peer) {
+    async _onJoinFipsRoom(peer, message = {}) {
         if (!this._conf.fips.enabled) {
             this._send(peer, {type: 'fips-status', status: await this._conf.fipsClient.status()});
             return;
@@ -351,16 +352,17 @@ export default class PairDropWsServer {
 
         if (!status.available) return;
 
-        this._joinFipsRoom(peer);
+        this._joinFipsRoom(peer, this._roomIdsFromJoinMessage(message));
     }
 
-    _joinFipsRoom(peer) {
+    _joinFipsRoom(peer, roomIds = []) {
         this._leaveFipsRoom(peer);
-        this._joinRoom(peer, 'fips', this._conf.fips.room);
-        peer.fipsRoomId = this._conf.fips.room;
+        peer.fipsRoomIds = roomIds;
+        peer.fipsRoomId = roomIds[0] || null;
+        for (const roomId of roomIds) this._joinRoom(peer, 'fips', roomId);
     }
 
-    async _onJoinPollenRoom(peer) {
+    async _onJoinPollenRoom(peer, message = {}) {
         if (!this._conf.pollen.enabled) {
             this._send(peer, {type: 'pollen-status', status: await this._conf.pollenClient.status()});
             return;
@@ -371,13 +373,24 @@ export default class PairDropWsServer {
 
         if (!status.available) return;
 
-        this._joinPollenRoom(peer);
+        this._joinPollenRoom(peer, this._roomIdsFromJoinMessage(message));
     }
 
-    _joinPollenRoom(peer) {
+    _joinPollenRoom(peer, roomIds = []) {
         this._leavePollenRoom(peer);
-        this._joinRoom(peer, 'pollen', this._conf.federation.pollen.room);
-        peer.pollenRoomId = this._conf.federation.pollen.room;
+        peer.pollenRoomIds = roomIds;
+        peer.pollenRoomId = roomIds[0] || null;
+        for (const roomId of roomIds) this._joinRoom(peer, 'pollen', roomId);
+    }
+
+    _roomIdsFromJoinMessage(message = {}) {
+        const requestedRooms = Array.isArray(message.rooms)
+            ? message.rooms
+            : (message.room ? [message.room] : []);
+
+        return [...new Set(requestedRooms
+            .map(room => normalizeNpubDiscoveryNetworkId(room))
+            .filter(Boolean))];
     }
 
     _joinSecretRoom(peer, roomSecret) {
@@ -426,16 +439,20 @@ export default class PairDropWsServer {
     }
 
     _leaveFipsRoom(peer, disconnect = false) {
-        if (!peer.fipsRoomId) return;
+        const roomIds = peer.fipsRoomIds || (peer.fipsRoomId ? [peer.fipsRoomId] : []);
+        if (!roomIds.length) return;
 
-        this._leaveRoom(peer, 'fips', peer.fipsRoomId, disconnect);
+        for (const roomId of roomIds) this._leaveRoom(peer, 'fips', roomId, disconnect);
+        peer.fipsRoomIds = [];
         peer.fipsRoomId = null;
     }
 
     _leavePollenRoom(peer, disconnect = false) {
-        if (!peer.pollenRoomId) return;
+        const roomIds = peer.pollenRoomIds || (peer.pollenRoomId ? [peer.pollenRoomId] : []);
+        if (!roomIds.length) return;
 
-        this._leaveRoom(peer, 'pollen', peer.pollenRoomId, disconnect);
+        for (const roomId of roomIds) this._leaveRoom(peer, 'pollen', roomId, disconnect);
+        peer.pollenRoomIds = [];
         peer.pollenRoomId = null;
     }
 

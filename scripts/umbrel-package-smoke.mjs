@@ -84,7 +84,7 @@ async function assertUmbrelDeployment(baseUrl) {
     assert(env.MESHDROP_TARGET === "umbrel", "rendered compose did not configure MESHDROP_TARGET=umbrel");
     assert(env.POLLEN_TRANSFER === "true", "rendered compose did not enable Pollen transfer");
     assert(env.FIPS_DISCOVERY === "false", "rendered compose should keep FIPS disabled until target UAT exists");
-    assert("MESHDROP_DISCOVERY_NPUBS" in env, "rendered compose did not expose MESHDROP_DISCOVERY_NPUBS");
+    assert(!Object.keys(env).some(key => staticDiscoveryNpubsPattern().test(key)), "rendered compose still exposes static discovery npubs");
     assert("MESHDROP_ADMIN_NPUB" in env, "rendered compose did not expose MESHDROP_ADMIN_NPUB");
     assert(!("NOSTR_ROOM" in env), "rendered compose still exposes NOSTR_ROOM");
     assert(!("FIPS_ROOM" in env), "rendered compose still exposes FIPS_ROOM");
@@ -97,6 +97,10 @@ async function assertUmbrelDeployment(baseUrl) {
     assert(config.capabilities?.transports?.fips?.supported === false, "Umbrel FIPS capability should remain disabled");
     assert(config.pollen?.enabled === true, "Umbrel Pollen config is not enabled");
     assert(config.fips?.enabled === false, "Umbrel FIPS config should remain disabled");
+}
+
+function staticDiscoveryNpubsPattern() {
+    return new RegExp(["DISCOVERY", "NPUBS"].join("_"));
 }
 
 async function inspectContainerEnv() {

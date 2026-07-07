@@ -23,7 +23,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
         RATE_LIMIT: "false",
         WS_FALLBACK: "false",
         NOSTR_RELAYS: "wss://bucket.coracle.social",
-        MESHDROP_DISCOVERY_NPUBS: "",
         MESHDROP_ADMIN_NPUB: "",
         BLOSSOM_SERVERS: "",
         FIPS_DISCOVERY: "false",

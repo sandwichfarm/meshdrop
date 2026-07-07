@@ -5,7 +5,6 @@ import {generateSecretKey, utils} from "nostr-tools";
 import {
     DEFAULT_NPUB_DISCOVERY_NETWORK_ID,
     createNpubDiscoveryNetwork,
-    parseNostrPubkeys,
     pubkeyFromSecret
 } from "./npub-network.js";
 
@@ -20,7 +19,7 @@ export function createFederationConfig(env = process.env) {
         : "";
     const network = createNpubDiscoveryNetwork({
         localPubkey: pubkeyFromSecret(secretKey),
-        peerPubkeys: parseNostrPubkeys(env.MESHDROP_DISCOVERY_NPUBS || env.MESHDROP_NPUBS || ""),
+        peerPubkeys: [],
         publicNetworkId
     });
 

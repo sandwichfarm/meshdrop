@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 
 const meshdropNetworkHasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+const RTC_ROUTE_ATTEMPT_TIMEOUT_MS = 15000;
 
 const SignalingRoomPriority = {
     priority: {
@@ -122,9 +123,9 @@ class ServerConnection {
         Events.on('room-secrets', e => this.send({ type: 'room-secrets', roomSecrets: e.detail }));
         Events.on('join-ip-room', _ => this.send({ type: 'join-ip-room'}));
         Events.on('leave-ip-room', _ => this.send({ type: 'leave-ip-room'}));
-        Events.on('join-fips-room', _ => this.send({ type: 'join-fips-room'}));
+        Events.on('join-fips-room', e => this.send({ type: 'join-fips-room', rooms: e.detail?.rooms || []}));
         Events.on('leave-fips-room', _ => this.send({ type: 'leave-fips-room'}));
-        Events.on('join-pollen-room', _ => this.send({ type: 'join-pollen-room'}));
+        Events.on('join-pollen-room', e => this.send({ type: 'join-pollen-room', rooms: e.detail?.rooms || []}));
         Events.on('leave-pollen-room', _ => this.send({ type: 'leave-pollen-room'}));
         Events.on('room-secrets-deleted', e => this.send({ type: 'room-secrets-deleted', roomSecrets: e.detail}));
         Events.on('regenerate-room-secret', e => this.send({ type: 'regenerate-room-secret', roomSecret: e.detail}));
@@ -538,7 +539,8 @@ class Peer {
         this._peerId = peerId;
 
         this._roomIds = {};
-        this._updateRoomIds(roomType, roomId);
+        this._peerIdsByRoomType = {};
+        this._updateRoomIds(roomType, roomId, peerId);
 
         this._filesQueue = [];
         this._busy = false;
@@ -578,7 +580,7 @@ class Peer {
         return Object.keys(this._roomIds);
     }
 
-    _updateRoomIds(roomType, roomId) {
+    _updateRoomIds(roomType, roomId, routePeerId = this._peerId) {
         const roomTypeIsSecret = roomType === "secret";
         const roomIdIsNotPairSecret = this._getPairSecret() !== roomId;
 
@@ -597,6 +599,7 @@ class Peer {
         }
 
         this._roomIds[roomType] = roomId;
+        if (routePeerId) this._peerIdsByRoomType[roomType] = routePeerId;
 
         if (!this._isSameBrowser()
             &&  roomTypeIsSecret
@@ -612,11 +615,16 @@ class Peer {
 
     _removeRoomType(roomType) {
         delete this._roomIds[roomType];
+        delete this._peerIdsByRoomType?.[roomType];
 
         Events.fire('room-type-removed', {
             peerId: this._peerId,
             roomType: roomType
         });
+    }
+
+    _routePeerId(roomType = this._getRoomTypes()[0]) {
+        return this._peerIdsByRoomType?.[roomType] || this._peerId;
     }
 
     _evaluateAutoAccept() {
@@ -1502,7 +1510,9 @@ class RTCPeer extends Peer {
         this._pendingIceCandidates = [];
         this._remoteOfferSdp = "";
         this._localOfferRecoveryAttempts = 0;
+        this._routeAttemptTimer = null;
 
+        this._routeStatus(this._isCaller ? "selected" : "waiting", "created");
         if (!this._isCaller) return; // we will listen for a caller
         this._connect();
     }
@@ -1510,6 +1520,8 @@ class RTCPeer extends Peer {
     _connect() {
         if (this._shouldRefreshOfferConnection()) this._dropConnection();
         if (!this._conn || this._conn.signalingState === "closed") this._openConnection();
+        this._routeStatus(this._isCaller ? "connecting" : "waiting", "rtc-connect");
+        this._scheduleRouteAttemptTimeout("rtc-connect");
 
         if (this._isCaller) {
             this._openChannel();
@@ -1545,6 +1557,7 @@ class RTCPeer extends Peer {
         });
         channel.onopen = e => this._onChannelOpened(e);
         channel.onerror = e => this._onError(e);
+        this._routeStatus("offer", "local-data-channel");
 
         this._conn
             .createOffer()
@@ -1556,6 +1569,7 @@ class RTCPeer extends Peer {
         // description.sdp = description.sdp.replace('b=AS:30', 'b=AS:1638400');
         if (description.type === 'answer' && this._conn.signalingState !== 'have-remote-offer') return;
 
+        this._routeStatus(description.type === "offer" ? "offer" : "answer", "local-description");
         this._conn
             .setLocalDescription(description)
             .then(_ => this._sendSignal({ sdp: description }))
@@ -1608,6 +1622,7 @@ class RTCPeer extends Peer {
         if (description.type === 'answer' && this._conn.signalingState !== 'have-local-offer') return;
         if (description.type === 'offer' && this._shouldIgnoreOffer(description)) return;
 
+        this._routeStatus(description.type === "offer" ? "remote-offer" : "remote-answer", "remote-description");
         if (description.type === 'offer') {
             this._signalSessionId = message.sessionId || this._createSignalSessionId();
             this._remoteOfferSdp = description.sdp || "";
@@ -1681,12 +1696,17 @@ class RTCPeer extends Peer {
     }
 
     _shouldIgnoreSignal(message) {
-        return this._shouldIgnoreSignalSession(message.sessionId || "");
+        if (!message.sessionId) {
+            this._routeStatus("signal-rejected", "missing-session");
+            console.warn("RTC: ignoring signal without session id", this._peerId);
+            return true;
+        }
+        return this._shouldIgnoreSignalSession(message.sessionId);
     }
 
     _shouldIgnoreSignalSession(sessionId) {
         if (sessionId) return !!this._signalSessionId && sessionId !== this._signalSessionId;
-        return false;
+        return true;
     }
 
     _createSignalSessionId() {
@@ -1697,6 +1717,7 @@ class RTCPeer extends Peer {
 
     _onChannelOpened(event) {
         console.log('RTC: channel opened with', this._peerId);
+        this._clearRouteAttemptTimeout();
         const channel = event.channel || event.target;
         channel.binaryType = 'arraybuffer';
         channel.onmessage = e => this._onMessage(e.data);
@@ -1704,6 +1725,7 @@ class RTCPeer extends Peer {
         this._channel = channel;
         Events.on('beforeunload', e => this._onBeforeUnload(e));
         Events.on('pagehide', _ => this._onPageHide());
+        this._routeStatus("connected", "data-channel-open");
         Events.fire('peer-connected', {peerId: this._peerId, connectionHash: this.getConnectionHash()});
     }
 
@@ -1749,6 +1771,7 @@ class RTCPeer extends Peer {
 
     _disconnect() {
         this._intentionalDisconnect = true;
+        this._clearRouteAttemptTimeout();
         if (this._conn && this._channel) {
             this._channel.onclose = null;
             this._channel.close();
@@ -1758,14 +1781,18 @@ class RTCPeer extends Peer {
 
     _onChannelClosed() {
         console.log('RTC: channel closed', this._peerId);
-        Events.fire('peer-disconnected', this._peerId);
         if (this._intentionalDisconnect) return;
+        const failedRoute = this._currentRouteType();
+        this._routeStatus("connection-disconnected", "data-channel-closed");
+        Events.fire('peer-route-failed', {peerId: this._peerId, reason: "data-channel-closed"});
         if (!this._isCaller) return;
+        if (this._intentionalDisconnect || this._currentRouteType() !== failedRoute) return;
         this._dropConnection();
-        this._connect(); // reopen the channel
+        this._connect(); // reopen the channel when no fallback route took over
     }
 
     _dropConnection() {
+        this._clearRouteAttemptTimeout();
         if (this._conn && this._conn.signalingState !== 'closed') this._conn.close();
         this._conn = null;
         this._channel = null;
@@ -1776,20 +1803,34 @@ class RTCPeer extends Peer {
 
     _onConnectionStateChange() {
         console.log('RTC: state changed:', this._conn.connectionState);
+        this._routeStatus(`connection-${this._conn.connectionState}`, "connection-state");
         switch (this._conn.connectionState) {
+            case 'connected':
+                this._clearRouteAttemptTimeout();
+                break;
             case 'disconnected':
                 console.warn('RTC: connection temporarily disconnected', this._peerId);
                 break;
             case 'failed':
-                Events.fire('peer-disconnected', this._peerId);
+                this._clearRouteAttemptTimeout();
+                Events.fire('peer-route-failed', {peerId: this._peerId, reason: "connection-failed"});
                 this._onError('rtc connection failed');
                 break;
         }
     }
 
     _onIceConnectionStateChange() {
+        this._routeStatus(`ice-${this._conn.iceConnectionState}`, "ice-state");
         switch (this._conn.iceConnectionState) {
+            case 'connected':
+            case 'completed':
+                this._clearRouteAttemptTimeout();
+                break;
             case 'failed':
+                this._clearRouteAttemptTimeout();
+                if (!this._intentionalDisconnect) {
+                    Events.fire('peer-route-failed', {peerId: this._peerId, reason: "ice-failed"});
+                }
                 this._onError('ICE Gathering failed');
                 break;
             default:
@@ -1813,11 +1854,12 @@ class RTCPeer extends Peer {
     }
 
     _sendSignal(signal) {
+        const roomType = this._getRoomTypes()[0];
         signal.type = 'signal';
-        signal.to = this._peerId;
+        signal.to = this._routePeerId(roomType);
         if (this._signalSessionId) signal.sessionId = this._signalSessionId;
-        signal.roomType = this._getRoomTypes()[0];
-        signal.roomId = this._roomIds[this._getRoomTypes()[0]];
+        signal.roomType = roomType;
+        signal.roomId = this._roomIds[roomType];
         this._server.send(signal);
     }
 
@@ -1839,7 +1881,8 @@ class RTCPeer extends Peer {
         return this._channel && this._channel.readyState === 'connecting';
     }
 
-    switchSignalingRoute(isCaller, roomType, roomId, transport) {
+    switchSignalingRoute(isCaller, roomType, roomId, transport, routePeerId = null) {
+        this._clearRouteAttemptTimeout();
         this._intentionalDisconnect = true;
         if (this._channel) {
             this._channel.onclose = null;
@@ -1856,8 +1899,68 @@ class RTCPeer extends Peer {
         this._isCaller = isCaller;
         this._server = transport;
         this._roomIds = SignalingRoomPriority.withPreferred(this._roomIds, roomType, roomId);
+        this._peerIdsByRoomType = {
+            ...this._peerIdsByRoomType,
+            [roomType]: routePeerId || this._routePeerId(roomType)
+        };
 
+        this._routeStatus(this._isCaller ? "selected" : "waiting", "route-switch");
         if (this._isCaller) this._connect();
+    }
+
+    _currentRouteType() {
+        return this._getRoomTypes()[0] || "";
+    }
+
+    _routeStatus(state, reason = "", extra = {}) {
+        const route = this._currentRouteType();
+        const detail = {
+            peerId: this._peerId,
+            route,
+            roomType: route,
+            roomId: this._roomIds[route] || "",
+            routePeerId: this._routePeerId(route),
+            routes: this._getRoomTypes(),
+            state,
+            reason,
+            isCaller: this._isCaller,
+            connectionState: this._conn?.connectionState || "",
+            iceConnectionState: this._conn?.iceConnectionState || "",
+            ...extra
+        };
+        if (console.info) {
+            console.info(
+                "[meshdrop:routes]",
+                "rtc status",
+                `peer=${detail.peerId}`,
+                `route=${detail.route || "none"}`,
+                `target=${detail.routePeerId || "unknown"}`,
+                `state=${detail.state}`,
+                `reason=${detail.reason || "none"}`
+            );
+        }
+        Events.fire('peer-route-status', detail);
+    }
+
+    _scheduleRouteAttemptTimeout(reason) {
+        this._clearRouteAttemptTimeout();
+        this._routeAttemptTimer = setTimeout(() => this._onRouteAttemptTimeout(reason), RTC_ROUTE_ATTEMPT_TIMEOUT_MS);
+        this._routeAttemptTimer.unref?.();
+    }
+
+    _clearRouteAttemptTimeout() {
+        if (!this._routeAttemptTimer) return;
+        clearTimeout(this._routeAttemptTimer);
+        this._routeAttemptTimer = null;
+    }
+
+    _onRouteAttemptTimeout(reason) {
+        this._routeAttemptTimer = null;
+        if (this._isConnected()) return;
+        this._routeStatus("timeout", reason, {timeoutMs: RTC_ROUTE_ATTEMPT_TIMEOUT_MS});
+        if (!this._intentionalDisconnect) {
+            Events.fire('peer-route-failed', {peerId: this._peerId, reason: "route-timeout"});
+        }
     }
 
     sendDisplayName(displayName) {
@@ -1885,9 +1988,10 @@ class WSPeer extends Peer {
     }
 
     sendJSON(message) {
-        message.to = this._peerId;
-        message.roomType = this._getRoomTypes()[0];
-        message.roomId = this._roomIds[this._getRoomTypes()[0]];
+        const roomType = this._getRoomTypes()[0];
+        message.to = this._routePeerId(roomType);
+        message.roomType = roomType;
+        message.roomId = this._roomIds[roomType];
         this._server.send(message);
     }
 
@@ -1923,6 +2027,7 @@ class PeersManager {
         Events.on('peer-left', e => this._onPeerLeft(e.detail));
         Events.on('peer-joined', e => this._onPeerJoined(e.detail));
         Events.on('peer-connected', e => this._onPeerConnected(e.detail.peerId));
+        Events.on('peer-route-failed', e => this._onPeerRouteFailed(e.detail));
         Events.on('peer-disconnected', e => this._onPeerDisconnected(e.detail));
         Events.on('leave-ip-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('ip'));
         Events.on('leave-fips-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('fips'));
@@ -1958,7 +2063,7 @@ class PeersManager {
         this.peers[peerId].onServerMessage(message);
     }
 
-    _refreshPeer(peerId, roomType, roomId, peerInfo = null) {
+    _refreshPeer(peerId, roomType, roomId, peerInfo = null, routePeerId = peerId) {
         if (!this._peerExists(peerId)) return false;
 
         const peer = this.peers[peerId];
@@ -1970,7 +2075,7 @@ class PeersManager {
         // if roomType or roomId for roomType differs peer is already connected
         // -> only update roomSecret and reevaluate auto accept
         if (roomTypesDiffer || roomIdsDiffer) {
-            peer._updateRoomIds(roomType, roomId);
+            peer._updateRoomIds(roomType, roomId, routePeerId);
             peer._evaluateAutoAccept();
 
             return true;
@@ -2008,41 +2113,55 @@ class PeersManager {
         const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
         if (globalThis.NostrFollowPolicy?.allowsPeer(policyPeer, roomType, identity) === false) return;
 
-        this._rememberPeerAliases(peerId, policyPeer);
+        const canonicalPeerId = this._canonicalPeerId(peerId, policyPeer, roomType);
+        this._rememberPeerAliases(canonicalPeerId, policyPeer, peerId);
 
-        if (this._peerExists(peerId)) {
-            const peer = this.peers[peerId];
-            this._rememberPeerRoute(peer, isCaller, roomType, transport || this._server);
+        if (this._peerExists(canonicalPeerId)) {
+            const peer = this.peers[canonicalPeerId];
+            this._rememberPeerRoute(peer, isCaller, roomType, transport || this._server, peerId);
             const currentRoomType = SignalingRoomPriority.primary(peer._roomIds);
             const connected = peer._isConnected?.() === true;
             const preferNewRoute = SignalingRoomPriority.shouldPrefer(currentRoomType, roomType, connected);
             this._traceRoute(
                 "route candidate",
-                `peer=${peerId}`,
+                `peer=${canonicalPeerId}`,
                 `current=${currentRoomType || "none"}`,
                 `candidate=${roomType}`,
+                `target=${peerId}`,
                 `connected=${connected}`,
                 `selected=${preferNewRoute}`
             );
-            this._refreshPeer(peerId, roomType, roomId, policyPeer);
+            this._refreshPeer(canonicalPeerId, roomType, roomId, policyPeer, peerId);
             if (preferNewRoute && peer.switchSignalingRoute) {
-                this._traceRoute("selected route", `peer=${peerId}`, `route=${roomType}`, "reason=priority");
-                peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server);
+                this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, "reason=priority");
+                this._emitRouteStatus(canonicalPeerId, roomType, "selected", "priority", {
+                    routePeerId: peerId,
+                    routes: peer._getRoomTypes()
+                });
+                peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server, peerId);
             }
             return;
         }
 
         if (window.isRtcSupported && rtcSupported) {
-            this._traceRoute("selected route", `peer=${peerId}`, `route=${roomType}`, "reason=initial");
-            this.peers[peerId] = new RTCPeer(transport, isCaller, peerId, roomType, roomId, this._wsConfig.rtcConfig);
-            this._applyPeerInfo(this.peers[peerId], policyPeer);
-            this._rememberPeerRoute(this.peers[peerId], isCaller, roomType, transport || this._server);
+            this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, "reason=initial");
+            this.peers[canonicalPeerId] = new RTCPeer(transport, isCaller, canonicalPeerId, roomType, roomId, this._wsConfig.rtcConfig);
+            this._applyPeerInfo(this.peers[canonicalPeerId], policyPeer);
+            this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, transport || this._server, peerId);
+            this._emitRouteStatus(canonicalPeerId, roomType, "selected", "initial", {
+                routePeerId: peerId,
+                routes: this.peers[canonicalPeerId]._getRoomTypes()
+            });
         }
         else if (roomType !== 'nostr' && this._wsConfig.wsFallback) {
-            this._traceRoute("selected route", `peer=${peerId}`, `route=${roomType}`, "reason=websocket-fallback");
-            this.peers[peerId] = new WSPeer(this._server, isCaller, peerId, roomType, roomId);
-            this._applyPeerInfo(this.peers[peerId], policyPeer);
-            this._rememberPeerRoute(this.peers[peerId], isCaller, roomType, this._server);
+            this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, "reason=websocket-fallback");
+            this.peers[canonicalPeerId] = new WSPeer(this._server, isCaller, canonicalPeerId, roomType, roomId);
+            this._applyPeerInfo(this.peers[canonicalPeerId], policyPeer);
+            this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, this._server, peerId);
+            this._emitRouteStatus(canonicalPeerId, roomType, "selected", "websocket-fallback", {
+                routePeerId: peerId,
+                routes: this.peers[canonicalPeerId]._getRoomTypes()
+            });
         }
         else {
             console.warn("Websocket fallback is not activated on this instance.\n" +
@@ -2096,7 +2215,8 @@ class PeersManager {
     }
 
     _onPeerLeft(message) {
-        if (this._peerExists(message.peerId) && this._webRtcSupported(message.peerId)) {
+        const peerId = this._resolvePeerId(message.peerId);
+        if (this._peerExists(peerId) && this._webRtcSupported(peerId)) {
             console.log('WSPeer left:', message.peerId);
         }
         this._disconnectOrRemoveRoomTypeByPeerId(message.peerId, message.roomType);
@@ -2138,8 +2258,8 @@ class PeersManager {
     }
 
     _onPeerDisconnected(peerId) {
+        peerId = this._resolvePeerId(peerId);
         const peer = this.peers[peerId];
-        if (peer && !peer._intentionalDisconnect && this._tryFallbackRoute(peerId, peer)) return;
 
         delete this.peers[peerId];
         this._forgetPeerAliases(peerId);
@@ -2149,6 +2269,14 @@ class PeersManager {
         peer._conn.close();
         peer._busy = false;
         peer._roomIds = {};
+    }
+
+    _onPeerRouteFailed(detail = {}) {
+        const peerId = this._resolvePeerId(detail.peerId);
+        const peer = this.peers[peerId];
+        if (peer && !peer._intentionalDisconnect && this._tryFallbackRoute(peerId, peer)) return;
+
+        Events.fire('peer-disconnected', peerId);
     }
 
     _tryFallbackRoute(peerId, peer) {
@@ -2165,17 +2293,31 @@ class PeersManager {
         const nextRoomType = SignalingRoomPriority.primary(peer._roomIds);
         if (!nextRoomType) return false;
 
+        const routePeerIdFor = roomType => peer._routePeerId?.(roomType)
+            || peer._peerIdsByRoomType?.[roomType]
+            || peer._peerId
+            || peerId;
         const nextRoomId = peer._roomIds[nextRoomType];
         const nextTransport = peer._transportsByRoomType?.[nextRoomType] || this._server;
         const nextIsCaller = peer._isCallerByRoomType?.[nextRoomType] ?? peer._isCaller;
+        const nextRoutePeerId = routePeerIdFor(nextRoomType);
         this._traceRoute(
             "route failed",
             `peer=${peerId}`,
             `route=${failedRoomType}`,
             `room=${failedRoomId || "unknown"}`
         );
-        this._traceRoute("selected route", `peer=${peerId}`, `route=${nextRoomType}`, "reason=fallback");
-        peer.switchSignalingRoute(nextIsCaller, nextRoomType, nextRoomId, nextTransport);
+        this._emitRouteStatus(peerId, failedRoomType, "failed", "fallback", {
+            routePeerId: routePeerIdFor(failedRoomType),
+            roomId: failedRoomId,
+            routes: peer._getRoomTypes()
+        });
+        this._traceRoute("selected route", `peer=${peerId}`, `route=${nextRoomType}`, `target=${nextRoutePeerId}`, "reason=fallback");
+        this._emitRouteStatus(peerId, nextRoomType, "selected", "fallback", {
+            routePeerId: nextRoutePeerId,
+            routes: peer._getRoomTypes()
+        });
+        peer.switchSignalingRoute(nextIsCaller, nextRoomType, nextRoomId, nextTransport, nextRoutePeerId);
         return true;
     }
 
@@ -2211,6 +2353,7 @@ class PeersManager {
     }
 
     _disconnectOrRemoveRoomTypeByPeerId(peerId, roomType) {
+        peerId = this._resolvePeerId(peerId);
         const peer = this.peers[peerId];
 
         if (!peer) return;
@@ -2278,10 +2421,11 @@ class PeersManager {
         return peerIds;
     }
 
-    _rememberPeerAliases(peerId, peerInfo = {}) {
+    _rememberPeerAliases(peerId, peerInfo = {}, routePeerId = "") {
         if (!peerId) return;
 
         this._peerAliases[peerId] = peerId;
+        if (routePeerId) this._peerAliases[routePeerId] = peerId;
         if (peerInfo.id) this._peerAliases[peerInfo.id] = peerId;
         if (peerInfo.nostrIdentity?.pubkey) {
             this._peerAliases[String(peerInfo.nostrIdentity.pubkey).toLowerCase()] = peerId;
@@ -2292,9 +2436,15 @@ class PeersManager {
         });
     }
 
-    _rememberPeerRoute(peer, isCaller, roomType, transport) {
+    _rememberPeerRoute(peer, isCaller, roomType, transport, routePeerId = peer?._peerId) {
         if (!peer || !roomType) return;
 
+        if (routePeerId) {
+            peer._peerIdsByRoomType = {
+                ...peer._peerIdsByRoomType,
+                [roomType]: routePeerId
+            };
+        }
         peer._transportsByRoomType = {
             ...peer._transportsByRoomType,
             [roomType]: transport || this._server
@@ -2313,6 +2463,47 @@ class PeersManager {
 
     _resolvePeerId(peerId) {
         return this._peerAliases[peerId] || this._peerAliases[String(peerId).toLowerCase()] || peerId;
+    }
+
+    _canonicalPeerId(peerId, peerInfo = {}, roomType = null) {
+        const resolvedPeerId = this._resolvePeerId(peerId);
+        if (this.peers[resolvedPeerId]) return resolvedPeerId;
+
+        const identityKeys = this._peerIdentityKeys(peerInfo || {id: peerId}, roomType);
+        if (!identityKeys.length) return resolvedPeerId;
+
+        return Object.keys(this.peers).find(existingPeerId => {
+            const existingKeys = this._peerIdentityKeys(this.peers[existingPeerId], null);
+            return identityKeys.some(identityKey => existingKeys.includes(identityKey));
+        }) || resolvedPeerId;
+    }
+
+    _peerIdentityKeys(peer, roomType = null) {
+        const pubkey = peer?.nostrIdentity?.pubkey || (roomType === "nostr" ? peer?.id : "");
+        return pubkey ? [`nostr:${String(pubkey).toLowerCase()}`] : [];
+    }
+
+    _emitRouteStatus(peerId, roomType, state, reason = "", extra = {}) {
+        const detail = {
+            peerId,
+            route: roomType,
+            roomType,
+            state,
+            reason,
+            ...extra
+        };
+        if (console.info) {
+            console.info(
+                "[meshdrop:routes]",
+                "route status",
+                `peer=${peerId}`,
+                `route=${roomType || "none"}`,
+                `target=${detail.routePeerId || "unknown"}`,
+                `state=${state}`,
+                `reason=${reason || "none"}`
+            );
+        }
+        Events.fire('peer-route-status', detail);
     }
 
     _traceRoute(...parts) {
