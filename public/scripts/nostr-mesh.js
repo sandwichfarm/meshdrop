@@ -100,13 +100,12 @@ const NostrMeshProtocol = {
         return [
             ["client", "meshdrop"],
             ["protocol", "nip100-webrtc"],
-            ["capability", "meshdrop"],
-            ["capability", "webrtc"]
+            ["capability", "meshdrop-webrtc"]
         ];
     },
 
     presenceCapabilityTags(routeCapabilities = [], sessionPeerId = "", expiresAt = 0) {
-        const tags = [...this.meshTags()];
+        const tags = [["capability", "meshdrop-webrtc"]];
         const normalizedRouteTypes = [...new Set(routeCapabilities
             .map(routeType => this.normalizeRouteType(routeType))
             .filter(Boolean))];
@@ -119,9 +118,7 @@ const NostrMeshProtocol = {
     },
 
     advertisesMeshDropWebRtc(event) {
-        return this.hasTag(event, "client", "meshdrop")
-            && this.hasTag(event, "capability", "meshdrop")
-            && this.hasTag(event, "capability", "webrtc");
+        return this.hasTag(event, "capability", "meshdrop-webrtc");
     },
 
     normalizeRouteType(routeType) {
@@ -456,11 +453,7 @@ class NostrMeshConnection {
             const event = await this._signEvent({
                 kind: NostrMeshProtocol.kind,
                 created_at: Math.floor(Date.now() / 1000),
-                tags: [
-                    ["type", type],
-                    ...NostrMeshProtocol.meshTags(),
-                    ["p", recipient]
-                ].concat(this._room ? [["r", this._room]] : []),
+                tags: this._addressedEventTags(type, recipient),
                 content: encryptedContent
             });
 
@@ -475,15 +468,19 @@ class NostrMeshConnection {
         const event = await this._signEvent({
             kind: NostrMeshProtocol.kind,
             created_at: Math.floor(Date.now() / 1000),
-            tags: [
-                ["type", type],
-                ...NostrMeshProtocol.meshTags(),
-                ["p", recipient]
-            ].concat(this._room ? [["r", this._room]] : []),
+            tags: this._addressedEventTags(type, recipient),
             content: encryptedContent
         });
 
         this._publishEvent(event);
+    }
+
+    _addressedEventTags(type, recipient) {
+        return [
+            ["type", type],
+            ...NostrMeshProtocol.meshTags(),
+            ["p", recipient]
+        ].concat(this._room ? [["r", this._room]] : []);
     }
 
     async _signEvent(event) {
@@ -536,6 +533,14 @@ class NostrMeshConnection {
             `type=${NostrMeshProtocol.eventType(event) || "unknown"}`,
             `pubkey=${event?.pubkey?.slice(0, 8) || "unknown"}`
         );
+        if (NostrMeshProtocol.eventType(event) === "connect") {
+            this._trace(
+                decision.accepted ? "route capability accepted" : "route capability rejected",
+                `routes=${NostrMeshProtocol.routeCapabilities(event).join(",") || "none"}`,
+                `reason=${decision.reason}`,
+                `pubkey=${event?.pubkey?.slice(0, 8) || "unknown"}`
+            );
+        }
         if (!decision.accepted) return;
 
         this._seenEvents.add(event.id);
