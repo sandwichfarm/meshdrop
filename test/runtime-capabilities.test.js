@@ -32,8 +32,16 @@ test("runtime capabilities describe backend transport support", () => {
     assert.equal(capabilities.transports.fips.supported, true);
     assert.equal(capabilities.transports.fips.requiresBackend, true);
     assert.equal(capabilities.transports.fips.room, "npub-network:fips");
+    assert.deepEqual(capabilities.transports.fips.relayIce, {
+        supported: false,
+        unavailableReason: "fips-relay-ice-not-configured"
+    });
     assert.equal(capabilities.transports.pollen.supported, true);
     assert.equal(capabilities.transports.pollen.maxUploadBytes, 1024);
+    assert.deepEqual(capabilities.transports.pollen.relayIce, {
+        supported: false,
+        unavailableReason: "pollen-relay-ice-not-configured"
+    });
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
 });
 
@@ -93,7 +101,15 @@ test("runtime capabilities describe static SPA support without backend-only tran
     assert.equal(capabilities.transports.hashtree.supported, true);
     assert.equal(capabilities.transports.localDiscovery.supported, false);
     assert.equal(capabilities.transports.fips.supported, false);
+    assert.deepEqual(capabilities.transports.fips.relayIce, {
+        supported: false,
+        unavailableReason: "fips-relay-ice-not-configured"
+    });
     assert.equal(capabilities.transports.pollen.supported, false);
+    assert.deepEqual(capabilities.transports.pollen.relayIce, {
+        supported: false,
+        unavailableReason: "pollen-relay-ice-not-configured"
+    });
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
     assert.equal(capabilities.serverSettings.supported, false);
     assert.equal(capabilities.serverSettings.actions.fipsPeers, false);

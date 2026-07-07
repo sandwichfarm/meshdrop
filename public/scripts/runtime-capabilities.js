@@ -67,12 +67,14 @@ const RuntimeCapabilities = {
                         supported: staticTransports.pollen,
                         requiresBackend: true,
                         room: "",
-                        maxUploadBytes: 0
+                        maxUploadBytes: 0,
+                        relayIce: this.relayIceCapability("pollen", staticTransports.pollen, targetManifest)
                     },
                     fips: {
                         supported: staticTransports.fips,
                         requiresBackend: true,
-                        room: ""
+                        room: "",
+                        relayIce: this.relayIceCapability("fips", staticTransports.fips, targetManifest)
                     }
                 },
                 serverSettings: {
@@ -151,6 +153,18 @@ const RuntimeCapabilities = {
         };
     },
 
+    relayIceCapability(routeType, transportSupported, targetManifest = null) {
+        const relayIce = targetManifest?.capabilities?.transports?.[routeType]?.relayIce || {};
+        if (transportSupported && relayIce.supported === true) {
+            return {supported: true};
+        }
+
+        return {
+            supported: false,
+            unavailableReason: `${routeType}-relay-ice-not-configured`
+        };
+    },
+
     bluetoothApiAvailable() {
         return !!globalThis.navigator?.bluetooth;
     },
@@ -168,6 +182,10 @@ const RuntimeCapabilities = {
         if (typeof capability?.supported === "boolean") return capability.supported;
 
         return !!fallback;
+    },
+
+    relayIceSupported(config, transport) {
+        return this.transports(config)[transport]?.relayIce?.supported === true;
     },
 
     serverActionSupported(config, action) {

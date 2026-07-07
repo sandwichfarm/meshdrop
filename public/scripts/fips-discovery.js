@@ -253,10 +253,13 @@ class FipsDiscoveryController {
         const translationKey = this._active
             ? "header.fips-discovery-disable"
             : "header.fips-discovery-enable";
+        const signalingOnly = supported && !globalThis.RuntimeCapabilities?.relayIceSupported?.(this._config, "fips")
+            ? " Signaling only: no FIPS WebRTC relay ICE is configured."
+            : "";
 
         this.$button.title = this._connecting
             ? "Connecting to FIPS peer discovery"
-            : Localization.getTranslation(`${translationKey}_title`);
+            : `${Localization.getTranslation(`${translationKey}_title`)}${signalingOnly}`;
         this.$button.classList.toggle("selected", this._active);
         this.$button.classList.toggle("connecting", this._connecting);
         this.$button.classList.toggle("unavailable", supported && !this._available);

@@ -17,7 +17,8 @@ function createHarness() {
     let sessionIndex = 0;
 
     class FakeRTCPeerConnection {
-        constructor() {
+        constructor(config = {}) {
+            this.config = config;
             this.signalingState = "stable";
             this.connectionState = "new";
             this.iceConnectionState = "new";
@@ -800,7 +801,7 @@ test("disabled clearnet routes ignore direct Nostr peer announcements", () => {
     assert.equal(connections.length, 0);
 });
 
-test("disabled clearnet uses Nostr presence to request private FIPS route", () => {
+test("disabled clearnet requests private FIPS signaling but blocks WebRTC without relay ICE", () => {
     const {PeersManager, connections, fired, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
     context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
@@ -869,10 +870,64 @@ test("disabled clearnet uses Nostr presence to request private FIPS route", () =
         transport: fipsTransport
     });
 
+    assert.equal(connections.length, 0);
+    assert.equal(manager.peers[pubkey]._roomIds.fips, undefined);
+    assert.equal(manager.peers[pubkey]._peerIdsByRoomType.fips, undefined);
+    assert.equal(manager.peers[pubkey]._pendingPrivateRouteRequests.fips, true);
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === pubkey
+            && event.detail.route === "fips"
+            && event.detail.state === "disabled"
+            && event.detail.reason === "overlay-relay-unavailable"),
+        true
+    );
+});
+
+test("disabled clearnet uses relay-only RTC config when FIPS relay ICE is available", () => {
+    const {PeersManager, connections, context} = createHarness();
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
+    const manager = new PeersManager({send() {}});
+    const pubkey = "c".repeat(64);
+    const fipsTransport = {send() {}};
+
+    manager._onConfig({
+        capabilities: {
+            transports: {
+                fips: {
+                    relayIce: {supported: true}
+                }
+            }
+        }
+    });
+    manager._onWsConfig({rtcConfig: {iceServers: [{urls: "turn:fips-relay.test"}]}, wsFallback: false});
+    manager._onPeerJoined({
+        peer: {
+            id: pubkey,
+            rtcSupported: true,
+            routeCapabilities: ["fips"],
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room"
+    });
+    manager._onPeerJoined({
+        peer: {
+            id: "fips-peer",
+            rtcSupported: true,
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "fips",
+        roomId: "fips-room",
+        transport: fipsTransport
+    });
+
     assert.equal(connections.length, 1);
-    assert.equal(manager.peers[pubkey]._roomIds.fips, "fips-room");
-    assert.equal(manager.peers[pubkey]._peerIdsByRoomType.fips, "fips-peer");
-    assert.equal(manager.peers[pubkey]._pendingPrivateRouteRequests.fips, undefined);
+    assert.equal(connections[0].config.iceTransportPolicy, "relay");
+    assert.deepEqual(connections[0].config.iceServers, [{urls: "turn:fips-relay.test"}]);
 });
 
 test("clearnet preference allows Nostr routes when instance sharing is disabled", () => {
@@ -893,7 +948,7 @@ test("clearnet preference allows Nostr routes when instance sharing is disabled"
     assert.equal(manager.peers["peer-a"]._roomIds.nostr, "nostr-room");
 });
 
-test("disabling clearnet switches auto route from Nostr to FIPS", () => {
+test("disabling clearnet refuses FIPS fallback when relay ICE is unavailable", () => {
     const {PeersManager, fired, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
     context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
@@ -923,6 +978,57 @@ test("disabling clearnet switches auto route from Nostr to FIPS", () => {
     manager._onClearnetRoutesChanged({enabled: false, roomTypes: ["nostr"]});
 
     assert.equal(manager.peers["peer-a"]._roomIds.nostr, undefined);
+    assert.equal(manager.peers["peer-a"]._roomIds.fips, undefined);
+    assert.deepEqual(switches, []);
+    assert.equal(fired.some(event => event.type === "peer-disconnected"), true);
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === "peer-a"
+            && event.detail.route === "fips"
+            && event.detail.state === "disabled"
+            && event.detail.reason === "overlay-relay-unavailable"),
+        true
+    );
+});
+
+test("disabling clearnet allows FIPS fallback when relay ICE is available", () => {
+    const {PeersManager, fired, context} = createHarness();
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
+    const manager = new PeersManager({send() {}});
+    const switches = [];
+    const fipsTransport = {send() {}};
+    manager._onConfig({
+        capabilities: {
+            transports: {
+                fips: {
+                    relayIce: {supported: true}
+                }
+            }
+        }
+    });
+
+    manager.peers["peer-a"] = {
+        rtcSupported: true,
+        _intentionalDisconnect: false,
+        _isCaller: true,
+        _roomIds: {nostr: "nostr-room", fips: "fips-room"},
+        _transportsByRoomType: {fips: fipsTransport},
+        _peerIdsByRoomType: {nostr: "nostr-peer", fips: "fips-peer"},
+        _isCallerByRoomType: {fips: false},
+        _getRoomTypes() {
+            return Object.keys(this._roomIds);
+        },
+        _removeRoomType(roomType) {
+            delete this._roomIds[roomType];
+        },
+        switchSignalingRoute(isCaller, roomType, roomId, transport, routePeerId) {
+            switches.push({isCaller, roomType, roomId, transport, routePeerId});
+        }
+    };
+
+    manager._onClearnetRoutesChanged({enabled: false, roomTypes: ["nostr"]});
+
     assert.deepEqual(switches, [{
         isCaller: false,
         roomType: "fips",

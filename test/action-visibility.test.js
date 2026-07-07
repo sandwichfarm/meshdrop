@@ -981,6 +981,7 @@ test("FIPS action remains visible but unavailable until status confirms the daem
     await controller._onConfig({fips: {enabled: true, room: "npub-network:test"}});
     assert.equal(buttons.get("fips-discovery").hasAttribute("hidden"), false);
     assert.equal(buttons.get("fips-discovery").classList.contains("unavailable"), true);
+    assert.match(buttons.get("fips-discovery").title, /Signaling only: no FIPS WebRTC relay ICE is configured/);
 
     globalThis.fetch = async () => ({
         ok: true,
@@ -1082,6 +1083,7 @@ test("Pollen action shows zero badge while visible without known peers", () => {
     assert.equal(button.hasAttribute("hidden"), false);
     assert.equal(button.classes.has("selected"), false);
     assert.equal(button.getAttribute("data-badge"), "0");
+    assert.match(button.title, /Signaling only: no Pollen WebRTC relay ICE is configured/);
 });
 
 test("Instance route action shows same-instance peer count while enabled", () => {

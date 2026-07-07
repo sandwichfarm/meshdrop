@@ -43,6 +43,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-h8o-add-fail-closed-overlay-relay-capability` | complete | FIPS/Pollen relay ICE defaults unavailable; Clearnet-off FIPS/Pollen WebRTC fails closed without relay ICE and relay-enabled routes use relay-only RTC config; focused 78/78; `npm test` 302/302; e2e; Docker smoke; diff/slop gates |
 | 2026-07-07 | `260707-64a-fix-clearnet-off-peer-route-ui-so-nostr-` | complete | Focused 42/42; `npm test` 295/295; e2e; Docker smoke; diff/slop gates |
 | 2026-07-04 | `20260704-admin-npub-signed-settings` | complete | Admin tests 7/7; repo/e2e/docker/diff/slop gates |
 | 2026-07-04 | `20260704-ci-test-baseline` | complete | `npm ci`; repo/e2e/docker/actionlint/diff gates; changed-code slop exit 0 |

@@ -23,6 +23,17 @@ function createBluetoothCapabilities(conf = {}) {
     };
 }
 
+function createRelayIceCapability(routeType, transportSupported, conf = {}) {
+    if (transportSupported && conf.relayIce?.supported === true) {
+        return {supported: true};
+    }
+
+    return {
+        supported: false,
+        unavailableReason: `${routeType}-relay-ice-not-configured`
+    };
+}
+
 export function createRuntimeCapabilities(conf = {}) {
     const runtime = conf.runtime || createServerRuntimeConfig();
     const hasBackend = runtime.hasBackend !== false;
@@ -68,12 +79,14 @@ export function createRuntimeCapabilities(conf = {}) {
                 supported: pollenSupported,
                 requiresBackend: true,
                 room: normalizeNpubDiscoveryNetworkId(conf.federation?.pollen?.room),
-                maxUploadBytes: conf.pollen?.maxUploadBytes || 0
+                maxUploadBytes: conf.pollen?.maxUploadBytes || 0,
+                relayIce: createRelayIceCapability("pollen", pollenSupported, conf.pollen)
             },
             fips: {
                 supported: fipsSupported,
                 requiresBackend: true,
-                room: normalizeNpubDiscoveryNetworkId(conf.fips?.room)
+                room: normalizeNpubDiscoveryNetworkId(conf.fips?.room),
+                relayIce: createRelayIceCapability("fips", fipsSupported, conf.fips)
             }
         },
         serverSettings: {
