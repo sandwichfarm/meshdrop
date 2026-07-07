@@ -666,6 +666,68 @@ test("disabled local discovery ignores late IP peer announcements", () => {
     assert.equal(connections.length, 0);
 });
 
+test("disabled clearnet routes ignore direct Nostr peer announcements", () => {
+    const {PeersManager, connections, context} = createHarness();
+    context.meshdropLocalDiscovery = {isEnabled: () => false};
+    const manager = new PeersManager({send() {}});
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+
+    manager._onPeerJoined({
+        peer: {id: "peer-a", rtcSupported: true},
+        roomType: "nostr",
+        roomId: "nostr-room"
+    });
+
+    assert.deepEqual(Object.keys(manager.peers), []);
+    assert.equal(connections.length, 0);
+});
+
+test("disabling clearnet switches auto route from Nostr to FIPS", () => {
+    const {PeersManager, fired, context} = createHarness();
+    context.meshdropLocalDiscovery = {isEnabled: () => false};
+    const manager = new PeersManager({send() {}});
+    const switches = [];
+    const fipsTransport = {send() {}};
+
+    manager.peers["peer-a"] = {
+        rtcSupported: true,
+        _intentionalDisconnect: false,
+        _isCaller: true,
+        _roomIds: {nostr: "nostr-room", fips: "fips-room", pollen: "pollen-room"},
+        _transportsByRoomType: {fips: fipsTransport},
+        _peerIdsByRoomType: {nostr: "nostr-peer", fips: "fips-peer", pollen: "pollen-peer"},
+        _isCallerByRoomType: {fips: false},
+        _getRoomTypes() {
+            return Object.keys(this._roomIds);
+        },
+        _removeRoomType(roomType) {
+            delete this._roomIds[roomType];
+        },
+        switchSignalingRoute(isCaller, roomType, roomId, transport, routePeerId) {
+            switches.push({isCaller, roomType, roomId, transport, routePeerId});
+        }
+    };
+
+    manager._onClearnetRoutesChanged({enabled: false});
+
+    assert.equal(manager.peers["peer-a"]._roomIds.nostr, undefined);
+    assert.deepEqual(switches, [{
+        isCaller: false,
+        roomType: "fips",
+        roomId: "fips-room",
+        transport: fipsTransport,
+        routePeerId: "fips-peer"
+    }]);
+    assert.equal(fired.some(event => event.type === "peer-disconnected"), false);
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === "peer-a"
+            && event.detail.route === "fips"
+            && event.detail.state === "selected"),
+        true
+    );
+});
+
 test("accepted Pollen storage responses do not stream files over RTC", () => {
     const {RTCPeer} = createHarness();
     const peer = new RTCPeer({send() {}}, true, "peer-a", "ip", "127.0.0.1", {});

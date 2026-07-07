@@ -6,7 +6,7 @@ await import("../public/scripts/ui.js");
 const protocol = globalThis.PeerAvailabilityProtocol;
 const routeStatus = globalThis.PeerRouteStatusProtocol;
 
-test("peer availability exposes instance, FIPS, Pollen, and Nostr room types", () => {
+test("peer availability exposes Clearnet, FIPS, Pollen, and Nostr-signaled room types", () => {
     const peer = {
         _roomIds: {
             fips: "meshdrop-fips",
@@ -19,8 +19,8 @@ test("peer availability exposes instance, FIPS, Pollen, and Nostr room types", (
     assert.deepEqual(
         protocol.availability(peer).map(option => [option.id, option.label, option.shortLabel]),
         [
-            ["local", "Instance", "Instance"],
-            ["webrtc", "Nostr", "Nostr"],
+            ["local", "Clearnet", "Clearnet"],
+            ["webrtc", "Clearnet via Nostr", "Clearnet"],
             ["fips", "FIPS", "FIPS"],
             ["pollen-mesh", "Pollen", "Pollen"]
         ]
@@ -97,19 +97,20 @@ test("transfer options expose privacy and encryption metadata", () => {
         const pollen = options.find(option => option.id === "pollen");
 
         assert.equal(local.group, "Network routes");
-        assert.equal(local.privacy, "Direct peer path");
+        assert.equal(local.privacy, "Direct clearnet path");
         assert.deepEqual(local.details, [
             ["Discovery", "same MeshDrop instance"],
-            ["Data path", "WebRTC ICE direct"],
-            ["Best case", "local network candidate"]
+            ["Data path", "clearnet WebRTC ICE"],
+            ["Exclude with", "Clearnet toggle"]
         ]);
         assert.equal(pollenMesh.group, "Network routes");
         assert.equal(pollenMesh.privacy, "P2P over Pollen route");
         assert.deepEqual(pollenMesh.details.at(-1), ["Best case", "local network candidate"]);
-        assert.equal(webrtc.label, "Nostr");
-        assert.equal(webrtc.privacy, "P2P after Nostr discovery");
+        assert.equal(webrtc.label, "Clearnet via Nostr");
+        assert.equal(webrtc.privacy, "Direct clearnet path");
         assert.deepEqual(webrtc.details.at(0), ["Discovery", "Nostr WOT"]);
-        assert.deepEqual(webrtc.details.at(-1), ["Nostr events", "signaling only"]);
+        assert.deepEqual(webrtc.details.at(1), ["Data path", "clearnet WebRTC ICE"]);
+        assert.deepEqual(webrtc.details.at(-1), ["Nostr events", "discovery/signaling only"]);
         assert.equal(hashtree.group, "Storage routes");
         assert.equal(hashtree.privacy, "Integrity, not secrecy");
         assert.deepEqual(hashtree.details.at(-1), ["Unencrypted", "servers see chunks"]);
@@ -148,8 +149,8 @@ test("peer counts summarize network posture badges", () => {
     assert.deepEqual(
         protocol.networkPostureCounts(peers).map(entry => [entry.id, entry.count, entry.shortLabel]),
         [
-            ["local", 1, "Instance"],
-            ["webrtc", 1, "Nostr"],
+            ["local", 1, "Clearnet"],
+            ["webrtc", 1, "Clearnet"],
             ["fips", 2, "FIPS"],
             ["pollen-mesh", 2, "Pollen"]
         ]
@@ -201,9 +202,11 @@ test("Nostr identity keys normalize pubkey case before grouping peers", () => {
 });
 
 test("route status text names the active network and phase", () => {
-    assert.equal(routeStatus.text({route: "nostr", state: "connecting"}), "Connecting via Nostr...");
+    assert.equal(routeStatus.text({route: "nostr", state: "connecting"}), "Connecting on Clearnet...");
     assert.equal(routeStatus.text({route: "fips", state: "ice-checking"}), "Checking FIPS ICE...");
     assert.equal(routeStatus.text({route: "pollen", state: "timeout"}), "Pollen timed out");
-    assert.equal(routeStatus.text({route: "ip", state: "failed"}), "Instance failed");
+    assert.equal(routeStatus.text({route: "ip", state: "failed"}), "Clearnet failed");
+    assert.equal(routeStatus.text({route: "nostr", state: "connected"}), "Connected on Clearnet");
+    assert.equal(routeStatus.text({route: "nostr", state: "disabled"}), "Clearnet disabled");
     assert.equal(routeStatus.statusKey({route: "fips", state: "ice-checking"}), "route-fips-ice-checking");
 });
