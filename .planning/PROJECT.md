@@ -14,16 +14,16 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.11.0 TURN Relay Proof
+## Current Milestone: v0.12.0 Route Blocker Issue Tracking
 
-**Goal:** prove relay-only WebRTC transfers through an explicit TURN path before MeshDrop advertises overlay WebRTC routes as byte-carrying paths.
+**Goal:** make every remaining route-expansion, release-readback, and deployed-target blocker actionable in live GitHub issues before the next transport proof milestone.
 
 **Target features:**
-- Add a deterministic local TURN/coturn transfer smoke that starts a relay target, configures MeshDrop with relay-only ICE, and transfers a proof payload between two browser peers.
-- Record route proof fields for the relay-only WebRTC byte path: sender runtime, recipient runtime, selected route type, data-plane primitive, WebRTC use, instance relay flag, byte counts, hash match, and fallback status.
-- Keep FIPS/Pollen/Tor/I2P/Loki overlay WebRTC claims unavailable unless the configured relay path has runtime proof.
-- Preserve existing direct Nostr WebRTC, FIPS stream, Pollen storage, and instance-relay semantics.
-- Track unavailable Tor/I2P/Loki byte-transfer work as blocked on local daemon/proxy dial surfaces; GitHub issues are disabled for this repository, so blockers stay in GSD/PR artifacts until the tracker is available.
+- Verify the GitHub issue tracker is enabled and writable for `sandwichfarm/meshdrop`.
+- Read back existing route blockers: Tor/I2P/Loki byte-transfer proof issue #151 and FIPS/Pollen route-specific WebRTC relay proof issue #152.
+- Create and record missing finish-line blockers for GHCR anonymous readback (#156), deployed StartOS/Umbrel UAT (#157), and signed iOS device/share-transfer UAT (#158).
+- Keep Tor/I2P/Loki and FIPS/Pollen route-specific WebRTC claims fail-closed until the linked issue acceptance proof exists.
+- Record blocker issue links in GSD and ADRs so future milestones start from live tracker state instead of stale PR text.
 
 ## Requirements
 
@@ -50,10 +50,11 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Add Tor, I2P, and Loki route adapter capability surfaces that fail closed until a local instance/native runtime can prove dial support.
 - [x] Prove relay-only WebRTC transfer through a configured TURN path before labeling FIPS/Pollen overlay WebRTC as byte-carrying routes. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
-- [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
-- [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services.
+- [x] Document remaining blocked route/release/UAT work in live GitHub issues with acceptance evidence.
+- [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag. Blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
+- [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services. Blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
 - [ ] Run the signed iOS device-install harness on macOS hardware, then complete iOS device file-picker/share-sheet/native
-  transfer UAT.
+  transfer UAT. Blocker: https://github.com/sandwichfarm/meshdrop/issues/158.
 
 ### Out of Scope
 
@@ -113,6 +114,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Generic instance relay comes before more networks | Pollen proved the first backend-mediated byte path; future FIPS/Tor/I2P/Loki routes need shared descriptor/proof semantics before more one-off adapters | ✓ Good |
 | Overlay networks start fail-closed | Tor/I2P/Loki need local dial proof before MeshDrop can claim transfer support | ✓ Good |
 | TURN relay proof precedes overlay WebRTC claims | Browser WebRTC can only count as FIPS/Pollen/Tor/I2P/Loki when stats prove file bytes used a relay candidate constrained to that route | ✓ Good |
+| Blocked transport claims live in GitHub issues | Future work needs a tracker-owned acceptance contract, not stale notes buried in PR bodies | ✓ Good |
 
 ---
-*Last updated: 2026-07-07 completing milestone v0.11.0 TURN Relay Proof.*
+*Last updated: 2026-07-07 completing milestone v0.12.0 Route Blocker Issue Tracking.*
