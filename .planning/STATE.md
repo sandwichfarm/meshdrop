@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.13.0
-milestone_name: Tor Byte Transfer Proof
+milestone: v0.14.0
+milestone_name: I2P Byte Transfer Proof
 status: complete
-last_updated: "2026-07-07T22:22:45.442Z"
-last_activity: 2026-07-07
+last_updated: "2026-07-07T23:05:31.293Z"
+last_activity: 2026-07-08
 progress:
   total_phases: 1
   completed_phases: 1
@@ -17,10 +17,10 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-07-07)
+See: `.planning/PROJECT.md` (updated 2026-07-08)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** Phase 17 Tor Byte Transfer Proof is complete; Tor has reproducible onion byte-transfer evidence while I2P/Loki remain tracked in issue #151.
+**Current focus:** Phase 18 I2P Byte Transfer Proof is complete; Tor and I2P have reproducible overlay byte-transfer evidence while Loki remains tracked in issue #151.
 
 ## Milestone Audit: 2026-07-06
 
@@ -45,7 +45,7 @@ Merged PRs through #105 satisfy the source/runtime/harness portions of the origi
 
 Current hard gaps:
 
-- Tor/I2P/Loki byte-transfer proof is blocked on a reproducible local daemon/proxy dial surface: https://github.com/sandwichfarm/meshdrop/issues/151.
+- Loki byte-transfer proof remains blocked on a reproducible local daemon/proxy dial surface; Tor and I2P now have route-specific daemon/proxy proof: https://github.com/sandwichfarm/meshdrop/issues/151.
 - FIPS/Pollen route-specific WebRTC relay proof is blocked on a relay endpoint reachable through the named overlay: https://github.com/sandwichfarm/meshdrop/issues/152.
 - `npm run verify:ghcr-anonymous -- v0.1.5` fails with GHCR `unauthorized`: https://github.com/sandwichfarm/meshdrop/issues/156.
 - `gh api /orgs/sandwichfarm/packages/container/meshdrop` fails with `403` because this token lacks `read:packages`, so
@@ -183,6 +183,7 @@ Closed during this audit branch:
 | 2026-07-07 | `260707-fips-stream-route-proof` | complete | FIPS HTTP stream over FIPS mesh IPv6 with encrypted payload route proof; focused 9/9; `npm run test:fips-stream` over two FIPS containers with `fips0` byte deltas; `npm test` 342/342; e2e; diff/slop gates |
 | 2026-07-07 | `260707-route-status-compact-badges` | complete | Peer route status now renders one icon-only row: blocked Clearnet crossed out, pending FIPS/Pollen animated, words preserved only in aria/title; focused 28/28; browser proof clean; `npm test` 359/359; diff check; changed-code slop exits 0 |
 | 2026-07-07 | `260707-tor-byte-transfer-proof` | complete | Generic overlay stream upload/download endpoints; Dockerized Tor hidden-service smoke emits `Proof tor-http-stream` with generated `.onion`, 42/42 bytes, hash matched, fallback disabled; focused 31/31; `npm test` 368/368; diff check |
+| 2026-07-08 | `260708-i2p-byte-transfer-proof` | complete | Dockerized i2pd HTTP proxy/server tunnel smoke emits `Proof i2p-http-stream` with generated `.b32.i2p`, 42/42 bytes, hash matched, fallback disabled; focused 33/33; `npm test` 369/369 |
 
 ## Active Quick Task
 
@@ -193,7 +194,7 @@ None.
 
 ## Current Position
 
-Phase: 17 Tor Byte Transfer Proof
-Plan: `.planning/phases/17-tor-byte-transfer-proof/17-01-PLAN.md`
+Phase: 18 I2P Byte Transfer Proof
+Plan: `.planning/phases/18-i2p-byte-transfer-proof/18-01-PLAN.md`
 Status: Complete
-Last activity: 2026-07-07 — Tor byte-transfer proof completed with Dockerized `.onion` route evidence.
+Last activity: 2026-07-08 — I2P byte-transfer proof completed with Dockerized `.b32.i2p` route evidence.

@@ -334,6 +334,31 @@ test("validates Tor stream route proof with onion topology evidence", () => {
     });
 });
 
+test("validates I2P stream route proof with b32 topology evidence", () => {
+    const proof = {
+        senderRuntime: "meshdrop-node",
+        recipientRuntime: "i2pd-http-proxy-client",
+        routeType: "i2p",
+        dataPlanePrimitive: "i2p-http-stream",
+        webRtcUsed: false,
+        instanceRelayed: false,
+        bytesSent: 43,
+        bytesReceived: 43,
+        hashMatched: true,
+        fallbackUsed: false,
+        topologyEvidence: {
+            overlay: "i2p",
+            destination: "meshdropabcd.b32.i2p",
+            proxy: "http://127.0.0.1:4444"
+        }
+    };
+
+    assert.deepEqual(contract.validateRouteProof(proof), {
+        ok: true,
+        proof
+    });
+});
+
 test("validates relay WebRTC proof only when selected ICE candidate is relay", () => {
     const proof = {
         senderRuntime: "browser-a",

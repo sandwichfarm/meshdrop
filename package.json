@@ -30,6 +30,7 @@
     "test:docker:two-host": "node scripts/docker-two-host-relay-smoke.mjs",
     "test:turn-relay": "node scripts/turn-relay-smoke.mjs",
     "test:tor-stream": "node scripts/tor-stream-smoke.mjs",
+    "test:i2p-stream": "node scripts/i2p-stream-smoke.mjs",
     "test:fips-stream": "node scripts/fips-stream-smoke.mjs",
     "test:android-apk": "node scripts/android-apk-smoke.mjs",
     "test:android-release-apk": "node scripts/android-release-apk-smoke.mjs",

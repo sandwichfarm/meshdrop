@@ -1,6 +1,6 @@
-# Requirements: MeshDrop v0.13.0 Tor Byte Transfer Proof
+# Requirements: MeshDrop v0.14.0 I2P Byte Transfer Proof
 
-**Defined:** 2026-07-07
+**Defined:** 2026-07-08
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
 
 ## Validated Baseline
@@ -14,6 +14,16 @@
 - FIPS stream proof proves encrypted payload bytes over the sender's FIPS mesh IPv6 address and emits route proof.
 - TURN relay proof proves browser WebRTC can be forced through a relay candidate before route-specific overlay WebRTC claims are allowed.
 - Tor/I2P/Loki runtime capability surfaces already fail closed unless configured with explicit overlay stream endpoints.
+
+## v0.14.0 Requirements
+
+### I2P Byte Transfer Proof
+
+- [x] **I2P-BYTE-01**: MeshDrop reuses the generic backend overlay stream upload/download primitive for configured I2P stream routes without changing Tor, FIPS, or Pollen behavior.
+- [x] **I2P-BYTE-02**: I2P stream descriptors require a valid `.b32.i2p` endpoint, route type `i2p`, primitive `i2p-http-stream`, owner/session binding, expiry, byte limit metadata, and private/encrypted/fail-closed constraints.
+- [x] **I2P-BYTE-03**: A runtime smoke starts a reproducible Dockerized i2pd HTTP proxy/server tunnel path, transfers a proof payload through the `.b32.i2p` endpoint, validates byte counts and SHA-256, and rejects Clearnet fallback as success.
+- [x] **I2P-BYTE-04**: I2P route proof names sender runtime, recipient runtime, route type, data-plane primitive, WebRTC flag, instance-relay flag, byte counts, hash match, fallback status, and topology evidence for the I2P route.
+- [x] **I2P-BYTE-05**: Loki stays unavailable/fail-closed with GitHub issue #151 still tracking future daemon/proxy byte-transfer proof.
 
 ## v0.13.0 Requirements
 
@@ -57,7 +67,6 @@
 
 ## Future Requirements
 
-- **I2P-BYTE-01**: I2P adapters transfer encrypted bytes only after a local instance/native runtime can prove daemon/proxy dial support, selected route type, byte counts, hash match, and fallback disabled. Tracked by https://github.com/sandwichfarm/meshdrop/issues/151.
 - **LOKI-BYTE-01**: Loki adapters transfer encrypted bytes only after a local instance/native runtime can prove daemon/proxy dial support, selected route type, byte counts, hash match, and fallback disabled. Tracked by https://github.com/sandwichfarm/meshdrop/issues/151.
 - **OVERLAY-WEBRTC-01**: FIPS/Pollen route-specific WebRTC relay claims stay unavailable until a relay endpoint reachable through that route proves selected relay candidates and no Clearnet fallback. Tracked by https://github.com/sandwichfarm/meshdrop/issues/152.
 
@@ -85,7 +94,7 @@
 
 | Feature | Reason |
 |---------|--------|
-| I2P/Loki byte-transfer support | This milestone proves the first overlay stream route through Tor only; I2P/Loki need equivalent daemon/proxy harnesses before support claims. |
+| Loki byte-transfer support | This milestone proves I2P only; Loki needs an equivalent daemon/proxy harness before support claims. |
 | FIPS instance-to-instance chunk relay | FIPS has direct FIPS stream proof; instance-to-instance relay is the next transport-specific slice. |
 | Native FSP daemon API | Current FIPS release exposes ordinary IPv6/TCP through `fips0`; native FSP remains future work. |
 | TURN overlay relay | Separate route type with different WebRTC proof needs. |
@@ -96,6 +105,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| I2P-BYTE-01 | Phase 18 | Complete |
+| I2P-BYTE-02 | Phase 18 | Complete |
+| I2P-BYTE-03 | Phase 18 | Complete |
+| I2P-BYTE-04 | Phase 18 | Complete |
+| I2P-BYTE-05 | Phase 18 | Complete |
 | TOR-BYTE-01 | Phase 17 | Complete |
 | TOR-BYTE-02 | Phase 17 | Complete |
 | TOR-BYTE-03 | Phase 17 | Complete |
@@ -128,10 +142,10 @@
 | BLOCKER-05 | Phase 16 | Complete |
 
 **Coverage:**
-- v0.13.0 requirements: 5 total
+- v0.14.0 requirements: 5 total
 - Mapped to phases: 5
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 completing Phase 17 Tor Byte Transfer Proof.*
+*Requirements defined: 2026-07-08*
+*Last updated: 2026-07-08 completing Phase 18 I2P Byte Transfer Proof.*
