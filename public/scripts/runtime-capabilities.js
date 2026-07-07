@@ -68,12 +68,14 @@ const RuntimeCapabilities = {
                         requiresBackend: true,
                         room: "",
                         maxUploadBytes: 0,
+                        unavailableReason: this.backendOnlyUnavailableReason(staticTransports.pollen),
                         relayIce: this.relayIceCapability("pollen", staticTransports.pollen, targetManifest)
                     },
                     fips: {
                         supported: staticTransports.fips,
                         requiresBackend: true,
                         room: "",
+                        unavailableReason: this.backendOnlyUnavailableReason(staticTransports.fips),
                         relayIce: this.relayIceCapability("fips", staticTransports.fips, targetManifest)
                     }
                 },
@@ -113,19 +115,28 @@ const RuntimeCapabilities = {
 
     staticTransports(targetManifest = null) {
         const transports = targetManifest?.transports || {};
-        const androidNativeBackend = this.androidNativeBackendAvailable(targetManifest);
-        const androidBackendReady = targetManifest?.target !== "android" || androidNativeBackend;
 
         return {
-            localDiscovery: transports.localDiscovery === true,
+            localDiscovery: false,
             webrtc: transports.webrtc !== false,
             nostr: transports.nostr !== false,
             blossom: transports.blossom !== false,
             hashtree: transports.hashtree !== false,
             bluetooth: false,
-            pollen: transports.pollen === true && androidBackendReady,
-            fips: transports.fips === true && androidBackendReady
+            pollen: transports.pollen === true && this.staticBackendOnlyRouteAvailable("pollen", targetManifest),
+            fips: transports.fips === true && this.staticBackendOnlyRouteAvailable("fips", targetManifest)
         };
+    },
+
+    staticBackendOnlyRouteAvailable(routeType, targetManifest = null) {
+        if (targetManifest?.target === "android") return this.androidNativeBackendAvailable(targetManifest);
+
+        const transport = targetManifest?.capabilities?.transports?.[routeType] || {};
+        return transport.browserRoute === true || transport.objectStore === true || transport.nativeBridgeAvailable === true;
+    },
+
+    backendOnlyUnavailableReason(supported) {
+        return supported ? "" : "requires-instance-native-route";
     },
 
     androidNativeBackendAvailable(targetManifest = null) {

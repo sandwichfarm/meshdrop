@@ -120,17 +120,68 @@ const PeerAvailabilityProtocol = {
         return statuses.filter(status => status?.route || status?.roomType);
     },
 
+    setConfig(config = null) {
+        this._config = config || null;
+    },
+
+    roomTypeSupported(roomType, config = this._config) {
+        if (!config?.capabilities?.transports || !globalThis.RuntimeCapabilities?.transportSupported) return true;
+
+        if (roomType === "nostr") {
+            return globalThis.RuntimeCapabilities.transportSupported(config, "nostr", true)
+                && globalThis.RuntimeCapabilities.transportSupported(config, "webrtc", true);
+        }
+        const transport = this.transportForRoomType(roomType);
+        if (!transport) return true;
+
+        return globalThis.RuntimeCapabilities.transportSupported(config, transport, true);
+    },
+
+    storageRouteSupported(transport, config = this._config) {
+        if (!config?.capabilities?.transports || !globalThis.RuntimeCapabilities?.transportSupported) return true;
+
+        return globalThis.RuntimeCapabilities.transportSupported(config, transport, true);
+    },
+
+    transportForRoomType(roomType) {
+        return {
+            ip: "localDiscovery",
+            nostr: "nostr",
+            fips: "fips",
+            pollen: "pollen"
+        }[roomType] || "";
+    },
+
+    unavailableReasonForRoomType(roomType, config = this._config) {
+        const transport = this.transportForRoomType(roomType);
+        const capabilityReason = transport
+            ? config?.capabilities?.transports?.[transport]?.unavailableReason
+            : "";
+        if (capabilityReason) return capabilityReason;
+        if (roomType === "fips" || roomType === "pollen") return "requires-instance-native-route";
+        if (roomType === "ip") return "requires-instance";
+        return "route-policy";
+    },
+
     statusForRoomType(peer, roomType) {
         return this.routeStatuses(peer)
             .filter(status => (status.route || status.roomType) === roomType)
             .at(-1) || null;
     },
 
-    availability(peer) {
-        return this.roomTypes(peer).map(roomType => ({
-            roomType,
-            ...this.roomTypeMeta[roomType]
-        }));
+    availability(peer, options = {}) {
+        return this.roomTypes(peer).flatMap(roomType => {
+            const supported = this.roomTypeSupported(roomType);
+            if (!supported && options.includeUnavailable !== true) return [];
+
+            return [{
+                roomType,
+                unavailable: !supported,
+                unavailableReason: supported ? "" : this.unavailableReasonForRoomType(roomType),
+                backendOnly: !supported && ["fips", "pollen"].includes(roomType),
+                ...this.roomTypeMeta[roomType]
+            }];
+        });
     },
 
     directOptions(peer) {
@@ -181,7 +232,7 @@ const PeerAvailabilityProtocol = {
 
     storageOptions() {
         const options = [];
-        if (globalThis.meshdropHashtreeTransfer?.isActive?.()) {
+        if (globalThis.meshdropHashtreeTransfer?.isActive?.() && this.storageRouteSupported("hashtree")) {
             options.push({
                 id: "hashtree",
                 type: "storage",
@@ -204,7 +255,7 @@ const PeerAvailabilityProtocol = {
                 })
             });
         }
-        if (globalThis.meshdropBlossomTransfer?.isActive?.()) {
+        if (globalThis.meshdropBlossomTransfer?.isActive?.() && this.storageRouteSupported("blossom")) {
             options.push({
                 id: "blossom",
                 type: "storage",
@@ -227,7 +278,7 @@ const PeerAvailabilityProtocol = {
                 })
             });
         }
-        if (globalThis.meshdropPollenTransfer?.isActive?.()) {
+        if (globalThis.meshdropPollenTransfer?.isActive?.() && this.storageRouteSupported("pollen")) {
             options.push({
                 id: "pollen",
                 type: "storage",
@@ -342,6 +393,7 @@ const PeerRouteStatusProtocol = {
     reasonLabels: {
         "requires-native-app": "Requires native app",
         "requires-instance": "Requires instance",
+        "requires-instance-native-route": "Requires instance or native app",
         "requires-nostr": "Needs Nostr sign-in",
         "nostr-sign-in": "Needs Nostr sign-in",
         "peer-not-trusted": "Peer not trusted",
@@ -466,10 +518,15 @@ const PeerRouteStatusProtocol = {
     },
 
     attemptsForPeer(peer = {}) {
-        const attempts = PeerAvailabilityProtocol.availability(peer)
+        const attempts = PeerAvailabilityProtocol.availability(peer, {includeUnavailable: true})
             .map(option => this.attempt(
                 PeerAvailabilityProtocol.statusForRoomType(peer, option.roomType)
-                || {route: option.roomType, state: "candidate"}
+                || {
+                    route: option.roomType,
+                    state: option.unavailable ? "disabled" : "candidate",
+                    reason: option.unavailableReason,
+                    backendOnly: option.backendOnly
+                }
             ));
         const seen = new Set(attempts.map(attempt => attempt.route));
         PeerAvailabilityProtocol.routeStatuses(peer).forEach(status => {
@@ -638,7 +695,13 @@ class PeersUI {
         meshdropEvents.on('peer-profile-changed', e => this._onPeerProfileChanged(e));
         meshdropEvents.on('nostr-identity-changed', e => this._onNostrIdentityChanged(e.detail));
 
+        meshdropEvents.on('config', e => this._onConfig(e.detail || {}));
         meshdropEvents.on('ws-config', e => this._evaluateRtcSupport(e.detail))
+    }
+
+    _onConfig(config) {
+        PeerAvailabilityProtocol.setConfig(config);
+        Object.keys(this.peers).forEach(peerId => this._redrawPeerRoomTypes(peerId));
     }
 
     _evaluateRtcSupport(wsConfig) {
@@ -706,7 +769,7 @@ class PeersUI {
 
     _joinPeer(peer, roomType, roomId) {
         const routeAllowed = this._routeAllowed(roomType);
-        const pendingRouteStatus = routeAllowed ? null : this._pendingPrivateRouteStatus(peer);
+        const pendingRouteStatus = routeAllowed ? null : this._pendingPrivateRouteStatus(peer, roomType);
         if (!routeAllowed && !pendingRouteStatus) return;
         if (globalThis.NostrFollowPolicy?.allowsPeer(peer, roomType) === false) return;
 
@@ -743,24 +806,29 @@ class PeersUI {
     }
 
     _routeAllowed(roomType) {
+        if (PeerAvailabilityProtocol.roomTypeSupported(roomType) === false) return false;
         if (globalThis.ClearnetRoutePolicy?.allows) return globalThis.ClearnetRoutePolicy.allows(roomType);
         if (globalThis.LocalDiscoveryProtocol?.allowsRoomType) return globalThis.LocalDiscoveryProtocol.allowsRoomType(roomType);
         if (roomType === "ip" && globalThis.meshdropLocalDiscovery?.isEnabled?.() === false) return false;
         return true;
     }
 
-    _pendingPrivateRouteStatus(peer = {}) {
-        const routeType = (peer.routeCapabilities || [])
-            .find(candidate => ["fips", "pollen"].includes(candidate) && this._routeAllowed(candidate));
+    _pendingPrivateRouteStatus(peer = {}, fallbackRoomType = "") {
+        const candidates = [
+            ...(peer.routeCapabilities || []),
+            fallbackRoomType
+        ];
+        const routeType = candidates.find(candidate => ["fips", "pollen"].includes(candidate));
         if (!routeType) return null;
+        const supported = PeerAvailabilityProtocol.roomTypeSupported(routeType);
         const peerId = peer.id;
         return {
             peerId,
             route: routeType,
             roomType: routeType,
             routePeerId: peer.nostrIdentity?.pubkey || peerId,
-            state: "requested",
-            reason: "clearnet-disabled",
+            state: supported ? "requested" : "disabled",
+            reason: supported ? "clearnet-disabled" : PeerAvailabilityProtocol.unavailableReasonForRoomType(routeType),
             routes: []
         };
     }

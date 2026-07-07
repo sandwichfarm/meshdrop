@@ -6,6 +6,24 @@ await import("../public/scripts/ui.js");
 const protocol = globalThis.PeerAvailabilityProtocol;
 const routeStatus = globalThis.PeerRouteStatusProtocol;
 
+function installRuntimeConfig(config) {
+    const originalRuntimeCapabilities = globalThis.RuntimeCapabilities;
+    globalThis.RuntimeCapabilities = {
+        transportSupported(runtimeConfig, transport, fallback = false) {
+            const capability = runtimeConfig?.capabilities?.transports?.[transport];
+            if (typeof capability?.supported === "boolean") return capability.supported;
+
+            return fallback;
+        }
+    };
+    protocol.setConfig(config);
+
+    return () => {
+        protocol.setConfig(null);
+        globalThis.RuntimeCapabilities = originalRuntimeCapabilities;
+    };
+}
+
 test("peer availability exposes Instance, Clearnet, FIPS, Pollen, and Nostr-signaled room types", () => {
     const peer = {
         _roomIds: {
@@ -69,6 +87,88 @@ test("transfer options prefer local when available and include enabled storage p
         globalThis.meshdropHashtreeTransfer = originalHashtree;
         globalThis.meshdropBlossomTransfer = originalBlossom;
         globalThis.meshdropPollenTransfer = originalPollen;
+    }
+});
+
+test("backend-free config does not offer peer-advertised FIPS or Pollen as selectable routes", () => {
+    const restore = installRuntimeConfig({
+        capabilities: {
+            runtime: {
+                target: "spa",
+                platform: "browser",
+                hasBackend: false
+            },
+            transports: {
+                localDiscovery: {supported: false},
+                webrtc: {supported: true},
+                nostr: {supported: true},
+                fips: {supported: false, unavailableReason: "requires-instance-native-route"},
+                pollen: {supported: false, unavailableReason: "requires-instance-native-route"}
+            }
+        }
+    });
+
+    try {
+        const peer = {
+            id: "peer-static",
+            _peerIdsByRoomType: {
+                nostr: "nostr-peer",
+                fips: "fips-peer",
+                pollen: "pollen-peer"
+            },
+            _roomIds: {
+                nostr: "meshdrop-nostr",
+                fips: "meshdrop-fips",
+                pollen: "meshdrop-pollen"
+            },
+            routeCapabilities: ["fips", "pollen"]
+        };
+
+        assert.deepEqual(
+            protocol.optionsFor(peer).map(option => [option.id, option.peerId || null]),
+            [["webrtc", "nostr-peer"]]
+        );
+        assert.deepEqual(
+            routeStatus.attemptsForPeer(peer).map(attempt => [attempt.route, attempt.state, attempt.reason]),
+            [
+                ["nostr", "candidate", ""],
+                ["fips", "disabled", "Requires instance or native app"],
+                ["pollen", "disabled", "Requires instance or native app"]
+            ]
+        );
+    } finally {
+        restore();
+    }
+});
+
+test("backend-free config suppresses Pollen storage option without suppressing browser object stores", () => {
+    const originalHashtree = globalThis.meshdropHashtreeTransfer;
+    const originalBlossom = globalThis.meshdropBlossomTransfer;
+    const originalPollen = globalThis.meshdropPollenTransfer;
+    const restore = installRuntimeConfig({
+        capabilities: {
+            transports: {
+                hashtree: {supported: true},
+                blossom: {supported: true},
+                pollen: {supported: false, unavailableReason: "requires-instance-native-route"}
+            }
+        }
+    });
+    globalThis.meshdropHashtreeTransfer = {isActive: () => true};
+    globalThis.meshdropBlossomTransfer = {isActive: () => true};
+    globalThis.meshdropPollenTransfer = {isActive: () => true};
+
+    try {
+        assert.deepEqual(
+            protocol.optionsFor({}).map(option => option.id),
+            ["hashtree", "blossom"]
+        );
+    }
+    finally {
+        globalThis.meshdropHashtreeTransfer = originalHashtree;
+        globalThis.meshdropBlossomTransfer = originalBlossom;
+        globalThis.meshdropPollenTransfer = originalPollen;
+        restore();
     }
 });
 

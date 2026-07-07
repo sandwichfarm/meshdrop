@@ -953,6 +953,56 @@ test("clearnet preference allows Nostr routes when instance sharing is disabled"
     assert.equal(manager.peers["peer-a"]._roomIds.nostr, "nostr-room");
 });
 
+test("backend-free config refuses peer-advertised FIPS as a selectable signaling route", () => {
+    const {PeersManager, context, connections, fired} = createHarness();
+    context.RuntimeCapabilities = {
+        transportSupported(config, transport, fallback = false) {
+            const capability = config?.capabilities?.transports?.[transport];
+            if (typeof capability?.supported === "boolean") return capability.supported;
+
+            return fallback;
+        }
+    };
+    const manager = new PeersManager({send() {}});
+    manager._onConfig({
+        capabilities: {
+            runtime: {
+                target: "spa",
+                platform: "browser",
+                hasBackend: false
+            },
+            transports: {
+                webrtc: {supported: true},
+                nostr: {supported: true},
+                fips: {supported: false, unavailableReason: "requires-instance-native-route"}
+            }
+        }
+    });
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+
+    manager._onPeerJoined({
+        peer: {
+            id: "fips-peer",
+            rtcSupported: true,
+            routeCapabilities: ["fips"]
+        },
+        isCaller: true,
+        roomType: "fips",
+        roomId: "fips-room"
+    });
+
+    assert.deepEqual(Object.keys(manager.peers), []);
+    assert.equal(connections.length, 0);
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.peerId === "fips-peer"
+            && event.detail.route === "fips"
+            && event.detail.state === "disabled"
+            && event.detail.reason === "requires-instance-native-route"),
+        true
+    );
+});
+
 test("disabling clearnet refuses FIPS fallback when relay ICE is unavailable", () => {
     const {PeersManager, fired, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};

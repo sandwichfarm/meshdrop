@@ -52,6 +52,11 @@ test("SPA artifact smoke proves runtime support plus browser-backed WebRTC trans
     assert.match(smoke, /public-spa-nostr-webrtc/);
     assert.match(smoke, /meshdropNostrMesh\.connect/);
     assert.match(smoke, /meshdrop-spa-proof\.txt/);
+    assert.match(smoke, /routeOptionIds/);
+    assert.match(smoke, /routeAttempts/);
+    assert.match(smoke, /SPA route options must not offer FIPS as selectable/);
+    assert.match(smoke, /SPA route options must not offer Pollen mesh as selectable/);
+    assert.match(smoke, /Requires instance or native app/);
     assert.match(smoke, /safeDebugPageState/);
     assert.match(smoke, /undefined, \{timeout: spaHydrationTimeoutMs\}/);
     assert.match(smoke, /defaultSmokeAttempts = browserTypeName === "webkit" \? 3 : 1/);
