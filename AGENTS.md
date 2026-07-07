@@ -6,6 +6,10 @@ This file is mandatory. Read it before any work in this repo. Follow it over gen
 
 Finish real work, not chat work.
 
+## Project Mission
+
+MeshDrop is a robust, self-healing, easy-to-use sharing application for moving files through as many real network conditions as possible. It uses the Nostr social graph to discover trusted peers, then negotiates across multiple network topologies so peers can still connect when LAN discovery, direct routing, relays, captive networks, NAT, or firewalls get in the way. Privacy is the default: private transfers must stay private, encrypted paths must fail closed instead of silently downgrading, and public sharing options must be explicit. WebRTC is the standard data transport across topologies; server handoffs, Blossom/Pollen/FIPS-style federation, relay signaling, and other topology-specific helpers exist to establish or recover the connection, not to replace the privacy and transfer guarantees. Keep this forest in view: every feature should make file sharing more reliable, more understandable, or safer under hostile or weird network conditions.
+
 Done means:
 - Issue understood from real repo/runtime evidence.
 - Change implemented with small diff.
@@ -13,6 +17,7 @@ Done means:
 - AI-slop scan passes for changed code; full-repo baseline failures are reported, not hidden.
 - Work is committed.
 - Work is pushed to remote, unless user explicitly says local-only.
+- During alpha, branch work is opened as a PR, read back from GitHub, and merged to `master` after verification unless the user explicitly says to hold it.
 - The operator can test the exact changed state from a named local path without doing git archaeology or guessing Docker/image/cache state.
 - Final report names commit, branch, push status, exact verification commands, and any remaining risk.
 
@@ -187,19 +192,33 @@ Slop patterns to hunt manually while iterating:
 ## Git And Shipping
 
 Default:
-- Use git worktrees for agent work. Treat the user's normal checkout as the operator worktree; do not edit it when it has unrelated dirty state.
-- For each new user task, start from `master`/`origin/master` in a fresh task worktree and create a fresh task branch before editing, unless the user explicitly says to continue the current branch or work directly on `master`.
+- Do not keep cloning this repository into `~/Develop` for every task. Use one canonical operator checkout plus git worktrees.
+- Treat the user's normal checkout as the operator worktree; do not edit it when it has unrelated dirty state.
+- For each independent user task, fetch `origin`, start from current `origin/master`, create a fresh task branch, and attach it to a fresh task worktree before editing, unless the user explicitly says to continue the current branch or work directly on `master`.
 - Use predictable branch names: `agent/<kind>-<slug>-<yyyymmdd>` or an issue-specific `fix/<issue>-<slug>` when the user names an issue.
+- Use predictable task worktree paths beside the operator checkout, for example `~/Develop/meshdrop-<slug>-<yyyymmdd>`.
 - Preserve user changes. Never reset, checkout, or overwrite dirty files you did not create.
 - Commit every completed task.
 - Push every completed task.
-- Open/update PR when branch is not `master` or when task references issue/PR flow.
+- Open/update PR for every task branch.
+- While MeshDrop is in alpha, merge the PR after verification and PR readback unless checks fail, the branch conflicts, or the user explicitly says not to merge. Alpha means clean breaks are allowed; do not leave completed work sitting in open PRs by default.
 - When a branch should be pushed, push it before announcing completion.
 
+Recommended start commands:
+
+```sh
+git -C ~/Develop/meshdrop fetch origin
+git -C ~/Develop/meshdrop worktree add -b agent/<kind>-<slug>-<yyyymmdd> \
+  ~/Develop/meshdrop-<slug>-<yyyymmdd> origin/master
+cd ~/Develop/meshdrop-<slug>-<yyyymmdd>
+```
+
+Use an existing task worktree only when it is already on the branch for the same task and `git status --short --branch` proves its state. Do not create a second clone or second worktree for the same task unless the first one is corrupt, missing, or unsafe to reuse.
+
 Worktree roles:
-- Operator worktree: the user's normal checkout. Use it for inspection only unless it is clean and the user explicitly wants work there.
-- Task worktree: the agent-owned worktree for one task branch. Implement, test, commit, and push from here.
-- Review/UAT worktree: optional clean checkout of the PR branch for the operator to run or inspect locally. Create or update it when useful, and report its path.
+- Operator worktree: the user's normal checkout, normally `~/Develop/meshdrop`. Use it for inspection, fetching, and safe fast-forward handoff only unless it is clean and the user explicitly wants work there.
+- Task worktree: the agent-owned worktree for one task branch, normally `~/Develop/meshdrop-<slug>-<yyyymmdd>`. Implement, test, commit, push, open PR, and merge from here.
+- Review/UAT worktree: optional clean checkout of the PR branch or merged commit for the operator to run or inspect locally. Create or update it when useful, and report its path.
 
 Dirty-state protocol:
 - If the operator worktree has unrelated dirty files, leave them untouched and create a task worktree from `origin/master`.
@@ -218,6 +237,7 @@ PR ceremony:
 - Open or update the PR.
 - Read the PR back with `gh pr view --json number,url,state,headRefName,baseRefName,title,body,commits,statusCheckRollup`.
 - PR bodies must include summary, verification, known baseline failures, runtime/UAT notes, dependencies, and merge order when stacked.
+- During alpha, merge the PR with `gh pr merge` after required verification and readback. Prefer merge commits for normal task branches unless repo policy says otherwise. After merge, fetch `origin` and prove `origin/master` contains the merge.
 
 Before commit:
 
@@ -260,8 +280,8 @@ Operator-testable handoff:
   - Browser hard refresh or service-worker unregister is not proof when source, image tag, or running container may be stale.
 
 Task end states:
-- Ready for UAT: code is committed, branch is pushed, PR is open/read back, verification is recorded, and the review path or task worktree path is named.
-- Complete: PR is merged, or the user explicitly accepts PR-ready handoff as the endpoint.
+- Ready for UAT: code is committed, branch is pushed, PR is open/read back, verification is recorded, and the review path or task worktree path is named. Use this only when the user asked to hold before merge or a real blocker prevents merge.
+- Complete during alpha: PR is merged into `master`, merge readback is done, and the operator checkout or a named review/UAT worktree is at the tested commit.
 - Do not delete task or review worktrees automatically after opening a PR. Keep them until merge or explicit cleanup request.
 - Before cleanup, show the worktree path and branch to be removed. Never remove a dirty worktree.
 
