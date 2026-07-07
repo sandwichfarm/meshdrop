@@ -590,6 +590,25 @@ const PeerRouteStatusProtocol = {
         };
     },
 
+    createVisualAttemptChip(attempt = {}, className = "route-attempt") {
+        const visual = this.visualAttempt(attempt);
+        const item = document.createElement('span');
+        item.className = className;
+        item.dataset.route = visual.route;
+        item.dataset.state = visual.state;
+        item.dataset.tone = visual.tone;
+        item.title = visual.title;
+        item.setAttribute('role', 'img');
+        item.setAttribute('aria-label', visual.ariaLabel);
+
+        const symbol = document.createElement('span');
+        symbol.className = 'route-attempt-symbol';
+        symbol.setAttribute('aria-hidden', 'true');
+
+        item.append(symbol);
+        return item;
+    },
+
     attemptsForPeer(peer = {}) {
         const attempts = PeerAvailabilityProtocol.availability(peer, {includeUnavailable: true})
             .map(option => this.attempt(
@@ -1551,6 +1570,7 @@ class PeerUI {
         if (!row) return;
         row.replaceChildren();
         row.setAttribute('hidden', true);
+        delete this.$el.dataset.routeVisual;
     }
 
     _renderRouteAttempts() {
@@ -1563,27 +1583,12 @@ class PeerUI {
         }
 
         const nodes = attempts.map(attempt => {
-            const visual = PeerRouteStatusProtocol.visualAttempt(attempt);
-            const item = document.createElement('span');
-            item.className = 'route-attempt';
-            item.dataset.route = visual.route;
-            item.dataset.state = visual.state;
-            item.dataset.tone = visual.tone;
-            item.title = visual.title;
-            item.setAttribute('role', 'img');
-            item.setAttribute('aria-label', visual.ariaLabel);
-
-            const symbol = document.createElement('span');
-            symbol.className = 'route-attempt-symbol';
-            symbol.setAttribute('aria-hidden', 'true');
-
-            item.append(symbol);
-
-            return item;
+            return PeerRouteStatusProtocol.createVisualAttemptChip(attempt);
         });
 
         row.replaceChildren(...nodes);
         row.hidden = false;
+        this.$el.dataset.routeVisual = 'true';
     }
 
     _createCallbacks() {
@@ -2383,11 +2388,16 @@ class TransferChoiceDialog extends Dialog {
                 const attempt = document.createElement('span');
                 attempt.className = 'transport-choice-attempt';
                 if (option.attempt) {
-                    attempt.dataset.state = option.attempt.state;
-                    attempt.textContent = [
-                        option.attempt.stateLabel,
-                        ...option.attempt.privacyLabels
-                    ].filter(Boolean).join(' · ');
+                    const chip = PeerRouteStatusProtocol.createVisualAttemptChip(
+                        option.attempt,
+                        'transport-choice-route route-attempt'
+                    );
+                    const visual = PeerRouteStatusProtocol.visualAttempt(option.attempt);
+                    attempt.dataset.state = visual.state;
+                    attempt.dataset.tone = visual.tone;
+                    attempt.title = visual.title;
+                    attempt.setAttribute('aria-label', visual.ariaLabel);
+                    attempt.append(chip);
                 } else {
                     attempt.setAttribute('hidden', true);
                 }
