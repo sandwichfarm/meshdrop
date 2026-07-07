@@ -14,15 +14,15 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.5.0 SPA Route Honesty
+## Current Milestone: v0.6.0 Android Native Route Adapter
 
-**Goal:** make backend-free SPA artifacts advertise and render only routes that the browser/static target can actually use, while showing backend-only FIPS/Pollen/native routes as unavailable or instance-dependent.
+**Goal:** make the installed Android WebView expose its native loopback FIPS/Pollen backend through the route adapter contract, with byte-transfer proof for the native Pollen data plane.
 
 **Target features:**
-- Keep pure-client SPA routes enabled: Nostr WebRTC over normal ICE plus encrypted object-store routes that the static target can use.
-- Mark backend-only FIPS/Pollen/instance-relay/native routes unavailable unless a reachable browser/OS route or instance/object-store primitive exists.
-- Prove static target manifests and SPA browser smokes do not claim FIPS/Pollen byte transfer from discovery, descriptors, badges, or build metadata alone.
-- Preserve route-attempt copy so users see "requires instance" or "requires native app" instead of a fake transfer option.
+- Register an Android native route adapter only when the Android WebView loopback backend is alive.
+- Expose native Pollen descriptor, upload/download, receive, and route proof methods through the generic adapter contract.
+- Expose native FIPS status honestly without claiming FIPS byte-transfer support before a FIPS data-plane proof exists.
+- Prove an installed APK sends and receives bytes through the native Pollen primitive, validates the hash, and emits route proof with no fallback.
 
 ## Requirements
 
@@ -44,7 +44,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Fit Pollen into that adapter contract with descriptor, upload/download or service substrate behavior, proof, and fail-closed fallback rules.
 - [x] Turn instance federation from discovery/signaling bridges into an encrypted file relay path under the same adapter contract.
 - [x] Show route attempts, choices, unavailable states, and privacy labels in the UI using proof-backed route status instead of optimistic transport badges.
-- [ ] Make backend-free SPA artifacts fail closed for backend-only FIPS/Pollen/native routes while keeping pure-client routes available.
+- [x] Make backend-free SPA artifacts fail closed for backend-only FIPS/Pollen/native routes while keeping pure-client routes available.
 - [ ] Implement WebRTC overlay relay candidates for FIPS and Pollen, or explicitly ship a differently named non-WebRTC live-transfer fallback where browser ICE cannot be constrained. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.

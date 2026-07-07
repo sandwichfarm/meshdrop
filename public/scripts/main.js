@@ -24,6 +24,7 @@ class PairDrop {
             "scripts/blossom-transfer.js",
             "scripts/hashtree-transfer.js",
             "scripts/pollen-transfer.js",
+            "scripts/android-native-routes.js",
             "scripts/fips-discovery.js",
             "scripts/network.js",
             "scripts/ui.js",
