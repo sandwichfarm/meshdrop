@@ -609,6 +609,25 @@ const PeerRouteStatusProtocol = {
         return item;
     },
 
+    createAvailabilityPill(option = {}, visual = {}) {
+        const pill = document.createElement('span');
+        pill.className = ["availability-pill", option.className].filter(Boolean).join(" ");
+        pill.dataset.transport = option.id || "";
+        pill.dataset.route = visual.route || option.roomType || option.id || "";
+        pill.dataset.state = visual.state || "candidate";
+        pill.dataset.tone = visual.tone || "available";
+        pill.title = visual.title || option.label || option.shortLabel || "";
+        pill.setAttribute("role", "img");
+        pill.setAttribute("aria-label", visual.ariaLabel || pill.title);
+
+        const symbol = document.createElement('span');
+        symbol.className = 'availability-pill-symbol';
+        symbol.setAttribute('aria-hidden', 'true');
+
+        pill.append(symbol);
+        return pill;
+    },
+
     attemptsForPeer(peer = {}) {
         const attempts = PeerAvailabilityProtocol.availability(peer, {includeUnavailable: true})
             .map(option => this.attempt(
@@ -1677,15 +1696,7 @@ class PeerUI {
                         backendOnly: option.backendOnly
                     }
                 ));
-                const pill = document.createElement('span');
-                pill.className = `availability-pill ${option.className}`;
-                pill.dataset.transport = option.id;
-                pill.dataset.state = visual.state;
-                pill.dataset.tone = visual.tone;
-                pill.textContent = option.shortLabel;
-                pill.title = visual.title || option.label;
-                pill.setAttribute("aria-label", visual.ariaLabel);
-                return pill;
+                return PeerRouteStatusProtocol.createAvailabilityPill(option, visual);
             });
 
         row.replaceChildren(...pills);

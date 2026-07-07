@@ -1,4 +1,4 @@
-const cacheVersion = 'v1.11.8-route-contract-build';
+const cacheVersion = 'v1.11.8-route-compact-badges';
 const cacheTitle = `meshdrop-cache-${cacheVersion}`;
 const relativePathsToCache = [
     './',
