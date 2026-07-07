@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.8.0
-milestone_name: Generic Instance Relay
+milestone: v0.9.0
+milestone_name: FIPS Instance Relay
 status: complete
-last_updated: "2026-07-07T16:28:36Z"
+last_updated: "2026-07-07T17:10:26.501Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** generic instance-relay descriptor/proof semantics complete; next slice can apply the contract to another backend.
+**Current focus:** apply generic instance-relay descriptor/proof semantics to the existing encrypted FIPS byte path.
 
 ## Milestone Audit: 2026-07-06
 
@@ -64,6 +64,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-fips-instance-relay` | complete | FIPS `fipsInstanceRelay` descriptor/proof added while keeping legacy `fipsStream`; focused 17/17; FIPS two-instance runtime smoke reports `instanceRelay=true`, 43/43 bytes, hash matched, fips0 deltas; `npm test` 345/345; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-generic-instance-relay` | complete | Generic `InstanceRelayTransferProtocol`; Pollen delegates descriptor/proof semantics without public shape change; focused 15/15; `npm test` 344/344; `npm run test:e2e`; `npm run test:docker`; diff/slop gates |
 | 2026-07-07 | `260707-android-native-route-adapter` | complete | Android native route adapter contract/proof added; focused 8/8; `npm run test:android-fips-pollen` route proof bytes 26/26; `npm test` 333/333; diff/slop gates |
 | 2026-07-07 | `260707-spa-route-honesty` | complete | Backend-free SPA config/options fail closed for backend-only FIPS/Pollen/native claims; focused 64/64; `npm run test:spa-artifact`; `npm test` 330/330; diff/slop gates |
@@ -180,7 +181,7 @@ None.
 
 ## Current Position
 
-Phase: 12 complete
-Plan: `.planning/ROADMAP.md`
-Status: Generic instance-relay contract complete
-Last activity: 2026-07-07 — Milestone v0.8.0 Generic Instance Relay complete
+Phase: 13 FIPS Instance Relay
+Plan: `.planning/phases/13-fips-instance-relay/13-01-PLAN.md`
+Status: Complete
+Last activity: 2026-07-07 — Phase 13 FIPS Instance Relay completed

@@ -1,4 +1,4 @@
-# Requirements: MeshDrop v0.8.0 Generic Instance Relay
+# Requirements: MeshDrop v0.9.0 FIPS Instance Relay
 
 **Defined:** 2026-07-07
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
@@ -25,11 +25,20 @@
 
 ## Future Requirements
 
-- **FIPS-RELAY-01**: FIPS instance relay moves encrypted chunks sender instance -> recipient instance over FIPS instead of requiring the recipient browser to fetch from the sender FIPS URL directly.
 - **TOR-01**: Tor instance adapter exposes stream descriptors only when the instance can dial onion endpoints locally.
 - **I2P-01**: I2P instance adapter exposes stream descriptors only when the instance can dial I2P destinations locally.
 - **LOKI-01**: Loki instance adapter exposes stream descriptors only when the instance has a proven local Loki transport.
 - **TURN-01**: WebRTC overlay relay candidates for FIPS/Pollen use TURN/TURNS routes only when the browser can dial the relay endpoint and relay-only ICE proof exists.
+
+## v0.9.0 Requirements
+
+### FIPS Instance Relay
+
+- [x] **FIPS-IR-01**: FIPS builds generic `transportShape=instance-relay` descriptors for encrypted payload descriptors served from a validated FIPS mesh IPv6 base URL.
+- [x] **FIPS-IR-02**: Private FIPS transfer requests attach `fipsInstanceRelay` metadata with owner pubkey, session ID, data-plane primitive `fips-http-stream`, `webRtcUsed=false`, `instanceRelayed=true`, bytes sent, and fallback disabled.
+- [x] **FIPS-IR-03**: Recipient validation prefers `fipsInstanceRelay`, rejects owner/session/expiry/primitive/WebRTC/fallback/hash mismatches before success, and emits route proof with bytes received and hash match.
+- [x] **FIPS-IR-04**: Legacy requests containing only `fipsStream` remain accepted and continue to emit legacy FIPS stream proof with `instanceRelayed=false`.
+- [x] **FIPS-IR-05**: Focused tests, FIPS stream runtime smoke, broad tests, Docker smoke, and changed-code slop gate prove the slice before merge.
 
 ## Out of Scope
 
@@ -51,12 +60,17 @@
 | INST-GEN-03 | Phase 12 | Complete |
 | INST-GEN-04 | Phase 12 | Complete |
 | INST-GEN-05 | Phase 12 | Complete |
+| FIPS-IR-01 | Phase 13 | Complete |
+| FIPS-IR-02 | Phase 13 | Complete |
+| FIPS-IR-03 | Phase 13 | Complete |
+| FIPS-IR-04 | Phase 13 | Complete |
+| FIPS-IR-05 | Phase 13 | Complete |
 
 **Coverage:**
-- v0.8.0 requirements: 5 total
+- v0.9.0 requirements: 5 total
 - Mapped to phases: 5
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 after completing Phase 12 Generic Instance Relay.*
+*Last updated: 2026-07-07 after completing Phase 13 FIPS Instance Relay.*

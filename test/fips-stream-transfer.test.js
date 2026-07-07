@@ -5,6 +5,7 @@ import vm from "node:vm";
 import {webcrypto} from "node:crypto";
 
 const routeContractSource = fs.readFileSync(new URL("../public/scripts/route-contract.js", import.meta.url), "utf8");
+const instanceRelaySource = fs.readFileSync(new URL("../public/scripts/instance-relay-transfer.js", import.meta.url), "utf8");
 const blossomSource = fs.readFileSync(new URL("../public/scripts/blossom-transfer.js", import.meta.url), "utf8");
 const fipsStreamSource = fs.readFileSync(new URL("../public/scripts/fips-stream-transfer.js", import.meta.url), "utf8");
 const networkSource = fs.readFileSync(new URL("../public/scripts/network.js", import.meta.url), "utf8");
@@ -72,6 +73,7 @@ function createHarness({localPubkey = "a".repeat(64), peerPubkey = "b".repeat(64
     context.globalThis = context;
 
     vm.runInNewContext(routeContractSource, context);
+    vm.runInNewContext(instanceRelaySource, context);
     vm.runInNewContext(blossomSource, context);
     vm.runInNewContext(fipsStreamSource, context);
 
@@ -177,6 +179,44 @@ test("FIPS stream protocol builds route descriptors and proof seeds for FIPS mes
         fallbackUsed: false
     });
 
+    const relayDescriptor = harness.context.FipsStreamTransferProtocol.buildInstanceRelayDescriptor({
+        ownerPubkey: harness.localPubkey,
+        sessionId: "session-1",
+        baseUrl: "http://[fd12:3456:789a::1]:3000",
+        files: [{
+            id: "a".repeat(32),
+            token: "b".repeat(64),
+            sha256: "c".repeat(64),
+            size: 5,
+            type: "text/plain"
+        }]
+    });
+
+    assert.equal(relayDescriptor.routeType, "fips");
+    assert.equal(relayDescriptor.transportShape, "instance-relay");
+    assert.equal(relayDescriptor.endpoint.primitive, "fips-http-stream");
+    assert.equal(relayDescriptor.endpoint.baseUrl, "http://[fd12:3456:789a::1]:3000");
+    assert.equal(relayDescriptor.capabilities.webRtcDataPath, false);
+    assert.equal(relayDescriptor.capabilities.instanceRelay, true);
+    assert.equal(harness.context.MeshDropRouteContract.validateDescriptor(relayDescriptor, {
+        expectedOwnerPubkey: harness.localPubkey,
+        expectedSessionId: "session-1",
+        now: Date.now()
+    }).ok, true);
+
+    assert.deepEqual(JSON.parse(JSON.stringify(harness.context.FipsStreamTransferProtocol.buildInstanceRelayProofSeed({
+        senderRuntime: "browser:sender",
+        bytesSent: 5
+    }))), {
+        senderRuntime: "browser:sender",
+        routeType: "fips",
+        dataPlanePrimitive: "fips-http-stream",
+        webRtcUsed: false,
+        instanceRelayed: true,
+        bytesSent: 5,
+        fallbackUsed: false
+    });
+
     assert.throws(
         () => harness.context.FipsStreamTransferProtocol.buildStreamDescriptor({
             ownerPubkey: harness.localPubkey,
@@ -222,6 +262,32 @@ test("private FIPS stream uploads ciphertext and attaches stream descriptor and 
         bytesSent: uploaded.size,
         fallbackUsed: false
     });
+
+    assert.equal(request.fipsInstanceRelay.descriptor.routeType, "fips");
+    assert.equal(request.fipsInstanceRelay.descriptor.transportShape, "instance-relay");
+    assert.equal(request.fipsInstanceRelay.descriptor.ownerPubkey, harness.localPubkey);
+    assert.equal(request.fipsInstanceRelay.descriptor.sessionId, request.payloadEncryption.transferId);
+    assert.equal(request.fipsInstanceRelay.descriptor.endpoint.primitive, "fips-http-stream");
+    assert.equal(request.fipsInstanceRelay.descriptor.endpoint.baseUrl, "http://[fd12:3456:789a::1]:3000");
+    assert.equal(request.fipsInstanceRelay.descriptor.capabilities.webRtcDataPath, false);
+    assert.equal(request.fipsInstanceRelay.descriptor.capabilities.instanceRelay, true);
+    assert.deepEqual(harness.context.MeshDropRouteContract.validateDescriptor(
+        request.fipsInstanceRelay.descriptor,
+        {
+            expectedOwnerPubkey: harness.localPubkey,
+            expectedSessionId: request.payloadEncryption.transferId,
+            now: Date.now()
+        }
+    ).ok, true);
+    assert.deepEqual(request.fipsInstanceRelay.proofSeed, {
+        senderRuntime: `browser:${harness.localPubkey.slice(0, 8)}.meshdrop.test`,
+        routeType: "fips",
+        dataPlanePrimitive: "fips-http-stream",
+        webRtcUsed: false,
+        instanceRelayed: true,
+        bytesSent: uploaded.size,
+        fallbackUsed: false
+    });
 });
 
 test("recipient decrypts FIPS stream, verifies hash, and emits route proof", async () => {
@@ -246,14 +312,40 @@ test("recipient decrypts FIPS stream, verifies hash, and emits route proof", asy
     assert.equal(proof.routeType, "fips");
     assert.equal(proof.dataPlanePrimitive, "fips-http-stream");
     assert.equal(proof.webRtcUsed, false);
-    assert.equal(proof.instanceRelayed, false);
+    assert.equal(proof.instanceRelayed, true);
     assert.equal(proof.bytesSent, request.payloadHeaders[0].size);
     assert.equal(proof.bytesReceived, request.payloadHeaders[0].size);
     assert.equal(proof.hashMatched, true);
     assert.equal(proof.fallbackUsed, false);
 });
 
-test("FIPS stream proof fails closed on bad descriptor binding, URL, hash, or fallback", async () => {
+test("recipient keeps legacy FIPS stream proof when instance-relay metadata is absent", async () => {
+    const harness = createHarness();
+    const sender = new harness.WSPeer(harness.server, false, harness.peerPubkey, "fips", "npub-network:pairwise");
+
+    await sender.requestFipsFileTransfer(
+        [new File(["secret"], "secret.txt", {type: "text/plain"})],
+        {id: "fips", type: "storage", label: "FIPS Stream", privacyMode: "private"}
+    );
+    const request = harness.sent.find(message => message.type === "fips-request");
+    delete request.fipsInstanceRelay;
+    harness.setDownloadedFiles(harness.getUploadedFiles());
+    harness.setLocalPubkey(harness.peerPubkey);
+
+    const recipient = new harness.WSPeer(harness.server, false, harness.localPubkey, "fips", "npub-network:pairwise");
+    await recipient._downloadFipsFiles(request);
+
+    const proof = harness.fired.find(event => event.type === "route-proof")?.detail;
+    assert.deepEqual(harness.context.MeshDropRouteContract.validateRouteProof(proof).ok, true);
+    assert.equal(proof.routeType, "fips");
+    assert.equal(proof.dataPlanePrimitive, "fips-http-stream");
+    assert.equal(proof.webRtcUsed, false);
+    assert.equal(proof.instanceRelayed, false);
+    assert.equal(proof.hashMatched, true);
+    assert.equal(proof.fallbackUsed, false);
+});
+
+test("FIPS instance relay proof fails closed on bad descriptor binding, URL, hash, or fallback", async () => {
     const harness = createHarness();
     const sender = new harness.WSPeer(harness.server, false, harness.peerPubkey, "fips", "npub-network:pairwise");
 
@@ -264,40 +356,60 @@ test("FIPS stream proof fails closed on bad descriptor binding, URL, hash, or fa
     const request = harness.sent.find(message => message.type === "fips-request");
 
     assert.throws(
-        () => harness.context.FipsStreamTransferProtocol.validateStreamRequest({
+        () => harness.context.FipsStreamTransferProtocol.validateInstanceRelayRequest({
             ...request,
-            fipsStream: {
-                ...request.fipsStream,
-                descriptor: {...request.fipsStream.descriptor, sessionId: "wrong-session"}
+            fipsInstanceRelay: {
+                ...request.fipsInstanceRelay,
+                descriptor: {...request.fipsInstanceRelay.descriptor, sessionId: "wrong-session"}
             }
         }),
         /session/
     );
     assert.throws(
-        () => harness.context.FipsStreamTransferProtocol.validateStreamRequest({
+        () => harness.context.FipsStreamTransferProtocol.validateInstanceRelayRequest({
             ...request,
-            fipsStream: {
-                ...request.fipsStream,
+            fipsInstanceRelay: {
+                ...request.fipsInstanceRelay,
                 descriptor: {
-                    ...request.fipsStream.descriptor,
-                    endpoint: {...request.fipsStream.descriptor.endpoint, baseUrl: "http://127.0.0.1:3000"}
+                    ...request.fipsInstanceRelay.descriptor,
+                    endpoint: {...request.fipsInstanceRelay.descriptor.endpoint, baseUrl: "http://127.0.0.1:3000"}
                 }
             }
         }),
         /FIPS mesh URL/
     );
     assert.throws(
-        () => harness.context.FipsStreamTransferProtocol.validateStreamRequest({
+        () => harness.context.FipsStreamTransferProtocol.validateInstanceRelayRequest({
             ...request,
-            fipsStream: {
-                ...request.fipsStream,
-                proofSeed: {...request.fipsStream.proofSeed, fallbackUsed: true}
+            fipsInstanceRelay: {
+                ...request.fipsInstanceRelay,
+                proofSeed: {...request.fipsInstanceRelay.proofSeed, fallbackUsed: true}
             }
         }),
         /fallback/
     );
+    assert.throws(
+        () => harness.context.FipsStreamTransferProtocol.validateInstanceRelayRequest({
+            ...request,
+            fipsInstanceRelay: {
+                ...request.fipsInstanceRelay,
+                proofSeed: {...request.fipsInstanceRelay.proofSeed, webRtcUsed: true}
+            }
+        }),
+        /WebRTC/
+    );
+    assert.throws(
+        () => harness.context.FipsStreamTransferProtocol.validateInstanceRelayRequest({
+            ...request,
+            fipsInstanceRelay: {
+                ...request.fipsInstanceRelay,
+                proofSeed: {...request.fipsInstanceRelay.proofSeed, instanceRelayed: false}
+            }
+        }),
+        /relay flag|flag is missing/
+    );
     await assert.rejects(
-        harness.context.FipsStreamTransferProtocol.finalizeStreamProof({
+        harness.context.FipsStreamTransferProtocol.finalizeInstanceRelayProof({
             request: {
                 ...request,
                 payloadIntegrity: {

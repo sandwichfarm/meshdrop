@@ -7,6 +7,8 @@ import {promisify} from "node:util";
 import {generateSecretKey, getPublicKey, nip19} from "nostr-tools";
 
 await import("../public/scripts/route-contract.js");
+await import("../public/scripts/instance-relay-transfer.js");
+await import("../public/scripts/fips-stream-transfer.js");
 
 const execFileAsync = promisify(execFile);
 const minute = 60 * 1000;
@@ -45,6 +47,14 @@ async function main() {
         assert(upload.size === Buffer.byteLength(payload), "upload size mismatch");
 
         const senderStatus = await getJsonFromContainer(containerA, "http://127.0.0.1:3000/fips/status");
+        const relayRequest = buildInstanceRelayRequest({
+            ownerPubkey: identityA.pubkey,
+            recipientPubkey: identityB.pubkey,
+            sessionId: `fips-stream-smoke-${suffix}`,
+            baseUrl: `http://[${senderStatus.ipv6Addr}]:3000`,
+            upload,
+            bytesSent: upload.size
+        });
         const downloadUrl = `http://[${senderStatus.ipv6Addr}]:3000/fips/download/${upload.id}?token=${upload.token}`;
         const received = await step("fetch over FIPS", () => fetchFromContainer(containerB, downloadUrl));
         assert(received.text === payload, "downloaded payload mismatch");
@@ -57,25 +67,23 @@ async function main() {
         assertFipsDeviceTrafficIncreased(deviceABefore, deviceAAfter, "sender");
         assertFipsDeviceTrafficIncreased(deviceBBefore, deviceBAfter, "recipient");
 
-        const proof = {
-            senderRuntime: `docker:${containerA}`,
+        const relay = globalThis.FipsStreamTransferProtocol.validateInstanceRelayRequest(relayRequest);
+        const proof = globalThis.InstanceRelayTransferProtocol.finalizeProof({
+            relay,
+            encryptedFiles: [new File([Buffer.from(received.text)], "meshdrop-fips-stream-proof.txt", {type: "text/plain"})],
             recipientRuntime: `docker:${containerB}`,
-            routeType: "fips",
-            dataPlanePrimitive: "fips-http-stream",
-            webRtcUsed: false,
-            instanceRelayed: false,
-            bytesSent: received.bytes,
-            bytesReceived: received.bytes,
-            hashMatched: true,
-            fallbackUsed: false
-        };
+            hashMatched: true
+        });
         const proofResult = globalThis.MeshDropRouteContract.validateRouteProof(proof);
         assert(proofResult.ok, `route proof rejected: ${proofResult.reason}`);
+        assert(proof.instanceRelayed === true, "instance relay proof flag mismatch");
+        assert(proof.bytesSent === received.bytes, "instance relay sent byte count mismatch");
+        assert(proof.bytesReceived === received.bytes, "instance relay received byte count mismatch");
 
         console.log(
-            `Proof fips-stream-route: ${containerB} fetched ${received.bytes} bytes from ${containerA} ` +
+            `Proof fips-instance-relay-route: ${containerB} fetched ${received.bytes} bytes from ${containerA} ` +
             `via ${downloadUrl} route=fips primitive=fips-http-stream webrtc=false ` +
-            `instanceRelay=false hashMatched=true fallback=false senderPeerCount=${statusAAfter.peerCount} ` +
+            `instanceRelay=true hashMatched=true fallback=false senderPeerCount=${statusAAfter.peerCount} ` +
             `recipientPeerCount=${statusBAfter.peerCount} senderFips0Bytes=${deviceDelta(deviceABefore, deviceAAfter)} ` +
             `recipientFips0Bytes=${deviceDelta(deviceBBefore, deviceBAfter)}`
         );
@@ -90,9 +98,39 @@ async function main() {
 
 function createIdentity() {
     const secretKey = generateSecretKey();
+    const pubkey = getPublicKey(secretKey);
     return {
         nsec: nip19.nsecEncode(secretKey),
-        npub: nip19.npubEncode(getPublicKey(secretKey))
+        npub: nip19.npubEncode(pubkey),
+        pubkey
+    };
+}
+
+function buildInstanceRelayRequest({ownerPubkey, recipientPubkey, sessionId, baseUrl, upload, bytesSent}) {
+    const descriptor = globalThis.FipsStreamTransferProtocol.buildInstanceRelayDescriptor({
+        ownerPubkey,
+        sessionId,
+        baseUrl,
+        files: [upload],
+        runtimeId: `docker:${containerA}`
+    });
+    const proofSeed = globalThis.FipsStreamTransferProtocol.buildInstanceRelayProofSeed({
+        senderRuntime: `docker:${containerA}`,
+        bytesSent
+    });
+
+    return {
+        payloadEncryption: {
+            transferId: sessionId,
+            keyDelivery: {
+                senderPubkey: ownerPubkey,
+                recipientPubkey
+            }
+        },
+        fipsInstanceRelay: {
+            descriptor,
+            proofSeed
+        }
     };
 }
 
