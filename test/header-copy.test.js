@@ -27,7 +27,8 @@ test("header protocol toggles are grouped without visible text labels", async ()
 
     const network = html.slice(networkStart, storageStart);
     assert.match(network, /aria-label="Network postures"/);
-    assert(network.indexOf('id="local-discovery"') < network.indexOf('id="fips-discovery"'));
+    assert(network.indexOf('id="local-discovery"') < network.indexOf('id="clearnet-routes"'));
+    assert(network.indexOf('id="clearnet-routes"') < network.indexOf('id="fips-discovery"'));
     assert(network.indexOf('id="fips-discovery"') < network.indexOf('id="pollen-transfer"'));
     assert(network.indexOf('id="pollen-transfer"') < network.indexOf('id="nostr-mesh"'));
     assert.match(network, /id="nostr-mesh"[\s\S]+xlink:href="#wifi-tethering"/);

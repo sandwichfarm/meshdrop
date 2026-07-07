@@ -111,9 +111,15 @@
         <div class="protocol-toggle-group protocol-toggle-group-network" data-protocol-group="network" role="group" aria-label="Network postures">
             <div class="protocol-toggle-items">
                 <div id="local-discovery" class="icon-button protocol-toggle selected"
-                     title="Clearnet file routes enabled">
+                     title="Instance sharing enabled">
                     <svg class="icon">
                         <use xlink:href="#local-discovery-icon"></use>
+                    </svg>
+                </div>
+                <div id="clearnet-routes" class="icon-button protocol-toggle selected"
+                     data-i18n-key="header.clearnet-routes-disable" data-i18n-attrs="title">
+                    <svg class="icon">
+                        <use xlink:href="#icon-language-selector"></use>
                     </svg>
                 </div>
                 <div id="fips-discovery" class="icon-button protocol-toggle"

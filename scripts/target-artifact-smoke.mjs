@@ -115,8 +115,9 @@ async function runRuntimeProof(browser, target, port, relayUrl) {
             target: globalThis.__meshdropE2E.config.capabilities.runtime.target,
             platform: globalThis.__meshdropE2E.config.capabilities.runtime.platform,
             hasBackend: globalThis.__meshdropE2E.config.capabilities.runtime.hasBackend,
-            localHidden: document.getElementById("local-discovery")?.hasAttribute("hidden"),
-            localTitle: document.getElementById("local-discovery")?.title,
+            instanceHidden: document.getElementById("local-discovery")?.hasAttribute("hidden"),
+            clearnetHidden: document.getElementById("clearnet-routes")?.hasAttribute("hidden"),
+            clearnetTitle: document.getElementById("clearnet-routes")?.title,
             fipsHidden: document.getElementById("fips-discovery")?.hasAttribute("hidden"),
             pollenHidden: document.getElementById("pollen-transfer")?.hasAttribute("hidden"),
             serverSettings: globalThis.__meshdropE2E.config.capabilities.serverSettings.supported
@@ -125,10 +126,11 @@ async function runRuntimeProof(browser, target, port, relayUrl) {
         assert(state.target === target.name, `Expected ${target.name} runtime, got ${state.target}`);
         assert(state.platform === target.platform, `Expected ${target.platform} platform, got ${state.platform}`);
         assert(state.hasBackend === false, `${target.name} source artifact must not claim a backend`);
-        assert(state.localHidden === false, "Clearnet route control must stay visible for direct Nostr WebRTC");
+        assert(state.instanceHidden === true, "Instance control must hide without same-instance backend support");
+        assert(state.clearnetHidden === false, "Clearnet route control must stay visible for direct Nostr WebRTC");
         assert(
-            state.localTitle?.startsWith("Clearnet file routes enabled"),
-            `Clearnet route control title was ${state.localTitle}`
+            state.clearnetTitle?.startsWith("Clearnet WebRTC routes enabled"),
+            `Clearnet route control title was ${state.clearnetTitle}`
         );
         assert(state.fipsHidden === true, "FIPS discovery control must be hidden");
         assert(state.pollenHidden === true, "Pollen transfer control must be hidden");

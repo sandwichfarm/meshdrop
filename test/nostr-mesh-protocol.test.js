@@ -538,3 +538,38 @@ test("Nostr mesh disconnect removes known Nostr peers from the UI model", () => 
         globalThis.Events = originalEvents;
     }
 });
+
+test("Nostr mesh user toggle stops signaling without removing existing RTC routes", async () => {
+    const originalEvents = globalThis.Events;
+    const originalLocalization = globalThis.Localization;
+    const fired = [];
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+
+    globalThis.Events = {
+        fire(type, detail) {
+            fired.push({type, detail});
+        }
+    };
+    globalThis.Localization = {getTranslation: key => key};
+
+    try {
+        mesh._active = true;
+        mesh._sockets = new Map();
+        mesh._peers = new Set(["a".repeat(64)]);
+        mesh._room = "mesh:meshdrop.test";
+        mesh._publishPresence = () => {};
+        mesh._stopPresenceHeartbeat = () => {};
+        mesh._render = () => {};
+        mesh._setPreferredActive = () => {};
+
+        await mesh.toggle();
+
+        assert.equal(mesh._active, false);
+        assert.equal(fired.some(event => event.type === "peer-left"), false);
+        assert.equal(mesh._peers.size, 0);
+    }
+    finally {
+        globalThis.Events = originalEvents;
+        globalThis.Localization = originalLocalization;
+    }
+});

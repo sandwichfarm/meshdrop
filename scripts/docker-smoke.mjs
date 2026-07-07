@@ -137,6 +137,7 @@ async function assertServedPage(baseUrl) {
         ["https://fips.network", "FIPS link missing from info overlay"],
         ["https://github.com/schlagmichdoch/PairDrop", "PairDrop credit link missing from info overlay"],
         ["id=\"nostr-identity\"", "Nostr identity control missing from served page"],
+        ["id=\"clearnet-routes\"", "Clearnet route control missing from served page"],
         ["id=\"nostr-mesh\"", "Nostr mesh control missing from served page"],
         ["id=\"fips-discovery\"", "FIPS discovery control missing from served page"],
         ["id=\"blossom-transfer\"", "Blossom transfer control missing from served page"],

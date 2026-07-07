@@ -128,6 +128,7 @@ function resetUi() {
     [
         "nostr-identity",
         "local-discovery",
+        "clearnet-routes",
         "nostr-mesh",
         "blossom-transfer",
         "hashtree-transfer",
@@ -502,9 +503,9 @@ test("Local discovery leaves IP room when same-instance backend is unsupported",
             }
         });
 
-        assert.equal(controller.isEnabled(), true);
+        assert.equal(controller.isEnabled(), false);
         assert.equal(controller.localDiscoveryEnabled(), false);
-        assert.equal(buttons.get("local-discovery").hasAttribute("hidden"), false);
+        assert.equal(buttons.get("local-discovery").hasAttribute("hidden"), true);
         assert.equal(fired.includes("leave-ip-room"), true);
     } finally {
         globalThis.Events.fire = originalFire;
@@ -1083,7 +1084,7 @@ test("Pollen action shows zero badge while visible without known peers", () => {
     assert.equal(button.getAttribute("data-badge"), "0");
 });
 
-test("Clearnet route action shows same-instance peer count while enabled", () => {
+test("Instance route action shows same-instance peer count while enabled", () => {
     resetUi();
     const controller = new globalThis.LocalDiscoveryController();
     const button = buttons.get("local-discovery");
@@ -1097,11 +1098,11 @@ test("Clearnet route action shows same-instance peer count while enabled", () =>
     assert.equal(button.hasAttribute("hidden"), false);
     assert.equal(button.classes.has("selected"), true);
     assert.equal(button.getAttribute("data-badge"), "2");
-    assert.match(button.title, /Clearnet file routes enabled/);
-    assert.match(button.title, /same-instance or direct Nostr-signaled WebRTC/);
+    assert.match(button.title, /Instance sharing enabled/);
+    assert.match(button.title, /same MeshDrop instance/);
 });
 
-test("Clearnet route action says Nostr discovery remains available when disabled", () => {
+test("Instance route action does not claim to control Clearnet or Nostr", () => {
     resetUi();
     const controller = new globalThis.LocalDiscoveryController();
     const button = buttons.get("local-discovery");
@@ -1112,12 +1113,12 @@ test("Clearnet route action says Nostr discovery remains available when disabled
     controller._render();
 
     assert.equal(button.classes.has("selected"), false);
-    assert.match(button.title, /Clearnet routes disabled/);
-    assert.match(button.title, /Nostr discovery stays available/);
-    assert.match(button.title, /file sharing skips same-instance and direct Nostr-signaled WebRTC/);
+    assert.match(button.title, /Instance sharing disabled/);
+    assert.doesNotMatch(button.title, /Nostr/);
+    assert.doesNotMatch(button.title, /Clearnet/);
 });
 
-test("Clearnet route action remains visible for Nostr WebRTC when same-instance discovery is unsupported", () => {
+test("Instance route action hides when same-instance discovery is unsupported", () => {
     resetUi();
     const fired = [];
     const originalFire = globalThis.Events.fire;
@@ -1142,11 +1143,11 @@ test("Clearnet route action remains visible for Nostr WebRTC when same-instance 
         });
         globalThis.Events.fire("display-name", {displayName: "Device"});
 
-        assert.equal(controller.isEnabled(), true);
+        assert.equal(controller.isEnabled(), false);
         assert.equal(controller.localDiscoveryEnabled(), false);
-        assert.equal(button.hasAttribute("hidden"), false);
-        assert.equal(button.classes.has("selected"), true);
-        assert.equal(button.getAttribute("data-badge"), "3");
+        assert.equal(button.hasAttribute("hidden"), true);
+        assert.equal(button.classes.has("selected"), false);
+        assert.equal(button.getAttribute("data-badge"), undefined);
         assert.equal(fired.includes("leave-ip-room"), true);
         assert.equal(fired.includes("join-ip-room"), false);
     } finally {
@@ -1154,10 +1155,35 @@ test("Clearnet route action remains visible for Nostr WebRTC when same-instance 
     }
 });
 
-test("Clearnet route action hides when no clearnet route class is supported", () => {
+test("Clearnet route action remains visible for Nostr WebRTC when same-instance discovery is unsupported", () => {
     resetUi();
-    const controller = new globalThis.LocalDiscoveryController();
-    const button = buttons.get("local-discovery");
+    const controller = new globalThis.ClearnetRouteController();
+    const button = buttons.get("clearnet-routes");
+
+    globalThis.meshdropPeerAvailabilityCounts = {nostr: 3};
+
+    globalThis.Events.fire("config", {
+        capabilities: {
+            transports: {
+                localDiscovery: {supported: false},
+                nostr: {supported: true},
+                webrtc: {supported: true}
+            }
+        }
+    });
+
+    assert.equal(controller.isEnabled(), true);
+    assert.equal(button.hasAttribute("hidden"), false);
+    assert.equal(button.classes.has("selected"), true);
+    assert.equal(button.getAttribute("data-badge"), "3");
+    assert.match(button.title, /Clearnet WebRTC routes enabled/);
+    assert.match(button.title, /Nostr discovery stays available/);
+});
+
+test("Clearnet route action hides when direct Nostr WebRTC is unsupported", () => {
+    resetUi();
+    const controller = new globalThis.ClearnetRouteController();
+    const button = buttons.get("clearnet-routes");
 
     globalThis.Events.fire("config", {
         capabilities: {
@@ -1170,6 +1196,5 @@ test("Clearnet route action hides when no clearnet route class is supported", ()
     });
 
     assert.equal(controller.isEnabled(), false);
-    assert.equal(controller.localDiscoveryEnabled(), false);
     assert.equal(button.hasAttribute("hidden"), true);
 });

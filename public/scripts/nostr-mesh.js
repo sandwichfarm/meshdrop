@@ -238,7 +238,7 @@ class NostrMeshConnection {
 
     async toggle() {
         if (this._active) {
-            this.disconnect();
+            this.disconnect(true, true, {preservePeerRoutes: true});
             return;
         }
 
@@ -297,17 +297,18 @@ class NostrMeshConnection {
         }
     }
 
-    disconnect(notify = true, remember = notify) {
+    disconnect(notify = true, remember = notify, options = {}) {
         if (!this._active && !this._sockets.size) return;
 
         if (this._active) {
             this._publishPresence("disconnect");
         }
 
+        const preservePeerRoutes = options?.preservePeerRoutes === true;
         this._active = false;
         this._connecting = false;
         this._stopPresenceHeartbeat();
-        this._removeKnownPeers();
+        if (!preservePeerRoutes) this._removeKnownPeers();
         this._peers.clear();
         for (const socket of this._sockets.values()) {
             socket.onclose = null;

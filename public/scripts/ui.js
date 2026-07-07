@@ -13,6 +13,24 @@ const meshdropDecodeBase64Text = globalThis.decodeBase64Text;
 const meshdropGetThumbnailAsDataUrl = globalThis.getThumbnailAsDataUrl;
 const meshdropIsUrlValid = globalThis.isUrlValid;
 const meshdropUiHasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+const meshdropNetworkRouteMeta = (meta, privacyTone = "direct") => ({
+    group: "Network routes",
+    privacyTone,
+    ...meta
+});
+const meshdropMeshSignaledRouteMeta = (id, label, className, substrate) => meshdropNetworkRouteMeta({
+    id,
+    label,
+    shortLabel: label,
+    className,
+    description: `WebRTC route discovered and signaled through ${substrate}`,
+    privacy: `${substrate} signaling, ICE data path`,
+    details: [
+        ["Signaling", `${substrate} substrate`],
+        ["Data path", "browser WebRTC ICE"],
+        ["Clearnet bytes", "possible unless relay-only ICE exists"]
+    ]
+});
 
 const PeerAvailabilityProtocol = {
     roomTypeOrder: ["ip", "nostr", "fips", "pollen", "secret", "public-id"],
@@ -25,96 +43,60 @@ const PeerAvailabilityProtocol = {
         "ice-failed"
     ]),
     roomTypeMeta: {
-        "ip": {
+        "ip": meshdropNetworkRouteMeta({
             id: "local",
-            label: "Clearnet",
-            shortLabel: "Clearnet",
+            label: "Instance",
+            shortLabel: "Instance",
             className: "badge-room-ip",
-            description: "Clearnet WebRTC path through same-instance discovery",
-            group: "Network routes",
-            privacy: "Direct clearnet path",
-            privacyTone: "strong",
+            description: "Instance-assisted WebRTC path through same-instance discovery",
+            privacy: "Instance-assisted path",
             details: [
                 ["Discovery", "same MeshDrop instance"],
                 ["Data path", "clearnet WebRTC ICE"],
-                ["Exclude with", "Clearnet toggle"]
+                ["Exclude with", "Instance toggle"]
             ]
-        },
-        "secret": {
+        }, "strong"),
+        "secret": meshdropNetworkRouteMeta({
             id: "paired",
             label: "Paired",
             shortLabel: "Pair",
             className: "badge-room-secret",
             description: "Paired-device peer-to-peer data channel",
-            group: "Network routes",
             privacy: "Direct paired path",
-            privacyTone: "strong",
             details: [
                 ["Discovery", "paired device"],
                 ["Data path", "WebRTC ICE direct"],
                 ["Best case", "local network candidate"]
             ]
-        },
-        "nostr": {
+        }, "strong"),
+        "nostr": meshdropNetworkRouteMeta({
             id: "webrtc",
             label: "Clearnet via Nostr",
             shortLabel: "Clearnet",
             className: "badge-room-nostr",
             description: "Direct clearnet WebRTC route discovered and signaled by Nostr",
-            group: "Network routes",
             privacy: "Direct clearnet path",
-            privacyTone: "direct",
             details: [
                 ["Discovery", "Nostr WOT"],
                 ["Data path", "clearnet WebRTC ICE"],
                 ["Nostr events", "discovery/signaling only"]
             ]
-        },
-        "fips": {
-            id: "fips",
-            label: "FIPS",
-            shortLabel: "FIPS",
-            className: "badge-room-fips",
-            description: "WebRTC route discovered and signaled through FIPS",
-            group: "Network routes",
-            privacy: "FIPS signaling, ICE data path",
-            privacyTone: "direct",
-            details: [
-                ["Signaling", "FIPS substrate"],
-                ["Data path", "browser WebRTC ICE"],
-                ["Clearnet bytes", "possible unless relay-only ICE exists"]
-            ]
-        },
-        "pollen": {
-            id: "pollen-mesh",
-            label: "Pollen",
-            shortLabel: "Pollen",
-            className: "badge-room-pollen",
-            description: "WebRTC route discovered and signaled through Pollen",
-            group: "Network routes",
-            privacy: "Pollen signaling, ICE data path",
-            privacyTone: "direct",
-            details: [
-                ["Signaling", "Pollen substrate"],
-                ["Data path", "browser WebRTC ICE"],
-                ["Clearnet bytes", "possible unless relay-only ICE exists"]
-            ]
-        },
-        "public-id": {
+        }),
+        "fips": meshdropMeshSignaledRouteMeta("fips", "FIPS", "badge-room-fips", "FIPS"),
+        "pollen": meshdropMeshSignaledRouteMeta("pollen-mesh", "Pollen", "badge-room-pollen", "Pollen"),
+        "public-id": meshdropNetworkRouteMeta({
             id: "room",
             label: "Room",
             shortLabel: "Room",
             className: "badge-room-public-id",
             description: "Peer-to-peer transfer found through room signaling",
-            group: "Network routes",
             privacy: "Direct after room signaling",
-            privacyTone: "direct",
             details: [
                 ["Discovery", "public room"],
                 ["Data path", "WebRTC ICE direct"],
                 ["Room server", "signaling only"]
             ]
-        }
+        })
     },
 
     roomTypes(peer) {

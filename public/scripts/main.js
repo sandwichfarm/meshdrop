@@ -213,6 +213,7 @@ class PairDrop {
         this.broadCast = new globalThis.BrowserTabsConnector();
         this.nostrIdentity = new globalThis.NostrIdentityController();
         this.localDiscovery = new globalThis.LocalDiscoveryController();
+        this.clearnetRoutes = new globalThis.ClearnetRouteController();
         this.nostrMesh = new globalThis.NostrMeshConnection();
         this.nostrMeshAutostart = new globalThis.NostrMeshAutostartController();
         this.blossomTransfer = new globalThis.BlossomTransferController();
