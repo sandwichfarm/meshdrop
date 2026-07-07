@@ -1,4 +1,4 @@
-# Requirements: MeshDrop v0.9.0 FIPS Instance Relay
+# Requirements: MeshDrop v0.10.0 Overlay Network Adapters
 
 **Defined:** 2026-07-07
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
@@ -23,11 +23,18 @@
 - [x] **INST-GEN-04**: The existing Pollen instance-relay flow uses the generic instance-relay protocol without changing its public metadata shape, ciphertext upload/download behavior, route proof fields, or focused/browser runtime proof.
 - [x] **INST-GEN-05**: ADRs document that this milestone generalizes relay descriptor/proof semantics only; it must not claim new FIPS/Tor/I2P/Loki byte-transfer support without route-specific runtime proof.
 
+## v0.10.0 Requirements
+
+### Overlay Network Adapters
+
+- [x] **ONA-01**: Runtime capabilities include Tor, I2P, and Loki transport entries that are unsupported by default and fail closed with explicit unavailable reasons.
+- [x] **ONA-02**: Server-side overlay adapter config normalizes Tor/I2P/Loki through one catalog instead of route-specific one-off code.
+- [x] **ONA-03**: Configured overlay adapters expose `transportShape=stream`, route-specific `*-http-stream` primitives, endpoint metadata, and max byte limits without changing existing FIPS/Pollen behavior.
+- [x] **ONA-04**: Backend-free SPA/source targets refuse backend-only Tor/I2P/Loki claims unless a future native/browser route surface proves support.
+- [x] **ONA-05**: Route descriptor/scoring tests cover Tor/I2P/Loki as ordinary private stream candidates and state that byte-transfer completion remains blocked until real local dial proof exists.
+
 ## Future Requirements
 
-- **TOR-01**: Tor instance adapter exposes stream descriptors only when the instance can dial onion endpoints locally.
-- **I2P-01**: I2P instance adapter exposes stream descriptors only when the instance can dial I2P destinations locally.
-- **LOKI-01**: Loki instance adapter exposes stream descriptors only when the instance has a proven local Loki transport.
 - **TURN-01**: WebRTC overlay relay candidates for FIPS/Pollen use TURN/TURNS routes only when the browser can dial the relay endpoint and relay-only ICE proof exists.
 
 ## v0.9.0 Requirements
@@ -44,7 +51,7 @@
 
 | Feature | Reason |
 |---------|--------|
-| New backend network support | This slice reduces duplicated relay proof logic before adding more transports. |
+| New Tor/I2P/Loki byte-transfer support | No local daemon/proxy contract exists in this repo yet, so this milestone must not claim route completion without external dial proof. |
 | FIPS instance-to-instance chunk relay | FIPS has direct FIPS stream proof; instance-to-instance relay is the next transport-specific slice. |
 | Native FSP daemon API | Current FIPS release exposes ordinary IPv6/TCP through `fips0`; native FSP remains future work. |
 | TURN overlay relay | Separate route type with different WebRTC proof needs. |
@@ -65,12 +72,17 @@
 | FIPS-IR-03 | Phase 13 | Complete |
 | FIPS-IR-04 | Phase 13 | Complete |
 | FIPS-IR-05 | Phase 13 | Complete |
+| ONA-01 | Phase 14 | Complete |
+| ONA-02 | Phase 14 | Complete |
+| ONA-03 | Phase 14 | Complete |
+| ONA-04 | Phase 14 | Complete |
+| ONA-05 | Phase 14 | Complete |
 
 **Coverage:**
-- v0.9.0 requirements: 5 total
+- v0.10.0 requirements: 5 total
 - Mapped to phases: 5
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 after completing Phase 13 FIPS Instance Relay.*
+*Last updated: 2026-07-07 after completing Phase 14 Overlay Network Adapters.*

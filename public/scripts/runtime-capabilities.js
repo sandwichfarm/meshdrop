@@ -29,6 +29,15 @@ const RuntimeCapabilities = {
                 enabled: staticTransports.fips,
                 room: ""
             },
+            tor: {
+                enabled: false
+            },
+            i2p: {
+                enabled: false
+            },
+            loki: {
+                enabled: false
+            },
             admin: {
                 enabled: false,
                 pubkey: "",
@@ -82,7 +91,8 @@ const RuntimeCapabilities = {
                             maxUploadBytes: 0
                         },
                         relayIce: this.relayIceCapability("fips", staticTransports.fips, targetManifest)
-                    }
+                    },
+                    ...this.overlayNetworkCapabilities(staticTransports)
                 },
                 serverSettings: {
                     supported: false,
@@ -129,8 +139,29 @@ const RuntimeCapabilities = {
             hashtree: transports.hashtree !== false,
             bluetooth: false,
             pollen: transports.pollen === true && this.staticBackendOnlyRouteAvailable("pollen", targetManifest),
-            fips: transports.fips === true && this.staticBackendOnlyRouteAvailable("fips", targetManifest)
+            fips: transports.fips === true && this.staticBackendOnlyRouteAvailable("fips", targetManifest),
+            tor: false,
+            i2p: false,
+            loki: false
         };
+    },
+
+    overlayNetworkCapabilities(staticTransports = {}) {
+        return Object.fromEntries(["tor", "i2p", "loki"].map(routeType => [
+            routeType,
+            {
+                supported: staticTransports[routeType] === true,
+                requiresBackend: true,
+                transportShape: "stream",
+                unavailableReason: this.backendOnlyUnavailableReason(staticTransports[routeType] === true),
+                stream: {
+                    supported: false,
+                    primitive: `${routeType}-http-stream`,
+                    endpointConfigured: false,
+                    maxUploadBytes: 0
+                }
+            }
+        ]));
     },
 
     staticBackendOnlyRouteAvailable(routeType, targetManifest = null) {
