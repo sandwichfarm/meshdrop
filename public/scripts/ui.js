@@ -413,15 +413,6 @@ const PeerRouteStatusProtocol = {
         "route-timeout": "Peer route timed out"
     },
 
-    visibleLabels: {
-        ip: "Inst",
-        nostr: "Net",
-        secret: "Pair",
-        fips: "FIPS",
-        pollen: "Pollen",
-        "public-id": "Room"
-    },
-
     pendingStates: new Set([
         "selected",
         "requested",
@@ -579,21 +570,23 @@ const PeerRouteStatusProtocol = {
         const route = attempt.route || "unknown";
         const state = attempt.state || "candidate";
         const routeLabel = attempt.routeLabel || PeerAvailabilityProtocol.routeLabel(route);
-        const title = [
+        const detail = [
             attempt.message,
             attempt.reason,
             ...(attempt.privacyLabels || [])
         ].filter(Boolean).join(" · ");
+        const fallbackLabel = `${routeLabel} ${this.stateLabel({state})}`;
+        const ariaLabel = detail || fallbackLabel;
 
         return {
             ...attempt,
             route,
             routeLabel,
             state,
-            visibleLabel: this.visibleLabels[route] || routeLabel,
+            visibleLabel: "",
             tone: this.visualTone({state}),
-            title,
-            ariaLabel: title || `${routeLabel} ${this.stateLabel({state})}`
+            title: detail || fallbackLabel,
+            ariaLabel
         };
     },
 
@@ -1584,12 +1577,7 @@ class PeerUI {
             symbol.className = 'route-attempt-symbol';
             symbol.setAttribute('aria-hidden', 'true');
 
-            const route = document.createElement('span');
-            route.className = 'route-attempt-route';
-            route.textContent = visual.visibleLabel;
-            route.setAttribute('aria-hidden', 'true');
-
-            item.append(symbol, route);
+            item.append(symbol);
 
             return item;
         });

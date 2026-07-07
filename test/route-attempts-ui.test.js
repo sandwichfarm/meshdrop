@@ -97,16 +97,17 @@ test("route attempt visuals keep peer cards compact while preserving accessible 
     assert.deepEqual(
         attempts.map(attempt => [attempt.route, attempt.visibleLabel, attempt.tone]),
         [
-            ["nostr", "Net", "blocked"],
-            ["fips", "FIPS", "pending"],
-            ["pollen", "Pollen", "pending"]
+            ["nostr", "", "blocked"],
+            ["fips", "", "pending"],
+            ["pollen", "", "pending"]
         ]
     );
 
     const visibleCopy = attempts.map(attempt => attempt.visibleLabel).join(" ");
-    assert.doesNotMatch(visibleCopy, /Trying|Unavailable|Fallback|Descriptor|Request/);
+    assert.equal(visibleCopy.trim(), "");
     assert.match(attempts[0].ariaLabel, /Clearnet unavailable/);
     assert.match(attempts[1].ariaLabel, /Private route requested/);
+    assert.match(attempts[2].title, /Pollen/);
 });
 
 test("route choice options can expose route-attempt metadata for renderers", () => {

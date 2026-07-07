@@ -250,10 +250,10 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
 
 .route-attempts {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: center;
-    gap: 3px;
-    margin-top: 4px;
+    gap: 4px;
+    margin-top: 5px;
     max-width: var(--peer-width);
 }
 
@@ -263,19 +263,20 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
 
 .route-attempt {
     --route-color: rgb(var(--text-color));
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    min-width: 0;
-    max-width: 48px;
-    min-height: 18px;
-    padding: 1px 4px;
+    flex: 0 0 22px;
+    width: 22px;
+    height: 18px;
+    padding: 0;
     border: 1px solid color-mix(in srgb, var(--route-color) 55%, transparent);
-    border-radius: 999px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--route-color) 18%, transparent);
     color: color-mix(in srgb, var(--route-color) 72%, white);
     line-height: 1;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--route-color) 18%, transparent);
 }
 
 .route-attempt[data-route="ip"] {
@@ -305,34 +306,68 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
 .route-attempt-symbol {
     position: relative;
     flex: 0 0 auto;
-    width: 6px;
-    height: 6px;
+    width: 11px;
+    height: 11px;
     border: 1px solid currentColor;
     border-radius: 50%;
 }
 
 .route-attempt-symbol::before {
     position: absolute;
-    inset: 2px;
+    inset: 3px;
     border-radius: 50%;
     background: currentColor;
     content: "";
+}
+
+.route-attempt[data-route="nostr"] .route-attempt-symbol::before {
+    inset: 5px 2px;
+    border-radius: 999px;
+}
+
+.route-attempt[data-route="nostr"] .route-attempt-symbol {
+    box-shadow:
+        inset 0 3px 0 -2px currentColor,
+        inset 0 -3px 0 -2px currentColor;
+}
+
+.route-attempt[data-route="fips"] .route-attempt-symbol {
+    border-radius: 3px;
+    transform: rotate(45deg);
+}
+
+.route-attempt[data-route="fips"] .route-attempt-symbol::before {
+    inset: 3px;
+    border-radius: 2px;
+}
+
+.route-attempt[data-route="pollen"] .route-attempt-symbol {
+    border: 0;
+}
+
+.route-attempt[data-route="pollen"] .route-attempt-symbol::before {
+    inset: 4px;
+    box-shadow:
+        -4px 0 0 currentColor,
+        4px 0 0 currentColor,
+        0 -4px 0 currentColor,
+        0 4px 0 currentColor;
 }
 
 .route-attempt[data-tone="blocked"],
 .route-attempt[data-tone="failed"] {
     background: rgba(var(--text-color), 0.05);
     color: rgba(var(--text-color), 0.58);
-    text-decoration: line-through;
-    opacity: 0.58;
+    opacity: 0.44;
+    box-shadow: none;
 }
 
 .route-attempt[data-tone="blocked"] .route-attempt-symbol::after,
 .route-attempt[data-tone="failed"] .route-attempt-symbol::after {
     position: absolute;
-    left: -2px;
-    top: 2px;
-    width: 10px;
+    left: -3px;
+    top: 5px;
+    width: 16px;
     height: 1px;
     border-radius: 999px;
     background: currentColor;
@@ -355,16 +390,6 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
 
 .route-attempt[data-tone="complete"] {
     background: rgba(76, 175, 80, 0.16);
-}
-
-.route-attempt-route {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 9px;
-    font-weight: 800;
-    text-transform: uppercase;
 }
 
 x-peer:not([status]):hover x-icon,
