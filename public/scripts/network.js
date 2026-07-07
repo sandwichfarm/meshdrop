@@ -42,11 +42,11 @@ const ClearnetRoutePolicy = {
 
     allows(roomType) {
         if (!this.roomTypes.has(roomType)) return true;
-        if (globalThis.meshdropLocalDiscovery?.isEnabled) {
-            return globalThis.meshdropLocalDiscovery.isEnabled() !== false;
-        }
         if (globalThis.LocalDiscoveryProtocol?.allowsRoomType) {
             return globalThis.LocalDiscoveryProtocol.allowsRoomType(roomType);
+        }
+        if (globalThis.meshdropLocalDiscovery?.isEnabled) {
+            return globalThis.meshdropLocalDiscovery.isEnabled() !== false;
         }
         return true;
     }

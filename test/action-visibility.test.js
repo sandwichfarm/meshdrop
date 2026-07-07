@@ -1098,3 +1098,18 @@ test("Clearnet route action shows same-instance peer count while enabled", () =>
     assert.match(button.title, /Clearnet routes enabled/);
     assert.match(button.title, /same-instance or direct Nostr-signaled WebRTC/);
 });
+
+test("Clearnet route action says Nostr discovery remains available when disabled", () => {
+    resetUi();
+    const controller = new globalThis.LocalDiscoveryController();
+    const button = buttons.get("local-discovery");
+
+    controller._supported = true;
+    controller._enabled = false;
+    controller._render();
+
+    assert.equal(button.classes.has("selected"), false);
+    assert.match(button.title, /Clearnet routes disabled/);
+    assert.match(button.title, /Nostr discovery stays available/);
+    assert.match(button.title, /file sharing skips same-instance and direct Nostr-signaled WebRTC/);
+});

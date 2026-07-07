@@ -72,7 +72,7 @@ class LocalDiscoveryController {
             this.leave();
         }
 
-        Events.fire("clearnet-routes-changed", {enabled: this.isEnabled()});
+        Events.fire("clearnet-routes-changed", {enabled: this._enabled});
         this._render();
     }
 
@@ -108,7 +108,7 @@ class LocalDiscoveryController {
         this.$button.setAttribute("aria-pressed", String(this.isEnabled()));
         this.$button.title = this.isEnabled()
             ? "Clearnet routes enabled. Auto selection may use same-instance or direct Nostr-signaled WebRTC."
-            : "Clearnet routes disabled. Auto selection skips same-instance and direct Nostr-signaled WebRTC.";
+            : "Clearnet routes disabled. Nostr discovery stays available; file sharing skips same-instance and direct Nostr-signaled WebRTC.";
         if (this.isEnabled()) {
             this.$button.setAttribute("data-badge", String(typeof userCount === "number" ? userCount : 0));
         } else {
