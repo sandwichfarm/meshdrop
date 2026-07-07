@@ -10,6 +10,7 @@ Complete. MeshDrop now has a generic browser instance-relay protocol for descrip
 - Centralized fail-closed validation for missing bindings, expired descriptors, primitive mismatch, WebRTC byte-path claims, fallback flags, missing instance-relay flags, byte mismatch, and hash mismatch.
 - Moved Pollen instance-relay descriptor/proof behavior onto the generic protocol without changing the `pollenInstanceRelay` request shape.
 - Loaded the generic helper after `route-contract.js` and before transfer protocols.
+- Hardened the federated Pollen e2e smoke to wait for active Pollen plus open Nostr relay sockets before transfer, matching the proof surface CI uses.
 - Documented the boundary in ADR 0006: generic relay semantics only; no new transport support without route-specific byte proof.
 
 ## Verification
