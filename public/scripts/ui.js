@@ -16,6 +16,14 @@ const meshdropUiHasOwn = (value, key) => Object.prototype.hasOwnProperty.call(va
 
 const PeerAvailabilityProtocol = {
     roomTypeOrder: ["ip", "nostr", "fips", "pollen", "secret", "public-id"],
+    terminalRouteStates: new Set([
+        "disabled",
+        "failed",
+        "timeout",
+        "error",
+        "connection-failed",
+        "ice-failed"
+    ]),
     roomTypeMeta: {
         "ip": {
             id: "local",
@@ -111,7 +119,16 @@ const PeerAvailabilityProtocol = {
 
     roomTypes(peer) {
         const roomIds = peer?._roomIds || {};
-        return this.roomTypeOrder.filter(roomType => meshdropUiHasOwn(roomIds, roomType));
+        const roomTypes = this.roomTypeOrder.filter(roomType => meshdropUiHasOwn(roomIds, roomType));
+        const statusRoomType = this.statusRoomType(peer?.routeStatus);
+        if (statusRoomType && !roomTypes.includes(statusRoomType)) roomTypes.push(statusRoomType);
+        return this.roomTypeOrder.filter(roomType => roomTypes.includes(roomType));
+    },
+
+    statusRoomType(status = null) {
+        const roomType = status?.route || status?.roomType || "";
+        if (!roomType || this.terminalRouteStates.has(status?.state)) return "";
+        return roomType;
     },
 
     availability(peer) {
@@ -276,6 +293,7 @@ const PeerRouteStatusProtocol = {
             case "candidate":
                 return status.selected ? `Trying ${route}...` : `${route} available`;
             case "selected":
+            case "requested":
                 return `Trying ${route}...`;
             case "connecting":
                 return `Connecting on ${route}...`;
@@ -511,13 +529,19 @@ class PeersUI {
     }
 
     _joinPeer(peer, roomType, roomId) {
-        if (roomType === "ip" && globalThis.meshdropLocalDiscovery?.isEnabled?.() === false) return;
+        const routeAllowed = this._routeAllowed(roomType);
+        const pendingRouteStatus = routeAllowed ? null : this._pendingPrivateRouteStatus(peer);
+        if (!routeAllowed && !pendingRouteStatus) return;
         if (globalThis.NostrFollowPolicy?.allowsPeer(peer, roomType) === false) return;
 
         const existingPeerId = this._existingPeerId(peer, roomType);
         const existingPeer = this.peers[existingPeerId];
         if (existingPeer) {
-            this._mergePeer(existingPeerId, peer, roomType, roomId);
+            if (routeAllowed) {
+                this._mergePeer(existingPeerId, peer, roomType, roomId);
+            } else {
+                this._applyRouteStatus(existingPeerId, pendingRouteStatus);
+            }
             return;
         }
 
@@ -525,9 +549,14 @@ class PeersUI {
         peer._roomIds = {};
         peer._peerIdsByRoomType = {};
 
-        peer._roomIds[roomType] = roomId;
-        peer._peerIdsByRoomType[roomType] = peer.id;
-        peer.routeStatus = this._routeStatuses[peer.id] || this._routeStatuses[this._visiblePeerId(peer.id)] || null;
+        if (routeAllowed) {
+            peer._roomIds[roomType] = roomId;
+            peer._peerIdsByRoomType[roomType] = peer.id;
+        }
+        peer.routeStatus = this._routeStatuses[peer.id]
+            || this._routeStatuses[this._visiblePeerId(peer.id)]
+            || pendingRouteStatus
+            || null;
         this.peers[peer.id] = peer;
         this._rememberPeerAliases(peer.id, peer);
         new PeerUI(peer, null, {
@@ -535,6 +564,46 @@ class PeersUI {
             descriptor: this.shareMode.descriptor,
         });
         this._renderProtocolPeerCounts();
+    }
+
+    _routeAllowed(roomType) {
+        if (globalThis.ClearnetRoutePolicy?.allows) return globalThis.ClearnetRoutePolicy.allows(roomType);
+        if (globalThis.LocalDiscoveryProtocol?.allowsRoomType) return globalThis.LocalDiscoveryProtocol.allowsRoomType(roomType);
+        if (roomType === "ip" && globalThis.meshdropLocalDiscovery?.isEnabled?.() === false) return false;
+        return true;
+    }
+
+    _pendingPrivateRouteStatus(peer = {}) {
+        const routeType = (peer.routeCapabilities || [])
+            .find(candidate => ["fips", "pollen"].includes(candidate) && this._routeAllowed(candidate));
+        if (!routeType) return null;
+        const peerId = peer.id;
+        return {
+            peerId,
+            route: routeType,
+            roomType: routeType,
+            routePeerId: peer.nostrIdentity?.pubkey || peerId,
+            state: "requested",
+            reason: "clearnet-disabled",
+            routes: []
+        };
+    }
+
+    _applyRouteStatus(peerId, status = null) {
+        if (!status) return;
+        const normalized = {
+            ...status,
+            peerId
+        };
+        this._routeStatuses[status.peerId] = normalized;
+        this._routeStatuses[peerId] = normalized;
+
+        const peer = this.peers[peerId];
+        if (peer) peer.routeStatus = normalized;
+
+        const peerNode = meshdropGetById(peerId);
+        peerNode?.ui?.setRouteStatus(normalized);
+        peerNode?.ui?.refreshAvailability?.();
     }
 
     _existingPeerId(peer, roomType) {

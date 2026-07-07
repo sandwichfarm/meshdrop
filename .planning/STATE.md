@@ -43,6 +43,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-64a-fix-clearnet-off-peer-route-ui-so-nostr-` | complete | Focused 42/42; `npm test` 295/295; e2e; Docker smoke; diff/slop gates |
 | 2026-07-04 | `20260704-admin-npub-signed-settings` | complete | Admin tests 7/7; repo/e2e/docker/diff/slop gates |
 | 2026-07-04 | `20260704-ci-test-baseline` | complete | `npm ci`; repo/e2e/docker/actionlint/diff gates; changed-code slop exit 0 |
 | 2026-07-04 | `20260704-fix-browser-ci-local-disable` | complete | e2e transfer proof; `npm test`; `git diff --check` |

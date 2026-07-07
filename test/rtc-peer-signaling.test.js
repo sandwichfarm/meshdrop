@@ -824,6 +824,20 @@ test("disabled clearnet uses Nostr presence to request private FIPS route", () =
     assert.equal(manager.peers[pubkey]._pendingPrivateRouteRequests.fips, true);
     assert.deepEqual(
         fired
+            .filter(event => event.type === "peer-route-status")
+            .map(event => ({
+                peerId: event.detail.peerId,
+                route: event.detail.route,
+                state: event.detail.state,
+                reason: event.detail.reason
+            })),
+        [
+            {peerId: pubkey, route: "nostr", state: "disabled", reason: "route-policy"},
+            {peerId: pubkey, route: "fips", state: "requested", reason: "descriptor-request"}
+        ]
+    );
+    assert.deepEqual(
+        fired
             .filter(event => event.type === "nostr-route-request-needed")
             .map(event => ({
                 peerId: event.detail.peerId,
