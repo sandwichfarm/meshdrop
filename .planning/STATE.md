@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.12.0
-milestone_name: Route Blocker Issue Tracking
-status: complete
-last_updated: "2026-07-07T21:45:00Z"
+milestone: v0.13.0
+milestone_name: Tor Byte Transfer Proof
+status: in_progress
+last_updated: "2026-07-07T22:22:45.442Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 1
-  completed_plans: 1
-  percent: 100
+  completed_plans: 0
+  percent: 0
 ---
 
 # GSD State
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** remaining route-expansion and release/UAT blockers are now tracked in live GitHub issues; future transport milestones start from those issue acceptance contracts.
+**Current focus:** Phase 17 Tor Byte Transfer Proof uses a Dockerized Tor hidden-service route to turn issue #151's Tor portion into real byte-transfer evidence.
 
 ## Milestone Audit: 2026-07-06
 
@@ -192,8 +192,7 @@ None.
 
 ## Current Position
 
-Phase: 16 Route Blocker Issue Tracking
-Plan: `.planning/phases/16-route-blocker-issue-tracking/16-01-PLAN.md`
-Summary: `.planning/phases/16-route-blocker-issue-tracking/16-01-SUMMARY.md`
-Status: Complete
-Last activity: 2026-07-07 — Live GitHub blocker issues created/read back and GSD/ADR docs updated with issue acceptance contracts.
+Phase: 17 Tor Byte Transfer Proof
+Plan: `.planning/phases/17-tor-byte-transfer-proof/17-01-PLAN.md`
+Status: In progress
+Last activity: 2026-07-07 — Milestone v0.13.0 started with a one-phase Tor byte-transfer proof plan.

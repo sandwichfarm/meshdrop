@@ -1,46 +1,40 @@
-# Roadmap: MeshDrop v0.12.0 Route Blocker Issue Tracking
+# Roadmap: MeshDrop v0.13.0 Tor Byte Transfer Proof
 
-## Phase 16: Route Blocker Issue Tracking
+## Phase 17: Tor Byte Transfer Proof
 
-Goal: move the remaining route-expansion, release-readback, and deployed-target blockers from stale GSD/PR text into live GitHub issues with acceptance criteria.
+Goal: prove a real Tor overlay stream data path by transferring bytes through a Dockerized `.onion` endpoint and emitting route proof.
 
-Current status: complete.
+Current status: planned.
 
-Requirements: BLOCKER-01, BLOCKER-02, BLOCKER-03, BLOCKER-04, BLOCKER-05.
+Requirements: TOR-BYTE-01, TOR-BYTE-02, TOR-BYTE-03, TOR-BYTE-04, TOR-BYTE-05.
 
 Success criteria:
 
-1. GitHub issue tracker availability is verified for `sandwichfarm/meshdrop`.
-2. Existing route proof blockers are read back from GitHub: https://github.com/sandwichfarm/meshdrop/issues/151 and https://github.com/sandwichfarm/meshdrop/issues/152.
-3. Missing finish-line blockers are created and read back: GHCR anonymous readback (#156), deployed StartOS/Umbrel UAT (#157), and signed iOS device/share-transfer UAT (#158).
-4. GSD and ADR docs link every active blocker issue and remove stale issue-disabled wording.
-5. Runtime route claims remain fail-closed until each issue's acceptance proof exists.
+1. Generic overlay stream upload/download endpoints store short-lived payloads and enforce token, expiry, hash, and max-byte limits.
+2. Tor stream descriptors validate `.onion` endpoints and preserve private/encrypted/fail-closed route constraints.
+3. `npm run test:tor-stream` starts Tor in Docker, publishes a MeshDrop onion service, downloads the payload through that onion route, and proves the hash and byte counts.
+4. The emitted route proof has `routeType=tor`, `dataPlanePrimitive=tor-http-stream`, `webRtcUsed=false`, `fallbackUsed=false`, and topology evidence naming the onion endpoint.
+5. I2P and Loki remain fail-closed and issue #151 stays open for their future proof.
 
 Verification:
 
-- Focused: `node --test test/route-blocker-issues.test.js` proves blocker issue links are recorded and stale disabled-tracker wording is gone.
-- Live GitHub: `gh repo view sandwichfarm/meshdrop --json hasIssuesEnabled,viewerPermission` and `gh issue view 151 152 156 157 158`.
+- Focused: route contract, runtime capability, and overlay stream transfer unit tests.
+- Runtime: `npm run test:tor-stream`.
+- Broad: `npm test`.
 - Hygiene: `git diff --check`.
 - AI-slop: `npx --yes aislop scan --changes .`.
 
 Completion evidence:
 
-- GitHub reports issues enabled with admin permission.
-- Existing route blockers read back:
-  - https://github.com/sandwichfarm/meshdrop/issues/151
-  - https://github.com/sandwichfarm/meshdrop/issues/152
-- New blocker issues created:
-  - https://github.com/sandwichfarm/meshdrop/issues/156
-  - https://github.com/sandwichfarm/meshdrop/issues/157
-  - https://github.com/sandwichfarm/meshdrop/issues/158
+- Pending.
 
 ## Future Milestone Queue
 
-1. Tor/I2P/Loki byte-transfer proof with real local daemon/proxy dial evidence. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/151.
+1. I2P/Loki byte-transfer proof with real local daemon/proxy dial evidence. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/151.
 2. FIPS/Pollen route-specific WebRTC relay proof using the generic TURN proof harness once a relay endpoint is reachable through those overlays. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/152.
 3. GHCR anonymous release image readback once package visibility or authenticated distribution policy is decided. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
 4. Deployed StartOS/Umbrel UAT once real installed service URLs are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
 5. Signed iOS device/share-transfer UAT once macOS signing hardware and a real device are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/158.
 
 ---
-*Roadmap updated: 2026-07-07 completing milestone v0.12.0 Route Blocker Issue Tracking.*
+*Roadmap updated: 2026-07-07 starting milestone v0.13.0 Tor Byte Transfer Proof.*
