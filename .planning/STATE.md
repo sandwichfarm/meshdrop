@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.3.0
-milestone_name: Pollen Instance Relay Proof
+milestone: v0.4.0
+milestone_name: Route Attempts UX
 status: verification
-last_updated: "2026-07-07T12:58:42.504Z"
+last_updated: "2026-07-07T13:52:13.608Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 0
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** prove one instance-mediated backend route by moving encrypted file bytes through Pollen with route proof and no silent fallback.
+**Current focus:** make route selection legible in the UI by showing route candidates, attempt states, failure reasons, privacy labels, and proof-backed completion.
 
 ## Milestone Audit: 2026-07-06
 
@@ -176,7 +176,7 @@ Closed during this audit branch:
 
 ## Current Position
 
-Phase: 7 Pollen Instance Relay Proof
-Plan: 07-01 implemented locally
-Status: Verification gates in progress
-Last activity: 2026-07-07 — Pollen instance relay implementation and browser runtime proof added
+Phase: 8 Route Attempts UX
+Plan: 08-01 implemented locally
+Status: Local verification complete; PR/CI/merge pending
+Last activity: 2026-07-07 — Route-attempt UX implementation, focused tests, broad tests, e2e, and visual probe added

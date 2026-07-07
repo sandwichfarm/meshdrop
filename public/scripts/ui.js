@@ -113,6 +113,19 @@ const PeerAvailabilityProtocol = {
         return roomType;
     },
 
+    routeStatuses(peer) {
+        const statuses = [];
+        if (Array.isArray(peer?.routeStatuses)) statuses.push(...peer.routeStatuses);
+        if (peer?.routeStatus) statuses.push(peer.routeStatus);
+        return statuses.filter(status => status?.route || status?.roomType);
+    },
+
+    statusForRoomType(peer, roomType) {
+        return this.routeStatuses(peer)
+            .filter(status => (status.route || status.roomType) === roomType)
+            .at(-1) || null;
+    },
+
     availability(peer) {
         return this.roomTypes(peer).map(roomType => ({
             roomType,
@@ -132,7 +145,11 @@ const PeerAvailabilityProtocol = {
                 group: option.group,
                 privacy: option.privacy,
                 privacyTone: option.privacyTone,
-                details: option.details
+                details: option.details,
+                attempt: PeerRouteStatusProtocol.attempt(
+                    this.statusForRoomType(peer, option.roomType)
+                    || {route: option.roomType, state: "candidate"}
+                )
             }));
     },
 
@@ -177,7 +194,14 @@ const PeerAvailabilityProtocol = {
                     ["Path", "Blossom storage"],
                     ["Private mode", "encrypts before upload"],
                     ["Unencrypted", "servers see chunks"]
-                ]
+                ],
+                attempt: PeerRouteStatusProtocol.attempt({
+                    route: "hashtree",
+                    routeLabel: "Hashtree storage",
+                    state: "candidate",
+                    encrypted: false,
+                    objectStore: true
+                })
             });
         }
         if (globalThis.meshdropBlossomTransfer?.isActive?.()) {
@@ -193,7 +217,14 @@ const PeerAvailabilityProtocol = {
                     ["Path", "selected Blossom servers"],
                     ["Encryption", "AES-256-GCM"],
                     ["Servers store", "ciphertext only"]
-                ]
+                ],
+                attempt: PeerRouteStatusProtocol.attempt({
+                    route: "blossom",
+                    routeLabel: "Blossom storage",
+                    state: "candidate",
+                    encrypted: true,
+                    objectStore: true
+                })
             });
         }
         if (globalThis.meshdropPollenTransfer?.isActive?.()) {
@@ -209,7 +240,14 @@ const PeerAvailabilityProtocol = {
                     ["Path", "browser to MeshDrop server to Pollen blob"],
                     ["Private mode", "encrypts before upload"],
                     ["Unencrypted", "server sees files"]
-                ]
+                ],
+                attempt: PeerRouteStatusProtocol.attempt({
+                    route: "pollen-storage",
+                    routeLabel: "Pollen Storage",
+                    state: "candidate",
+                    encrypted: false,
+                    objectStore: true
+                })
             });
         }
         return options;
@@ -268,6 +306,61 @@ const PeerAvailabilityProtocol = {
 globalThis.PeerAvailabilityProtocol = PeerAvailabilityProtocol;
 
 const PeerRouteStatusProtocol = {
+    stateLabels: {
+        candidate: "Available",
+        selected: "Trying",
+        requested: "Trying",
+        accepted: "Accepted",
+        connecting: "Connecting",
+        waiting: "Waiting",
+        offer: "Connecting",
+        answer: "Connecting",
+        "remote-offer": "Connecting",
+        "remote-answer": "Connecting",
+        "ice-checking": "Connecting",
+        "connection-connecting": "Connecting",
+        transferring: "Transferring",
+        connected: "Connected",
+        "ice-connected": "Connected",
+        "ice-completed": "Connected",
+        "connection-connected": "Connected",
+        complete: "Complete",
+        disabled: "Unavailable",
+        unavailable: "Unavailable",
+        rejected: "Rejected",
+        expired: "Expired",
+        timeout: "Timed out",
+        failed: "Failed",
+        error: "Failed",
+        "connection-failed": "Failed",
+        "ice-failed": "Failed",
+        "blocked-fallback": "Fallback blocked",
+        "connection-disconnected": "Disconnected",
+        "ice-disconnected": "Disconnected"
+    },
+
+    reasonLabels: {
+        "requires-native-app": "Requires native app",
+        "requires-instance": "Requires instance",
+        "requires-nostr": "Needs Nostr sign-in",
+        "nostr-sign-in": "Needs Nostr sign-in",
+        "peer-not-trusted": "Peer not trusted",
+        "overlay-unavailable": "Overlay network unavailable",
+        "route-expired": "Peer route expired",
+        "peer-route-expired": "Peer route expired",
+        "fallback-disabled": "Fallback disabled by privacy policy",
+        "route-policy": "Fallback disabled by privacy policy",
+        "clearnet-disabled": "Clearnet disabled",
+        "private-route": "Private route requested",
+        "priority": "Best available route",
+        "local-description": "Local offer prepared",
+        "remote-description": "Peer answered",
+        "ice-failed": "ICE route failed",
+        "connection-failed": "Connection failed",
+        "data-channel-closed": "Data channel closed",
+        "route-timeout": "Peer route timed out"
+    },
+
     text(status = {}) {
         const route = PeerAvailabilityProtocol.routeLabel(status.route || status.roomType);
 
@@ -313,6 +406,107 @@ const PeerRouteStatusProtocol = {
             default:
                 return route ? `Connecting on ${route}...` : meshdropLocalization.getTranslation("notifications.connecting");
         }
+    },
+
+    stateLabel(status = {}) {
+        return this.stateLabels[status.state] || "Connecting";
+    },
+
+    reasonLabel(reason = "") {
+        if (!reason) return "";
+        if (this.reasonLabels[reason]) return this.reasonLabels[reason];
+        return String(reason)
+            .split("-")
+            .filter(Boolean)
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+    },
+
+    routeLabel(status = {}) {
+        return status.routeLabel || PeerAvailabilityProtocol.routeLabel(status.route || status.roomType);
+    },
+
+    message(status = {}) {
+        const route = this.routeLabel(status);
+        if (status.state === "disabled" || status.state === "unavailable") return `${route} unavailable`;
+        if (status.state === "complete") return `Complete on ${route}`;
+        return this.text(status);
+    },
+
+    privacyLabels(status = {}) {
+        const labels = status.encrypted === false ? [] : ["End-to-end encrypted"];
+        const route = status.route || status.roomType || "";
+        if (status.instanceRelayed) {
+            labels.push("Relayed by your instance", "Relayed by peer instance");
+        } else if (status.backendOnly) {
+            labels.push("Backend-only route");
+        } else if (route === "nostr" || status.webRtcUsed) {
+            labels.push("Direct data path");
+        } else if (route === "ip") {
+            labels.push("Instance-assisted discovery");
+        } else if (status.objectStore) {
+            labels.push("Object-store route");
+        }
+        if (status.publicDiscovery === true) labels.push("Public discovery enabled");
+        if (status.publicDiscovery === false) labels.push("Public discovery disabled");
+        return labels;
+    },
+
+    attempt(status = {}) {
+        const route = status.route || status.roomType || "unknown";
+        return {
+            route,
+            routeLabel: this.routeLabel(status),
+            state: status.state || "candidate",
+            stateLabel: this.stateLabel(status),
+            message: this.message(status),
+            reason: this.reasonLabel(status.reason),
+            privacyLabels: this.privacyLabels(status)
+        };
+    },
+
+    attemptsForPeer(peer = {}) {
+        const attempts = PeerAvailabilityProtocol.availability(peer)
+            .map(option => this.attempt(
+                PeerAvailabilityProtocol.statusForRoomType(peer, option.roomType)
+                || {route: option.roomType, state: "candidate"}
+            ));
+        const seen = new Set(attempts.map(attempt => attempt.route));
+        PeerAvailabilityProtocol.routeStatuses(peer).forEach(status => {
+            const route = status.route || status.roomType;
+            if (!route || seen.has(route)) return;
+            attempts.push(this.attempt(status));
+            seen.add(route);
+        });
+        return attempts;
+    },
+
+    formatBytes(bytes) {
+        const value = Number(bytes || 0);
+        if (value < 1024) return `${value} B`;
+        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+        return `${(value / 1024 / 1024).toFixed(1)} MB`;
+    },
+
+    proofSummary(proof = {}) {
+        if (!proof.routeType || proof.fallbackUsed || proof.hashMatched !== true) return null;
+        if (Number(proof.bytesSent) !== Number(proof.bytesReceived)) return null;
+        const route = proof.routeType;
+        return {
+            route,
+            routeLabel: PeerAvailabilityProtocol.routeLabel(route),
+            state: "complete",
+            stateLabel: "Complete",
+            message: `Complete on ${PeerAvailabilityProtocol.routeLabel(route)}`,
+            dataPlane: proof.dataPlanePrimitive || "",
+            bytes: `${this.formatBytes(proof.bytesSent)} sent / ${this.formatBytes(proof.bytesReceived)} received`,
+            privacyLabels: this.privacyLabels({
+                route,
+                state: "complete",
+                webRtcUsed: proof.webRtcUsed,
+                instanceRelayed: proof.instanceRelayed
+            })
+        };
     },
 
     statusKey(status = {}) {
@@ -581,7 +775,10 @@ class PeersUI {
         this._routeStatuses[peerId] = normalized;
 
         const peer = this.peers[peerId];
-        if (peer) peer.routeStatus = normalized;
+        if (peer) {
+            peer.routeStatus = normalized;
+            peer.routeStatuses = this._mergeRouteStatuses(peer.routeStatuses, normalized);
+        }
 
         const peerNode = meshdropGetById(peerId);
         peerNode?.ui?.setRouteStatus(normalized);
@@ -767,10 +964,22 @@ class PeersUI {
         this._routeStatuses[peerId] = normalized;
 
         const peer = this.peers[peerId];
-        if (peer) peer.routeStatus = normalized;
+        if (peer) {
+            peer.routeStatus = normalized;
+            peer.routeStatuses = this._mergeRouteStatuses(peer.routeStatuses, normalized);
+        }
 
         const peerNode = meshdropGetById(peerId);
         peerNode?.ui?.setRouteStatus(normalized);
+    }
+
+    _mergeRouteStatuses(statuses = [], status = {}) {
+        const route = status.route || status.roomType;
+        if (!route) return statuses || [];
+        return [
+            ...(statuses || []).filter(entry => (entry.route || entry.roomType) !== route),
+            status
+        ];
     }
 
     _renderProtocolPeerCounts() {
@@ -1065,6 +1274,7 @@ class PeerUI {
                     <div class="device-name font-body2"></div>
                     <div class="availability-row"></div>
                     <div class="status font-body2"></div>
+                    <div class="route-attempts font-body2" hidden></div>
                 </div>
             </label>`;
 
@@ -1168,6 +1378,7 @@ class PeerUI {
                 this.$el.removeAttribute('data-route-state');
             }
             this.$el.querySelector('.status').innerText = title;
+            this._renderRouteAttempts();
             this.currentStatus = this._routeStatus
                 ? PeerRouteStatusProtocol.statusKey(this._routeStatus)
                 : 'connecting';
@@ -1177,12 +1388,14 @@ class PeerUI {
             this.$input.removeAttribute('disabled');
             this.$el.removeAttribute('data-route');
             this.$el.removeAttribute('data-route-state');
+            this._clearRouteAttempts();
         }
         else {
             title =  meshdropLocalization.getTranslation("peer-ui.click-to-send-share-mode", null, {descriptor: this._shareMode.descriptor});
             this.$input.setAttribute('disabled', true);
             this.$el.removeAttribute('data-route');
             this.$el.removeAttribute('data-route-state');
+            this._clearRouteAttempts();
         }
         this.$label.setAttribute('title', title);
     }
@@ -1190,6 +1403,57 @@ class PeerUI {
     _connectingStatusText() {
         if (!this._routeStatus) return meshdropLocalization.getTranslation("notifications.connecting");
         return PeerRouteStatusProtocol.text(this._routeStatus);
+    }
+
+    _clearRouteAttempts() {
+        const row = this.$el.querySelector('.route-attempts');
+        if (!row) return;
+        row.replaceChildren();
+        row.setAttribute('hidden', true);
+    }
+
+    _renderRouteAttempts() {
+        const row = this.$el.querySelector('.route-attempts');
+        if (!row) return;
+        const attempts = PeerRouteStatusProtocol.attemptsForPeer(this._peer).slice(0, 3);
+        if (!attempts.length) {
+            this._clearRouteAttempts();
+            return;
+        }
+
+        const nodes = attempts.map(attempt => {
+            const item = document.createElement('span');
+            item.className = 'route-attempt';
+            item.dataset.route = attempt.route;
+            item.dataset.state = attempt.state;
+            item.title = [
+                attempt.message,
+                attempt.reason,
+                ...attempt.privacyLabels
+            ].filter(Boolean).join(' · ');
+
+            const state = document.createElement('span');
+            state.className = 'route-attempt-state';
+            state.textContent = attempt.stateLabel;
+
+            const route = document.createElement('span');
+            route.className = 'route-attempt-route';
+            route.textContent = attempt.routeLabel;
+
+            item.append(state, route);
+
+            if (attempt.reason) {
+                const reason = document.createElement('span');
+                reason.className = 'route-attempt-reason';
+                reason.textContent = attempt.reason;
+                item.append(reason);
+            }
+
+            return item;
+        });
+
+        row.replaceChildren(...nodes);
+        row.hidden = false;
     }
 
     _createCallbacks() {
@@ -1283,8 +1547,14 @@ class PeerUI {
     setRouteStatus(status = null) {
         this._routeStatus = status;
         this._peer.routeStatus = status;
+        this._peer.routeStatuses = status
+            ? PeerAvailabilityProtocol.routeStatuses(this._peer)
+                .filter(entry => (entry.route || entry.roomType) !== (status.route || status.roomType))
+                .concat(status)
+            : [];
         if (this._connected) return;
         this._evaluateShareMode();
+        this.refreshAvailability();
     }
 
     _icon() {
@@ -1968,6 +2238,18 @@ class TransferChoiceDialog extends Dialog {
                 description.className = 'transport-choice-description';
                 description.textContent = option.description;
 
+                const attempt = document.createElement('span');
+                attempt.className = 'transport-choice-attempt';
+                if (option.attempt) {
+                    attempt.dataset.state = option.attempt.state;
+                    attempt.textContent = [
+                        option.attempt.stateLabel,
+                        ...option.attempt.privacyLabels
+                    ].filter(Boolean).join(' · ');
+                } else {
+                    attempt.setAttribute('hidden', true);
+                }
+
                 const details = document.createElement('span');
                 details.className = 'transport-choice-details';
                 (option.details || []).forEach(([term, value]) => {
@@ -1987,7 +2269,7 @@ class TransferChoiceDialog extends Dialog {
                 });
 
                 head.append(label, privacy);
-                button.append(head, description, details);
+                button.append(head, description, attempt, details);
                 nodes.push(button);
             });
         });

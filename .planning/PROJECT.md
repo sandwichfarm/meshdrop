@@ -14,15 +14,15 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.3.0 Pollen Instance Relay Proof
+## Current Milestone: v0.4.0 Route Attempts UX
 
-**Goal:** make one instance-mediated backend route carry encrypted file bytes end to end, with proof that Pollen moved the data and no silent fallback took over.
+**Goal:** make route selection legible to users by showing route choices, attempt states, failure reasons, privacy labels, and proof-backed completion without exposing protocol internals.
 
 **Target features:**
-- Add an instance relay path where sender browser uploads encrypted chunks to its local MeshDrop instance, that instance forwards them through Pollen, and recipient browser downloads from its own instance.
-- Preserve client-side encryption: instances may see route/session metadata and ciphertext chunk sizes, but never plaintext file bytes.
-- Emit route proof that names sender runtime, recipient runtime, route type, data-plane primitive, WebRTC use, instance relay use, bytes sent/received, hash match, and fallback status.
-- Keep the route contract from v0.2.0 as the boundary for descriptors, adapters, and proof; do not build a Pollen-only architecture that bypasses it.
+- Show route candidates and selected route attempts for each peer in a compact, scan-friendly surface.
+- Show clear unavailable or failed reasons such as needs Nostr sign-in, requires instance, requires native app, overlay unavailable, peer route expired, and fallback blocked.
+- Label privacy and data path honestly: end-to-end encrypted, direct, relayed by instance, backend-only, or public discovery enabled.
+- Keep unsupported routes hidden or disabled until runtime status and transfer primitives prove they can carry bytes.
 
 ## Requirements
 
@@ -43,6 +43,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [ ] Fit FIPS into that adapter contract with a first-class data-plane path that transfers encrypted file bytes over FIPS and reports proof.
 - [x] Fit Pollen into that adapter contract with descriptor, upload/download or service substrate behavior, proof, and fail-closed fallback rules.
 - [x] Turn instance federation from discovery/signaling bridges into an encrypted file relay path under the same adapter contract.
+- [ ] Show route attempts, choices, unavailable states, and privacy labels in the UI using proof-backed route status instead of optimistic transport badges.
 - [ ] Implement WebRTC overlay relay candidates for FIPS and Pollen, or explicitly ship a differently named non-WebRTC live-transfer fallback where browser ICE cannot be constrained. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
@@ -101,6 +102,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Route labels require byte-path proof | Visible controls and descriptors are not proof unless the route carried verified file bytes | ✓ Good |
 | Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | ✓ Good |
 | Pollen instance relay is the first backend relay slice | Existing Pollen upload/download primitives give the shortest path to prove encrypted bytes through an instance-mediated backend route before FIPS stream work | ✓ Good |
+| Route attempts need user-facing explanations | Users need to understand why a route is selected, unavailable, failed, or complete without reading protocol internals | Active UX requirement |
 
 ---
-*Last updated: 2026-07-07 after starting milestone v0.3.0 Pollen Instance Relay Proof.*
+*Last updated: 2026-07-07 after starting milestone v0.4.0 Route Attempts UX.*

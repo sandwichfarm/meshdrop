@@ -415,7 +415,14 @@ async function runLocalRouteChoiceTransferScenario(browser, baseUrl) {
             window.dispatchEvent(new CustomEvent("select-files-transport", {
                 detail: {to, files: [file]}
             }));
-            document.querySelector('[data-transport-id="local"]')?.click();
+            const localOption = document.querySelector('[data-transport-id="local"]');
+            if (!localOption) throw new Error("Missing local route option");
+            const attempt = localOption.querySelector(".transport-choice-attempt")?.textContent || "";
+            const hasRouteState = attempt.includes("Available") || attempt.includes("Connected");
+            if (!hasRouteState || !attempt.includes("End-to-end encrypted")) {
+                throw new Error(`Local route option missing route-attempt proof copy: ${attempt}`);
+            }
+            localOption.click();
         }, {to: peerId, payload: "local-route-ok"});
 
         const received = await waitForReceivedFiles(pageB, 1);
