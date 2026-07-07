@@ -14,6 +14,16 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
+## Current Milestone: v0.2.0 Route Adapter Contract
+
+**Goal:** create the shared route descriptor, adapter, and scoring vocabulary needed before FIPS, Pollen, instance relay, native, and future transports can become data-plane adapters.
+
+**Target features:**
+- Define a generic route descriptor contract that can validate route type, transport shape, session binding, trust binding, expiration, endpoint metadata, and proof requirements without changing live transport behavior.
+- Define the minimum route adapter contract and route proof terms future transport slices must satisfy before a route may claim file-transfer support.
+- Add behavior-first tests for descriptor validation, expiration, trust binding, adapter shape, and deterministic route scoring.
+- Record an ADR that separates identity/control-plane concerns from data-plane route adapters.
+
 ## Requirements
 
 ### Validated
@@ -29,11 +39,12 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 
 ### Active
 
-- [ ] Introduce a generic route adapter contract that answers: runtime availability, safe descriptor shape, data-plane behavior, encrypted send/receive primitive, and transfer proof.
+- [x] Introduce a generic route adapter contract that answers: runtime availability, safe descriptor shape, data-plane behavior, encrypted send/receive primitive, and transfer proof.
 - [ ] Fit FIPS into that adapter contract with a first-class data-plane path that transfers encrypted file bytes over FIPS and reports proof.
 - [ ] Fit Pollen into that adapter contract with descriptor, upload/download or service substrate behavior, proof, and fail-closed fallback rules.
 - [ ] Turn instance federation from discovery/signaling bridges into an encrypted file relay path under the same adapter contract.
 - [ ] Implement WebRTC overlay relay candidates for FIPS and Pollen, or explicitly ship a differently named non-WebRTC live-transfer fallback where browser ICE cannot be constrained. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
+- [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
 - [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services.
 - [ ] Run the signed iOS device-install harness on macOS hardware, then complete iOS device file-picker/share-sheet/native
@@ -91,4 +102,4 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | ✓ Good |
 
 ---
-*Last updated: 2026-07-07 after importing the project overview handoff.*
+*Last updated: 2026-07-07 after starting milestone v0.2.0 Route Adapter Contract.*

@@ -1,4 +1,4 @@
-const cacheVersion = 'v1.11.7';
+const cacheVersion = 'v1.11.8-route-contract-build';
 const cacheTitle = `meshdrop-cache-${cacheVersion}`;
 const relativePathsToCache = [
     './',
@@ -15,6 +15,7 @@ const relativePathsToCache = [
     'scripts/ui-main.js',
     'scripts/util.js',
     'scripts/nostr-relays.js',
+    'scripts/route-contract.js',
     'scripts/nostr-mesh-autostart.js',
     'scripts/worker/canvas-worker.js',
     'scripts/libs/noble-ciphers/LICENSE',
