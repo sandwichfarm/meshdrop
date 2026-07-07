@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.11.0
-milestone_name: TURN Relay Proof
+milestone: v0.12.0
+milestone_name: Route Blocker Issue Tracking
 status: complete
-last_updated: "2026-07-07T20:10:53Z"
+last_updated: "2026-07-07T21:45:00Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** TURN relay-only WebRTC proof is the next buildable route gap; Tor/I2P/Loki byte-transfer proof is blocked on absent local daemon/proxy dial surfaces and a disabled GitHub issue tracker.
+**Current focus:** remaining route-expansion and release/UAT blockers are now tracked in live GitHub issues; future transport milestones start from those issue acceptance contracts.
 
 ## Milestone Audit: 2026-07-06
 
@@ -45,14 +45,18 @@ Merged PRs through #105 satisfy the source/runtime/harness portions of the origi
 
 Current hard gaps:
 
-- `npm run verify:ghcr-anonymous -- v0.1.5` fails with GHCR `unauthorized`.
+- Tor/I2P/Loki byte-transfer proof is blocked on a reproducible local daemon/proxy dial surface: https://github.com/sandwichfarm/meshdrop/issues/151.
+- FIPS/Pollen route-specific WebRTC relay proof is blocked on a relay endpoint reachable through the named overlay: https://github.com/sandwichfarm/meshdrop/issues/152.
+- `npm run verify:ghcr-anonymous -- v0.1.5` fails with GHCR `unauthorized`: https://github.com/sandwichfarm/meshdrop/issues/156.
 - `gh api /orgs/sandwichfarm/packages/container/meshdrop` fails with `403` because this token lacks `read:packages`, so
   this session cannot inspect or change package visibility.
 
-- Deployed StartOS/Umbrel UAT and signed iOS device package/UAT remain unproven; the repo now has a fail-loud signed
-  iOS device-install harness that must pass on macOS hardware before those claims can close.
+- Deployed StartOS/Umbrel UAT remains unproven until real installed services are available: https://github.com/sandwichfarm/meshdrop/issues/157.
+- Signed iOS device package/share-transfer UAT remains unproven until macOS signing hardware and a real device are available: https://github.com/sandwichfarm/meshdrop/issues/158.
 
 Closed during this audit branch:
+
+- GitHub issue tracking is now enabled for `sandwichfarm/meshdrop`, and route/release/UAT blockers are linked in issues #151, #152, #156, #157, and #158.
 
 - `npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`, proving APK install, WebView
   capability, WebView Nostr WebRTC transfer, Android share-intent transfer, and native picker UI on physical hardware.
@@ -64,6 +68,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-route-blocker-issue-tracking` | complete | GitHub issues enabled/admin; route blockers #151/#152 read back; GHCR #156, deployed StartOS/Umbrel #157, signed iOS #158 created; focused docs guard covers links and stale disabled-tracker wording |
 | 2026-07-07 | `260707-uov-polish-peer-route-badges-so-clearnet-fip` | complete | Peer and transfer-choice route attempts render icon-only chips with ARIA/title detail; Clearnet blocked chip muted/struck; FIPS/Pollen pending chips animate; visual proof `/tmp/meshdrop-route-badge-motion-mobile-dark.png`; focused route UI 7/7; `npm test` 357/357; e2e transfer smoke; diff/changed-code slop exit 0 with existing size/duplicate warnings |
 | 2026-07-07 | `260707-tp3-route-status-badge-polish` | complete | Route-attempt chips are icon-only; blocked Clearnet is muted/struck; pending FIPS/Pollen animate; focused route UI test 6/6; dark mobile screenshot `/tmp/meshdrop-route-status-badges-mobile-dark.png`; visual verdict 94/pass; `npm test` 356/356; e2e transfer smoke; diff/changed-code slop exit 0 with existing `ui.js` size/duplicate warnings |
 | 2026-07-07 | `260707-route-status-icon-ui` | complete | Route status card copy replaced with compact animated badge chips; focused route UI test 6/6; dark mobile screenshot `/tmp/meshdrop-route-status-icons-mobile-dark.png`; visual verdict 92/pass; `npm test` 356/356; e2e transfer smoke; diff/changed-code slop exit 0; full-repo slop baseline remains failing outside touched files |
@@ -187,8 +192,8 @@ None.
 
 ## Current Position
 
-Phase: 15 TURN Relay Proof
-Plan: `.planning/phases/15-turn-relay-proof/15-01-PLAN.md`
-Summary: `.planning/phases/15-turn-relay-proof/15-01-SUMMARY.md`
+Phase: 16 Route Blocker Issue Tracking
+Plan: `.planning/phases/16-route-blocker-issue-tracking/16-01-PLAN.md`
+Summary: `.planning/phases/16-route-blocker-issue-tracking/16-01-SUMMARY.md`
 Status: Complete
-Last activity: 2026-07-07 — Compact route-status badges complete; active peer cards hide route words and duplicate availability row while preserving accessible Clearnet/FIPS/Pollen status detail.
+Last activity: 2026-07-07 — Live GitHub blocker issues created/read back and GSD/ADR docs updated with issue acceptance contracts.

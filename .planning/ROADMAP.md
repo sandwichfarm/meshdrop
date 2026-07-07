@@ -1,45 +1,46 @@
-# Roadmap: MeshDrop v0.11.0 TURN Relay Proof
+# Roadmap: MeshDrop v0.12.0 Route Blocker Issue Tracking
 
-## Phase 15: TURN Relay Proof
+## Phase 16: Route Blocker Issue Tracking
 
-Goal: prove browser WebRTC can transfer file bytes over a configured relay-only TURN path before MeshDrop labels overlay WebRTC routes as byte-carrying paths.
+Goal: move the remaining route-expansion, release-readback, and deployed-target blockers from stale GSD/PR text into live GitHub issues with acceptance criteria.
 
 Current status: complete.
 
-Requirements: TURN-01, TURN-02, TURN-03, TURN-04, TURN-05.
+Requirements: BLOCKER-01, BLOCKER-02, BLOCKER-03, BLOCKER-04, BLOCKER-05.
 
 Success criteria:
 
-1. A focused relay proof test fails first because no smoke currently proves relay-only selected candidate pairs.
-2. A local coturn-backed smoke starts TURN plus MeshDrop with generated RTC config and transfers a proof payload between two browser peers.
-3. Proof output names sender/recipient runtime, selected route type, primitive, WebRTC use, instance relay flag, byte counts, hash match, fallback status, and selected ICE candidate type.
-4. Runtime/route tests keep overlay WebRTC unavailable without relay ICE config and fail closed when relay-only policy cannot connect.
-5. ADR/docs record that TURN relay proof is a prerequisite for FIPS/Pollen/Tor/I2P/Loki WebRTC overlay claims, not proof of those specific overlays by itself.
+1. GitHub issue tracker availability is verified for `sandwichfarm/meshdrop`.
+2. Existing route proof blockers are read back from GitHub: https://github.com/sandwichfarm/meshdrop/issues/151 and https://github.com/sandwichfarm/meshdrop/issues/152.
+3. Missing finish-line blockers are created and read back: GHCR anonymous readback (#156), deployed StartOS/Umbrel UAT (#157), and signed iOS device/share-transfer UAT (#158).
+4. GSD and ADR docs link every active blocker issue and remove stale issue-disabled wording.
+5. Runtime route claims remain fail-closed until each issue's acceptance proof exists.
 
 Verification:
 
-- Focused: relay ICE config, route policy, and relay proof extraction tests.
-- Runtime: `npm run test:turn-relay` proves local relay-only WebRTC byte transfer with selected candidate type `relay`.
-- Browser: `npm run test:e2e` because WebRTC proof reporting changes.
-- Broad local: `npm test`.
-- Docker: `npm run test:docker`.
+- Focused: `node --test test/route-blocker-issues.test.js` proves blocker issue links are recorded and stale disabled-tracker wording is gone.
+- Live GitHub: `gh repo view sandwichfarm/meshdrop --json hasIssuesEnabled,viewerPermission` and `gh issue view 151 152 156 157 158`.
 - Hygiene: `git diff --check`.
 - AI-slop: `npx --yes aislop scan --changes .`.
 
 Completion evidence:
 
-- `node --test test/route-contract.test.js test/docker-smoke-script.test.js test/relay-ice-config.test.js test/runtime-capabilities.test.js test/rtc-peer-signaling.test.js` -> 58/58 pass.
-- `npm run test:turn-relay` -> `Proof turn-relay-webrtc` with `selectedIceCandidateType:"relay"`, sender/receiver relay candidate pairs, 66/66 bytes, hash matched, fallback disabled.
-- `npm test` -> 355/355 pass.
-- `npm run test:e2e` -> local, Blossom, Hashtree, Pollen storage, Nostr WebRTC, FIPS route-candidate-only, federated Pollen WebRTC, and Pollen instance relay proofs pass.
-- `npm run test:docker` -> Docker browser transfer smoke and two-host Nostr WebRTC proof pass.
-- `git diff --check` and `npx --yes aislop scan --changes .` pass.
-- `npx --yes aislop scan .` still fails on pre-existing baseline outside touched files.
+- GitHub reports issues enabled with admin permission.
+- Existing route blockers read back:
+  - https://github.com/sandwichfarm/meshdrop/issues/151
+  - https://github.com/sandwichfarm/meshdrop/issues/152
+- New blocker issues created:
+  - https://github.com/sandwichfarm/meshdrop/issues/156
+  - https://github.com/sandwichfarm/meshdrop/issues/157
+  - https://github.com/sandwichfarm/meshdrop/issues/158
 
 ## Future Milestone Queue
 
-1. Tor/I2P/Loki byte-transfer proof with real local daemon/proxy dial evidence. Current blocker: no Tor/I2P/Loki daemon/proxy exists on this host, and GitHub issues are disabled for `sandwichfarm/meshdrop`.
-2. FIPS/Pollen route-specific WebRTC relay proof using the generic TURN proof harness once a relay endpoint is reachable through those overlays.
+1. Tor/I2P/Loki byte-transfer proof with real local daemon/proxy dial evidence. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/151.
+2. FIPS/Pollen route-specific WebRTC relay proof using the generic TURN proof harness once a relay endpoint is reachable through those overlays. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/152.
+3. GHCR anonymous release image readback once package visibility or authenticated distribution policy is decided. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
+4. Deployed StartOS/Umbrel UAT once real installed service URLs are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
+5. Signed iOS device/share-transfer UAT once macOS signing hardware and a real device are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/158.
 
 ---
-*Roadmap updated: 2026-07-07 completing milestone v0.11.0 TURN Relay Proof.*
+*Roadmap updated: 2026-07-07 completing milestone v0.12.0 Route Blocker Issue Tracking.*

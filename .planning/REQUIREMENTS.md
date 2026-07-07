@@ -1,4 +1,4 @@
-# Requirements: MeshDrop v0.11.0 TURN Relay Proof
+# Requirements: MeshDrop v0.12.0 Route Blocker Issue Tracking
 
 **Defined:** 2026-07-07
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
@@ -12,6 +12,17 @@
 - Installed Android APKs already expose a loopback native backend for FIPS status and Pollen upload/download.
 - Pollen instance relay proves encrypted payload bytes through an object-store primitive and emits route proof.
 - FIPS stream proof proves encrypted payload bytes over the sender's FIPS mesh IPv6 address and emits route proof.
+- TURN relay proof proves browser WebRTC can be forced through a relay candidate before route-specific overlay WebRTC claims are allowed.
+
+## v0.12.0 Requirements
+
+### Route Blocker Issue Tracking
+
+- [x] **BLOCKER-01**: MeshDrop records Tor/I2P/Loki byte-transfer proof as blocked on a reproducible local daemon/proxy dial surface, with GitHub issue acceptance criteria for future runtime proof: https://github.com/sandwichfarm/meshdrop/issues/151.
+- [x] **BLOCKER-02**: MeshDrop records FIPS/Pollen route-specific WebRTC relay proof as blocked on a relay endpoint reachable through the named overlay, with GitHub issue acceptance criteria for future topology proof: https://github.com/sandwichfarm/meshdrop/issues/152.
+- [x] **BLOCKER-03**: MeshDrop records GHCR anonymous release image readback as blocked until public package visibility or an explicit authenticated distribution contract is proven: https://github.com/sandwichfarm/meshdrop/issues/156.
+- [x] **BLOCKER-04**: MeshDrop records deployed StartOS and Umbrel node UAT as blocked until real installed services are available and pass deployed transfer harnesses: https://github.com/sandwichfarm/meshdrop/issues/157.
+- [x] **BLOCKER-05**: MeshDrop records signed iOS device install and share-transfer UAT as blocked until macOS signing hardware and a real device produce transfer proof: https://github.com/sandwichfarm/meshdrop/issues/158.
 
 ## v0.8.0 Requirements
 
@@ -35,7 +46,8 @@
 
 ## Future Requirements
 
-- **TOR-BYTE-01**: Tor, I2P, and Loki adapters transfer encrypted bytes only after a local instance/native runtime can prove daemon/proxy dial support, selected route type, byte counts, hash match, and fallback disabled. GitHub issues are disabled for this repository, so this blocker is tracked in GSD until issues can be enabled.
+- **TOR-BYTE-01**: Tor, I2P, and Loki adapters transfer encrypted bytes only after a local instance/native runtime can prove daemon/proxy dial support, selected route type, byte counts, hash match, and fallback disabled. Tracked by https://github.com/sandwichfarm/meshdrop/issues/151.
+- **OVERLAY-WEBRTC-01**: FIPS/Pollen route-specific WebRTC relay claims stay unavailable until a relay endpoint reachable through that route proves selected relay candidates and no Clearnet fallback. Tracked by https://github.com/sandwichfarm/meshdrop/issues/152.
 
 ## v0.11.0 Requirements
 
@@ -92,12 +104,17 @@
 | TURN-03 | Phase 15 | Complete |
 | TURN-04 | Phase 15 | Complete |
 | TURN-05 | Phase 15 | Complete |
+| BLOCKER-01 | Phase 16 | Complete |
+| BLOCKER-02 | Phase 16 | Complete |
+| BLOCKER-03 | Phase 16 | Complete |
+| BLOCKER-04 | Phase 16 | Complete |
+| BLOCKER-05 | Phase 16 | Complete |
 
 **Coverage:**
-- v0.11.0 requirements: 5 total
+- v0.12.0 requirements: 5 total
 - Mapped to phases: 5
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 completing Phase 15 TURN Relay Proof.*
+*Last updated: 2026-07-07 completing Phase 16 Route Blocker Issue Tracking.*
