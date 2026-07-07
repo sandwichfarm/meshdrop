@@ -10,7 +10,8 @@ test('route expansion blockers are tracked with live GitHub issue links', () => 
   const roadmap = read('.planning/ROADMAP.md');
   const state = read('.planning/STATE.md');
   const adr = read('docs/adr/0008-route-blocker-issue-tracking.md');
-  const combined = [project, requirements, roadmap, state, adr].join('\n');
+  const phase16Summary = read('.planning/phases/16-route-blocker-issue-tracking/16-01-SUMMARY.md');
+  const combined = [project, requirements, roadmap, state, adr, phase16Summary].join('\n');
 
   for (const issue of [151, 152, 156, 157, 158]) {
     assert.match(
@@ -21,6 +22,7 @@ test('route expansion blockers are tracked with live GitHub issue links', () => 
   }
 
   assert.doesNotMatch(combined, /GitHub issues are disabled/i);
-  assert.match(roadmap, /Phase 16: Route Blocker Issue Tracking/);
-  assert.match(state, /Status: Complete/);
+  assert.match(phase16Summary, /Phase 16 Summary: Route Blocker Issue Tracking/);
+  assert.match(phase16Summary, /Complete\./);
+  assert.match(state, /Phase: 17 Tor Byte Transfer Proof/);
 });

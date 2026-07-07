@@ -14,16 +14,16 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.12.0 Route Blocker Issue Tracking
+## Current Milestone: v0.13.0 Tor Byte Transfer Proof
 
-**Goal:** make every remaining route-expansion, release-readback, and deployed-target blocker actionable in live GitHub issues before the next transport proof milestone.
+**Goal:** turn the Tor half of blocker #151 from "no daemon/proxy" into a reproducible byte-transfer proof using a Dockerized Tor hidden-service route.
 
 **Target features:**
-- Verify the GitHub issue tracker is enabled and writable for `sandwichfarm/meshdrop`.
-- Read back existing route blockers: Tor/I2P/Loki byte-transfer proof issue #151 and FIPS/Pollen route-specific WebRTC relay proof issue #152.
-- Create and record missing finish-line blockers for GHCR anonymous readback (#156), deployed StartOS/Umbrel UAT (#157), and signed iOS device/share-transfer UAT (#158).
-- Keep Tor/I2P/Loki and FIPS/Pollen route-specific WebRTC claims fail-closed until the linked issue acceptance proof exists.
-- Record blocker issue links in GSD and ADRs so future milestones start from live tracker state instead of stale PR text.
+- Add a generic overlay stream transfer endpoint that configured Tor adapters can use without special-casing the route contract.
+- Generate and validate Tor stream descriptors with `.onion` endpoint evidence, short-lived tokens, byte limits, hash metadata, and fail-closed constraints.
+- Add a Dockerized Tor runtime smoke that starts a Tor hidden service, fetches the MeshDrop payload through the onion route, and emits route proof for `tor-http-stream`.
+- Keep I2P and Loki unsupported until equivalent reproducible daemon/proxy proof exists.
+- Close or update blocker #151 only for the Tor portion; leave remaining overlay network gaps explicit.
 
 ## Requirements
 
@@ -51,6 +51,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Prove relay-only WebRTC transfer through a configured TURN path before labeling FIPS/Pollen overlay WebRTC as byte-carrying routes. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [x] Document remaining blocked route/release/UAT work in live GitHub issues with acceptance evidence.
+- [x] Prove a Tor overlay stream route transfers bytes through a reproducible Dockerized `.onion` path, validates the payload hash, and emits proof with fallback disabled.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag. Blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
 - [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services. Blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
 - [ ] Run the signed iOS device-install harness on macOS hardware, then complete iOS device file-picker/share-sheet/native
@@ -115,6 +116,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Overlay networks start fail-closed | Tor/I2P/Loki need local dial proof before MeshDrop can claim transfer support | ✓ Good |
 | TURN relay proof precedes overlay WebRTC claims | Browser WebRTC can only count as FIPS/Pollen/Tor/I2P/Loki when stats prove file bytes used a relay candidate constrained to that route | ✓ Good |
 | Blocked transport claims live in GitHub issues | Future work needs a tracker-owned acceptance contract, not stale notes buried in PR bodies | ✓ Good |
+| Dockerized Tor proof unblocks local daemon absence | A route-specific smoke can provide its own Tor daemon/proxy surface instead of depending on host-installed Tor | ✓ Good |
 
 ---
-*Last updated: 2026-07-07 completing milestone v0.12.0 Route Blocker Issue Tracking.*
+*Last updated: 2026-07-07 completing Phase 17 Tor Byte Transfer Proof.*

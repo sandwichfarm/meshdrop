@@ -309,6 +309,31 @@ test("validates route proof fields for claimed byte transport", () => {
     );
 });
 
+test("validates Tor stream route proof with onion topology evidence", () => {
+    const proof = {
+        senderRuntime: "meshdrop-node",
+        recipientRuntime: "tor-socks-client",
+        routeType: "tor",
+        dataPlanePrimitive: "tor-http-stream",
+        webRtcUsed: false,
+        instanceRelayed: false,
+        bytesSent: 43,
+        bytesReceived: 43,
+        hashMatched: true,
+        fallbackUsed: false,
+        topologyEvidence: {
+            overlay: "tor",
+            destination: "meshdropabcd.onion",
+            proxy: "socks5h://127.0.0.1:9050"
+        }
+    };
+
+    assert.deepEqual(contract.validateRouteProof(proof), {
+        ok: true,
+        proof
+    });
+});
+
 test("validates relay WebRTC proof only when selected ICE candidate is relay", () => {
     const proof = {
         senderRuntime: "browser-a",

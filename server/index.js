@@ -8,6 +8,7 @@ import FipsStreamTransferClient, {createFipsStreamConfig} from "./fips-stream-tr
 import PollenTransferClient, {createPollenConfig} from "./pollen-transfer.js";
 import MeshFederation, {createFederationConfig} from "./federation.js";
 import {createOverlayNetworkConfig} from "./overlay-network-adapters.js";
+import {createOverlayStreamClients} from "./overlay-stream-transfer.js";
 import {createRelayIceConfig} from "./relay-ice-config.js";
 
 const writeStdout = (...parts) => process.stdout.write(`${parts.join(" ")}\n`);
@@ -90,6 +91,7 @@ conf.fipsClient = new FipsControlClient(conf.fips);
 conf.fipsStream = createFipsStreamConfig();
 conf.fipsStreamClient = new FipsStreamTransferClient(conf.fipsStream);
 conf.overlayNetworks = createOverlayNetworkConfig();
+conf.overlayStreamClients = createOverlayStreamClients(conf.overlayNetworks);
 conf.federationClient = new MeshFederation(conf.federation, {
     fipsClient: conf.fipsClient,
     pollenClient: conf.pollenClient

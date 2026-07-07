@@ -106,6 +106,17 @@ export default class PairDropServer {
             res.send(await conf.pollenClient.status());
         });
 
+        const overlayClient = routeType => conf.overlayStreamClients?.[routeType];
+
+        app.get('/overlay/:route/status', async (req, res) => {
+            const client = overlayClient(req.params.route);
+            if (!client) {
+                res.status(404).send({error: "overlay route not found"});
+                return;
+            }
+            res.send(await client.status());
+        });
+
         app.get('/.well-known/meshdrop-federation', (req, res) => {
             if (!conf.federation?.enabled || !conf.federationClient) {
                 res.status(404).send({error: "MeshDrop federation is disabled"});
@@ -151,6 +162,66 @@ export default class PairDropServer {
             } catch (error) {
                 if (tempFile) await tempFile.cleanup();
                 res.status(502).send({error: error.message});
+            }
+        });
+
+        app.post('/overlay/:route/upload', async (req, res) => {
+            const client = overlayClient(req.params.route);
+            if (!client) {
+                res.status(404).send({error: "overlay route not found"});
+                return;
+            }
+
+            try {
+                const status = await client.status();
+                if (!status.available) {
+                    res.status(503).send({error: "overlay stream transfer is unavailable"});
+                    return;
+                }
+                const descriptor = await client.uploadStream(req, {
+                    size: Number(req.headers["content-length"] || 0),
+                    type: req.headers["content-type"] || "application/octet-stream"
+                });
+                res.send(descriptor);
+            } catch (error) {
+                res.status(502).send({error: error.message});
+            }
+        });
+
+        app.options('/overlay/:route/download/:id', (req, res) => {
+            res.set("Access-Control-Allow-Origin", "*");
+            res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+            res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            res.status(204).end();
+        });
+
+        app.get('/overlay/:route/download/:id', async (req, res) => {
+            const client = overlayClient(req.params.route);
+            if (!client) {
+                res.status(404).send({error: "overlay route not found"});
+                return;
+            }
+
+            try {
+                const token = String(req.query.token || "").trim()
+                    || String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+                const download = client.openDownload(req.params.id, token);
+                res.set("Access-Control-Allow-Origin", "*");
+                res.sendFile(download.path, {
+                    headers: {
+                        "Content-Type": download.type || "application/octet-stream",
+                        "Content-Length": String(download.size),
+                        "X-MeshDrop-Overlay-Route": download.routeType,
+                        "X-MeshDrop-Overlay-Primitive": download.primitive,
+                        "X-MeshDrop-Overlay-Destination": download.destination,
+                        "X-MeshDrop-Overlay-SHA256": download.sha256
+                    }
+                }, error => {
+                    if (error && !res.headersSent) res.status(502).send({error: error.message});
+                });
+            } catch (error) {
+                const status = /token|id/.test(error.message) ? 403 : 410;
+                res.status(status).send({error: error.message});
             }
         });
 
