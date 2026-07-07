@@ -1,59 +1,37 @@
-# Roadmap: MeshDrop
+# Roadmap: MeshDrop v0.2.0 Route Adapter Contract
 
-## Phase 1: Transfer Proof And Discovery Correctness
+## Phase 6: Route Contract And Test Harness
 
-Goal: make WebRTC/discovery claims require real transfer proof and remove mock-only success paths.
+Goal: introduce the shared route descriptor, adapter, proof, and scoring contract that later transport slices must satisfy, without changing live route selection or claiming new data-plane support.
 
-Current status: complete for claimed paths.
+Current status: complete locally; PR/CI/merge still pending.
 
-- Maintain browser e2e coverage for local, FIPS, Pollen, Nostr, and federated FIPS transfers.
-- Keep Nostr/FIPS/Pollen discovery scoped to npub networks.
-- Add regression coverage when runtime proof finds signaling edge cases.
+Requirements: ROUTE-01, ROUTE-02, ROUTE-03, ADAPT-01, ADAPT-02, ADAPT-03, SCORE-01, SCORE-02, PROOF-01, ADR-01, TEST-01.
 
-## Phase 2: Runtime Capability Negotiation
+Success criteria:
 
-Goal: make GUI controls derive from runtime capabilities instead of hard-coded assumptions.
+1. `public/scripts/route-contract.js` or equivalent exposes descriptor validation, adapter validation, route proof field validation, and deterministic candidate scoring through a public browser-safe surface.
+2. Tests prove descriptors reject unsupported shapes, expired timestamps, wrong sessions, and wrong owner/trust bindings.
+3. Tests prove existing room-based FIPS/Pollen descriptors are accepted as a legacy route descriptor shape without changing the live route manager.
+4. Tests prove route scoring is deterministic and explainable while preserving current runtime behavior.
+5. ADR documents Nostr as control plane, routes as data-plane adapters, identity separation, fail-closed route claims, and route proof requirements.
 
-Current status: complete for SPA, Docker, Desktop, iOS, Android, Start9, and Umbrel metadata/control gating.
+Verification:
 
-- Define capability schema for SPA, Docker, Start9/Umbrel, desktop, and mobile.
-- Expose backend capability metadata through `/config`.
-- Gate controls/toggles by capability and identity.
+- Focused: `node --test test/route-contract.test.js test/nostr-mesh-protocol.test.js test/signaling-room-priority.test.js test/pollen-transfer-protocol.test.js`
+- Broad local: `npm test`
+- Hygiene: `git diff --check`
+- AI-slop: `npx --yes aislop scan --changes .`
 
-## Phase 3: Shared Instance Admin
+## Future Milestone Queue
 
-Goal: allow a configured Docker admin npub to manage backend settings from the GUI with backend-verified signed Nostr requests.
+These are not part of v0.2.0. Start a new GSD milestone for each slice after the previous PR is merged.
 
-Current status: complete for Docker shared-instance admin contract and automated/deployed-compose UAT.
-
-- Configure admin npub in compose/runtime env.
-- Verify admin Nostr events on backend before accepting settings changes.
-- Gate admin settings UI to the configured admin identity.
-- Support FIPS/backend config and safe restart requests through signed admin API.
-
-## Phase 4: Platform Targets And UAT
-
-Goal: make every target platform buildable and testable with explicit UAT runbooks.
-
-Current status: mostly complete. Build artifacts, automated smokes, Android physical hardware UAT, and runbooks exist.
-Hardware/node UAT remains open for signed iOS device packages, StartOS, and Umbrel.
-
-- Docker standalone smoke and UAT.
-- SPA capability-limited runtime.
-- Start9/Umbrel packaging path.
-- Desktop/mobile runtime feasibility and packaging plan.
-
-## Phase 5: CI/CT/CD And Release Ceremony
-
-Goal: make GitHub Actions and release automation reflect the real alpha shipping path.
-
-Current status: mostly complete. CI/release automation exists and `v0.1.5` published the latest target artifacts/images,
-but anonymous GHCR readback still fails with `unauthorized`.
-
-- PR checks cover build/test/runtime smoke surfaces.
-- Release flow avoids redundant CI when branch protection already proves the target.
-- Tagged alpha releases produce GitHub releases and image/artifact outputs.
-- Make GHCR target images anonymously readable, or document the intended authenticated-only pull model.
+1. Instance relay over one backend: choose FIPS or Pollen and prove encrypted chunks cross two instances with hash match and route proof.
+2. UX for route attempts: show route choices, route failure reasons, unsupported routes, and privacy labels.
+3. SPA route honesty: pure-client routes remain enabled while backend-only routes are unavailable or instance-dependent.
+4. Android native adapter: expose native FIPS/Pollen status and transfer primitives through the route adapter contract.
+5. Additional networks: add Tor, I2P, Loki, or TURN adapters only through the same descriptor/scoring/proof model.
 
 ---
-*Roadmap initialized: 2026-07-04 from goal objective. Status audited: 2026-07-06.*
+*Roadmap initialized: 2026-07-07 for milestone v0.2.0 Route Adapter Contract.*

@@ -1,11 +1,26 @@
+---
+gsd_state_version: 1.0
+milestone: v0.2.0
+milestone_name: Route Adapter Contract
+status: planning
+last_updated: "2026-07-07T12:20:04.754Z"
+last_activity: 2026-07-07
+progress:
+  total_phases: 1
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 100
+---
+
 # GSD State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-07-04)
+See: `.planning/PROJECT.md` (updated 2026-07-07)
 
-**Core value:** Files must transfer between peers reliably over every negotiated transport that claims to support the path.
-**Current focus:** finish release/public-readback and real hardware/node UAT gaps that cannot be closed by source tests alone.
+**Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
+**Current focus:** define and implement the route descriptor, adapter, proof, and scoring contract before adding new transport data-plane behavior.
 
 ## Milestone Audit: 2026-07-06
 
@@ -14,13 +29,17 @@ Merged PRs through #105 satisfy the source/runtime/harness portions of the origi
 - Phase 1 transfer/discovery correctness is complete for claimed paths: local, FIPS, Pollen, Nostr, federated FIPS,
   Docker local/Pollen/two-host/public relay, SPA Chromium/Firefox/WebKit, Desktop Chromium, Android WebView, and
   target-artifact source transfers now use real transfer proof instead of mock-only success.
+
 - Phase 2 runtime capability negotiation is complete for current targets: `/config`, static target manifests, and GUI
   controllers gate controls by runtime capability and identity.
+
 - Phase 3 Docker shared-instance admin is complete for the repo contract: compose/runtime admin npub config, `/config`
   metadata, GUI visibility, backend signed-event validation, FIPS settings updates, and restart requests are covered by
   focused tests plus Docker/admin UAT.
+
 - Phase 4 platform work is complete for automated build/run/runbook proof and Android physical hardware UAT, but not
   for StartOS/Umbrel node acceptance or signed iOS device acceptance.
+
 - Phase 5 CI/release automation is complete for authenticated release publication/readback through `v0.1.5`, but
   anonymous GHCR readback still fails before release images can be called publicly readable.
 
@@ -29,6 +48,7 @@ Current hard gaps:
 - `npm run verify:ghcr-anonymous -- v0.1.5` fails with GHCR `unauthorized`.
 - `gh api /orgs/sandwichfarm/packages/container/meshdrop` fails with `403` because this token lacks `read:packages`, so
   this session cannot inspect or change package visibility.
+
 - Deployed StartOS/Umbrel UAT and signed iOS device package/UAT remain unproven; the repo now has a fail-loud signed
   iOS device-install harness that must pass on macOS hardware before those claims can close.
 
@@ -36,6 +56,7 @@ Closed during this audit branch:
 
 - `npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`, proving APK install, WebView
   capability, WebView Nostr WebRTC transfer, Android share-intent transfer, and native picker UI on physical hardware.
+
 - `v0.1.5` was tagged from `5876d8e`, published release assets and GHCR target images, passed authenticated readback,
   and failed only at anonymous GHCR manifest readback with `unauthorized`.
 
@@ -152,3 +173,10 @@ Closed during this audit branch:
 
 ---
 *Initialized: 2026-07-04 from goal objective.*
+
+## Current Position
+
+Phase: 6 Route Contract And Test Harness
+Plan: Phase 6 route contract and test harness
+Status: Complete locally; PR/CI/merge pending
+Last activity: 2026-07-07 — Route contract implemented; focused route suite and `npm test` pass
