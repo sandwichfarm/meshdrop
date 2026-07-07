@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v0.11.0
 milestone_name: TURN Relay Proof
 status: complete
-last_updated: "2026-07-07T18:57:39Z"
+last_updated: "2026-07-07T19:31:38Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
@@ -64,6 +64,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-07 | `260707-tp3-route-status-badge-polish` | complete | Route-attempt chips are icon-only; blocked Clearnet is muted/struck; pending FIPS/Pollen animate; focused route UI test 6/6; dark mobile screenshot `/tmp/meshdrop-route-status-badges-mobile-dark.png`; visual verdict 94/pass; `npm test` 356/356; e2e transfer smoke; diff/changed-code slop exit 0 with existing `ui.js` size/duplicate warnings |
 | 2026-07-07 | `260707-route-status-icon-ui` | complete | Route status card copy replaced with compact animated badge chips; focused route UI test 6/6; dark mobile screenshot `/tmp/meshdrop-route-status-icons-mobile-dark.png`; visual verdict 92/pass; `npm test` 356/356; e2e transfer smoke; diff/changed-code slop exit 0; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-turn-relay-proof` | complete | Route proof contract requires `selectedIceCandidateType=relay` for `webrtc-relay-ice`; local coturn-backed TURN smoke transfers browser bytes with `iceTransportPolicy=relay`, selected relay/relay candidate pairs, 66/66 bytes, hash matched, fallback disabled; focused 58/58; `npm test` 355/355; `npm run test:turn-relay`; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |
 | 2026-07-07 | `260707-overlay-network-adapters` | complete | Tor/I2P/Loki runtime capability entries and shared overlay adapter catalog added; configured stream metadata exposed through `/config`; SPA/source targets fail closed for overlay claims; route descriptors/scoring reuse generic contract; focused 33/33; `npm test` 354/354; e2e; Docker smoke; diff/changed-code slop clean; full-repo slop baseline remains failing outside touched files |
@@ -188,4 +189,4 @@ Phase: 15 TURN Relay Proof
 Plan: `.planning/phases/15-turn-relay-proof/15-01-PLAN.md`
 Summary: `.planning/phases/15-turn-relay-proof/15-01-SUMMARY.md`
 Status: Complete
-Last activity: 2026-07-07 — TURN relay-only WebRTC byte proof complete; Tor/I2P/Loki byte proof remains blocked by missing local daemon/proxy surfaces and disabled GitHub issues.
+Last activity: 2026-07-07 — Route status badge polish complete; route-attempt chips are icon-only with accessible detail, blocked Clearnet styling, and pending FIPS/Pollen animation.
