@@ -287,10 +287,13 @@ class PollenTransferController {
         const translationKey = this._active
             ? "header.pollen-transfer-disable"
             : "header.pollen-transfer-enable";
+        const signalingOnly = supported && !globalThis.RuntimeCapabilities?.relayIceSupported?.(this._config, "pollen")
+            ? " Signaling only: no Pollen WebRTC relay ICE is configured."
+            : "";
 
         this.$button.title = this._connecting
             ? "Checking Pollen daemon"
-            : Localization.getTranslation(`${translationKey}_title`);
+            : `${Localization.getTranslation(`${translationKey}_title`)}${signalingOnly}`;
         this.$button.classList.toggle("selected", this._active);
         this.$button.classList.toggle("connecting", this._connecting);
         this.$button.classList.toggle("unavailable", supported && !this._available);

@@ -1,4 +1,5 @@
 import {normalizeNpubDiscoveryNetworkId} from "./npub-network.js";
+import {normalizeRelayIceConfig} from "./relay-ice-config.js";
 
 const DEFAULT_RUNTIME_TARGET = "standalone";
 
@@ -21,6 +22,11 @@ function createBluetoothCapabilities(conf = {}) {
         requiresAdapter: true,
         unavailableReason: "bluetooth-transfer-not-implemented"
     };
+}
+
+function createRelayIceCapability(routeType, transportSupported, conf = {}) {
+    if (!transportSupported) return normalizeRelayIceConfig(routeType);
+    return normalizeRelayIceConfig(routeType, conf.relayIce);
 }
 
 export function createRuntimeCapabilities(conf = {}) {
@@ -68,12 +74,14 @@ export function createRuntimeCapabilities(conf = {}) {
                 supported: pollenSupported,
                 requiresBackend: true,
                 room: normalizeNpubDiscoveryNetworkId(conf.federation?.pollen?.room),
-                maxUploadBytes: conf.pollen?.maxUploadBytes || 0
+                maxUploadBytes: conf.pollen?.maxUploadBytes || 0,
+                relayIce: createRelayIceCapability("pollen", pollenSupported, conf.pollen)
             },
             fips: {
                 supported: fipsSupported,
                 requiresBackend: true,
-                room: normalizeNpubDiscoveryNetworkId(conf.fips?.room)
+                room: normalizeNpubDiscoveryNetworkId(conf.fips?.room),
+                relayIce: createRelayIceCapability("fips", fipsSupported, conf.fips)
             }
         },
         serverSettings: {

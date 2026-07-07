@@ -32,9 +32,73 @@ test("runtime capabilities describe backend transport support", () => {
     assert.equal(capabilities.transports.fips.supported, true);
     assert.equal(capabilities.transports.fips.requiresBackend, true);
     assert.equal(capabilities.transports.fips.room, "npub-network:fips");
+    assert.deepEqual(capabilities.transports.fips.relayIce, {
+        supported: false,
+        unavailableReason: "fips-relay-ice-not-configured"
+    });
     assert.equal(capabilities.transports.pollen.supported, true);
     assert.equal(capabilities.transports.pollen.maxUploadBytes, 1024);
+    assert.deepEqual(capabilities.transports.pollen.relayIce, {
+        supported: false,
+        unavailableReason: "pollen-relay-ice-not-configured"
+    });
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
+});
+
+test("runtime capabilities require TURN relay config before advertising overlay relay ICE", () => {
+    const bare = createRuntimeCapabilities({
+        runtime: {target: "standalone"},
+        fips: {enabled: true, relayIce: {supported: true}},
+        pollen: {enabled: true, relayIce: {supported: true}},
+        admin: {enabled: false}
+    });
+
+    assert.deepEqual(bare.transports.fips.relayIce, {
+        supported: false,
+        unavailableReason: "fips-relay-ice-not-configured"
+    });
+    assert.deepEqual(bare.transports.pollen.relayIce, {
+        supported: false,
+        unavailableReason: "pollen-relay-ice-not-configured"
+    });
+
+    const configured = createRuntimeCapabilities({
+        runtime: {target: "standalone"},
+        fips: {
+            enabled: true,
+            relayIce: {
+                supported: true,
+                rtcConfig: {
+                    iceServers: [{urls: "turn:fips-relay.test:3478", username: "fips", credential: "secret"}]
+                }
+            }
+        },
+        pollen: {
+            enabled: true,
+            relayIce: {
+                supported: true,
+                rtcConfig: {
+                    iceServers: [{urls: ["stun:ignored.test:19302", "turns:pollen-relay.test:5349"]}]
+                }
+            }
+        },
+        admin: {enabled: false}
+    });
+
+    assert.deepEqual(configured.transports.fips.relayIce, {
+        supported: true,
+        rtcConfig: {
+            iceServers: [{urls: "turn:fips-relay.test:3478", username: "fips", credential: "secret"}],
+            iceTransportPolicy: "relay"
+        }
+    });
+    assert.deepEqual(configured.transports.pollen.relayIce, {
+        supported: true,
+        rtcConfig: {
+            iceServers: [{urls: ["turns:pollen-relay.test:5349"]}],
+            iceTransportPolicy: "relay"
+        }
+    });
 });
 
 test("server runtime config reports the configured deployment target", () => {
@@ -93,7 +157,15 @@ test("runtime capabilities describe static SPA support without backend-only tran
     assert.equal(capabilities.transports.hashtree.supported, true);
     assert.equal(capabilities.transports.localDiscovery.supported, false);
     assert.equal(capabilities.transports.fips.supported, false);
+    assert.deepEqual(capabilities.transports.fips.relayIce, {
+        supported: false,
+        unavailableReason: "fips-relay-ice-not-configured"
+    });
     assert.equal(capabilities.transports.pollen.supported, false);
+    assert.deepEqual(capabilities.transports.pollen.relayIce, {
+        supported: false,
+        unavailableReason: "pollen-relay-ice-not-configured"
+    });
     assertBluetoothNegotiatedUnsupported(capabilities.transports.bluetooth);
     assert.equal(capabilities.serverSettings.supported, false);
     assert.equal(capabilities.serverSettings.actions.fipsPeers, false);

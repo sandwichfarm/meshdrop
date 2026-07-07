@@ -67,6 +67,25 @@ const ClearnetRoutePolicy = {
 
 globalThis.ClearnetRoutePolicy = ClearnetRoutePolicy;
 
+const OverlayRelayPolicy = {
+    roomTypes: new Set(["fips", "pollen"]),
+
+    applies(roomType) {
+        return this.roomTypes.has(roomType);
+    },
+
+    relayIceSupported(config, roomType) {
+        if (!this.applies(roomType)) return true;
+        if (globalThis.RuntimeCapabilities?.relayIceSupported) {
+            return globalThis.RuntimeCapabilities.relayIceSupported(config, roomType);
+        }
+        const relayIce = config?.capabilities?.transports?.[roomType]?.relayIce;
+        return relayIce?.supported === true && Array.isArray(relayIce.rtcConfig?.iceServers);
+    }
+};
+
+globalThis.OverlayRelayPolicy = OverlayRelayPolicy;
+
 const ServerConnectionIdentityProtocol = {
     key(identity = null) {
         if (!identity?.pubkey) return "";
@@ -1911,7 +1930,7 @@ class RTCPeer extends Peer {
         return this._channel && this._channel.readyState === 'connecting';
     }
 
-    switchSignalingRoute(isCaller, roomType, roomId, transport, routePeerId = null) {
+    switchSignalingRoute(isCaller, roomType, roomId, transport, routePeerId = null, rtcConfig = null) {
         this._clearRouteAttemptTimeout();
         this._intentionalDisconnect = true;
         if (this._channel) {
@@ -1928,6 +1947,7 @@ class RTCPeer extends Peer {
         this._intentionalDisconnect = false;
         this._isCaller = isCaller;
         this._server = transport;
+        if (rtcConfig) this.rtcConfig = rtcConfig;
         this._roomIds = SignalingRoomPriority.withPreferred(this._roomIds, roomType, roomId);
         this._peerIdsByRoomType = {
             ...this._peerIdsByRoomType,
@@ -2063,6 +2083,7 @@ class PeersManager {
         Events.on('leave-fips-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('fips'));
         Events.on('leave-pollen-room', _ => this._disconnectOrRemoveRoomTypeByRoomType('pollen'));
         Events.on('clearnet-routes-changed', e => this._onClearnetRoutesChanged(e.detail));
+        Events.on('config', e => this._onConfig(e.detail || {}));
 
         // this device closes connection
         Events.on('room-secrets-deleted', e => this._onRoomSecretsDeleted(e.detail));
@@ -2079,6 +2100,10 @@ class PeersManager {
         Events.on('ws-disconnected', _ => this._onWsDisconnected());
         Events.on('ws-relay', e => this._onWsRelay(e.detail));
         Events.on('ws-config', e => this._onWsConfig(e.detail));
+    }
+
+    _onConfig(config) {
+        this._config = config || {};
     }
 
     _onWsConfig(wsConfig) {
@@ -2158,8 +2183,17 @@ class PeersManager {
         const canonicalPeerId = this._canonicalPeerId(peerId, policyPeer, roomType);
         this._rememberPeerAliases(canonicalPeerId, policyPeer, peerId);
 
-        if (!this._routeAllowed(roomType)) {
+        const blockedReason = this._routeSelectionBlockedReason(roomType);
+        if (blockedReason === "route-policy") {
             this._requestPrivateRouteFromDisallowedDiscovery(canonicalPeerId, isCaller, peerId, roomType, transport, policyPeer);
+            return;
+        }
+        if (blockedReason) {
+            this._traceRoute("route candidate disabled", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, `reason=${blockedReason}`);
+            this._emitRouteStatus(canonicalPeerId, roomType, "disabled", blockedReason, {
+                routePeerId: peerId,
+                routes: this.peers[canonicalPeerId]?._getRoomTypes?.() || []
+            });
             return;
         }
 
@@ -2200,7 +2234,7 @@ class PeersManager {
                     routes: peer._getRoomTypes()
                 });
                 if (peer._pendingPrivateRouteRequests) delete peer._pendingPrivateRouteRequests[roomType];
-                peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server, peerId);
+                peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server, peerId, this._rtcConfigForRoute(roomType));
             }
             return;
         }
@@ -2211,7 +2245,7 @@ class PeersManager {
     _startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer = null, reason = "initial") {
         if (window.isRtcSupported && rtcSupported) {
             this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, `reason=${reason}`);
-            this.peers[canonicalPeerId] = new RTCPeer(transport, isCaller, canonicalPeerId, roomType, roomId, this._wsConfig.rtcConfig);
+            this.peers[canonicalPeerId] = new RTCPeer(transport, isCaller, canonicalPeerId, roomType, roomId, this._rtcConfigForRoute(roomType));
             this._applyPeerInfo(this.peers[canonicalPeerId], policyPeer);
             this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, transport || this._server, peerId);
             if (this.peers[canonicalPeerId]._pendingPrivateRouteRequests) {
@@ -2520,7 +2554,7 @@ class PeersManager {
             routePeerId: nextRoutePeerId,
             routes: peer._getRoomTypes()
         });
-        peer.switchSignalingRoute(nextIsCaller, nextRoomType, nextRoomId, nextTransport, nextRoutePeerId);
+        peer.switchSignalingRoute(nextIsCaller, nextRoomType, nextRoomId, nextTransport, nextRoutePeerId, this._rtcConfigForRoute(nextRoomType));
         return true;
     }
 
@@ -2528,14 +2562,43 @@ class PeersManager {
         return ClearnetRoutePolicy.allows(roomType);
     }
 
+    _routeSelectionBlockedReason(roomType) {
+        if (!this._routeAllowed(roomType)) return "route-policy";
+        if (!this._overlayRelayRequired(roomType)) return "";
+        if (OverlayRelayPolicy.relayIceSupported(this._config, roomType)) return "";
+        return "overlay-relay-unavailable";
+    }
+
+    _overlayRelayRequired(roomType) {
+        return OverlayRelayPolicy.applies(roomType) && !ClearnetRoutePolicy.allows("nostr");
+    }
+
+    _rtcConfigForRoute(roomType) {
+        const rtcConfig = this._wsConfig?.rtcConfig || {};
+        if (!this._overlayRelayRequired(roomType) || !OverlayRelayPolicy.relayIceSupported(this._config, roomType)) {
+            return rtcConfig;
+        }
+
+        const relayRtcConfig = globalThis.RuntimeCapabilities?.relayIceConfig?.(this._config, roomType)
+            || this._config?.capabilities?.transports?.[roomType]?.relayIce?.rtcConfig
+            || {};
+        return {
+            ...rtcConfig,
+            ...relayRtcConfig,
+            iceTransportPolicy: "relay"
+        };
+    }
+
     _dropDisallowedRoutes(peerId, peer) {
         for (const roomType of peer._getRoomTypes()) {
-            if (this._routeAllowed(roomType)) continue;
+            const blockedReason = this._routeSelectionBlockedReason(roomType);
+            if (!blockedReason) continue;
+            const routePeerId = peer._peerIdsByRoomType?.[roomType] || peer._peerId || peerId;
             peer._removeRoomType(roomType);
             delete peer._transportsByRoomType?.[roomType];
             delete peer._isCallerByRoomType?.[roomType];
-            this._emitRouteStatus(peerId, roomType, "disabled", "route-policy", {
-                routePeerId: peer._peerIdsByRoomType?.[roomType] || peer._peerId || peerId,
+            this._emitRouteStatus(peerId, roomType, "disabled", blockedReason, {
+                routePeerId,
                 routes: peer._getRoomTypes()
             });
         }
