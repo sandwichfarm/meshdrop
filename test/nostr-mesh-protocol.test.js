@@ -84,16 +84,24 @@ test("Nostr mesh presence advertises MeshDrop WebRTC capability without a defaul
 
     const tags = signedEvents[0].tags;
     const serializedTags = JSON.stringify(tags);
+    const tagNames = tags.map(tag => tag[0]);
+    assert.deepEqual([...new Set(tagNames)].sort(), ["capability", "expiration", "peer", "type"]);
     assert.deepEqual(tags.filter(tag => tag[0] === "p"), []);
     assert.equal(tags.some(tag => tag[0] === "r"), false);
+    assert.equal(tags.some(tag => tag[0] === "client"), false);
+    assert.equal(tags.some(tag => tag[0] === "protocol"), false);
     assert.equal(tags.some(tag => tag[0] === "name"), false);
     assert.equal(serializedTags.includes("Alice"), false);
+    assert.equal(serializedTags.includes("http://10.0.0.2:3000"), false);
+    assert.equal(serializedTags.includes("127.0.0.1"), false);
+    assert.equal(serializedTags.includes("Linux"), false);
     assert.equal(serializedTags.includes("Macintosh"), false);
     assert.equal(serializedTags.includes("pollen-service"), false);
+    assert.equal(serializedTags.includes("pollen-invite"), false);
     assert.equal(serializedTags.includes("fips/status"), false);
-    assert(tags.some(tag => tag[0] === "client" && tag[1] === "meshdrop"));
-    assert(tags.some(tag => tag[0] === "capability" && tag[1] === "meshdrop"));
-    assert(tags.some(tag => tag[0] === "capability" && tag[1] === "webrtc"));
+    assert(tags.some(tag => tag[0] === "capability" && tag[1] === "meshdrop-webrtc"));
+    assert.equal(tags.some(tag => tag[0] === "capability" && tag[1] === "meshdrop"), false);
+    assert.equal(tags.some(tag => tag[0] === "capability" && tag[1] === "webrtc"), false);
     assert(tags.some(tag => tag[0] === "capability" && tag[1] === "fips-route"));
     assert.equal(tags.some(tag => tag[0] === "capability" && tag[1] === "pollen-route"), false);
     assert(tags.some(tag => tag[0] === "peer" && tag[1] === "session-peer"));
@@ -327,6 +335,66 @@ test("Nostr mesh route responses reject nonce, recipient, and expiry mismatches"
     }
 });
 
+test("Nostr mesh rejects plaintext route detail events before joining routes", async () => {
+    const localPubkey = "1".repeat(64);
+    const peerPubkey = "2".repeat(64);
+    const traces = [];
+    const joined = [];
+    const published = [];
+    const originalFips = globalThis.meshdropFipsDiscovery;
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+    mesh._identity = {pubkey: localPubkey};
+    mesh._pendingRouteRequests = new Map([
+        [`${peerPubkey}:fips`, {
+            nonce: "expected",
+            sessionId: "session-local",
+            routeType: "fips",
+            recipient: peerPubkey,
+            expiresAt: Math.floor(Date.now() / 1000) + 30
+        }]
+    ]);
+    mesh._identityController = {
+        canNip44: () => true,
+        decryptNip44From: async () => {
+            throw new Error("invalid-ciphertext");
+        }
+    };
+    mesh._trace = (...args) => traces.push(args);
+    mesh._publishEncryptedRouteEvent = async (...args) => published.push(args);
+    globalThis.meshdropFipsDiscovery = {
+        joinRouteDescriptor(descriptor) {
+            joined.push(descriptor);
+            return true;
+        },
+        routeDescriptorFor: async () => ({
+            routeType: "fips",
+            rooms: ["npub-network:private"]
+        })
+    };
+
+    try {
+        await mesh._onRouteResponseEvent({
+            pubkey: peerPubkey,
+            content: JSON.stringify({type: "route-response", fipsBase: "http://10.0.0.2:3000"})
+        });
+        await mesh._onRouteRequestEvent({
+            pubkey: peerPubkey,
+            content: JSON.stringify({type: "route-request", pollenService: "meshdrop-fed"})
+        });
+
+        assert.deepEqual(joined, []);
+        assert.deepEqual(published, []);
+        assert.equal(mesh._pendingRouteRequests.has(`${peerPubkey}:fips`), true);
+        assert(traces.some(parts => parts[0] === "encrypted route response rejected"
+            && parts.includes("reason=invalid-ciphertext")));
+        assert(traces.some(parts => parts[0] === "encrypted route request rejected"
+            && parts.includes("reason=invalid-ciphertext")));
+    }
+    finally {
+        globalThis.meshdropFipsDiscovery = originalFips;
+    }
+});
+
 test("Nostr mesh protocol parses incoming draft event tags", () => {
     const event = {
         pubkey: "a".repeat(64),
@@ -363,9 +431,7 @@ test("Nostr mesh accepts trusted WOT presence and rejects untrusted events", () 
         pubkey,
         tags: [
             ["type", "connect"],
-            ["client", "meshdrop"],
-            ["capability", "meshdrop"],
-            ["capability", "webrtc"]
+            ["capability", "meshdrop-webrtc"]
         ]
     });
 
@@ -396,6 +462,15 @@ test("Nostr mesh accepts trusted WOT presence and rejects untrusted events", () 
         ...event(followed),
         tags: [["type", "connect"]]
     }), false);
+    assert.equal(mesh._shouldHandleEvent({
+        ...event(followed),
+        id: "legacy-capabilities",
+        tags: [
+            ["type", "connect"],
+            ["capability", "meshdrop"],
+            ["capability", "webrtc"]
+        ]
+    }), false);
 });
 
 test("Nostr mesh ignores presence from a different Nostr room", () => {
@@ -417,9 +492,7 @@ test("Nostr mesh ignores presence from a different Nostr room", () => {
         tags: [
             ["type", "connect"],
             ["r", "other-room"],
-            ["client", "meshdrop"],
-            ["capability", "meshdrop"],
-            ["capability", "webrtc"]
+            ["capability", "meshdrop-webrtc"]
         ]
     }), false);
 });
