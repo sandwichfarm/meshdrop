@@ -16,24 +16,38 @@ globalThis.localStorage = {
 
 await import("../public/scripts/local-discovery.js");
 
-test("clearnet routes default to enabled", () => {
+test("instance and clearnet routes default to enabled", () => {
     storage.clear();
 
     assert.equal(globalThis.LocalDiscoveryProtocol.readEnabled(), true);
     assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("ip"), true);
     assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("nostr"), true);
+    assert.equal(globalThis.ClearnetRouteProtocol.readEnabled(), true);
+    assert.equal(globalThis.ClearnetRouteProtocol.allowsRoomType("ip"), true);
+    assert.equal(globalThis.ClearnetRouteProtocol.allowsRoomType("nostr"), true);
     assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("fips"), true);
 });
 
-test("clearnet routes gate direct IP and Nostr room types", () => {
+test("instance route preference gates only same-instance IP room types", () => {
     storage.clear();
     globalThis.LocalDiscoveryProtocol.writeEnabled(false);
 
     assert.equal(globalThis.LocalDiscoveryProtocol.readEnabled(), false);
     assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("ip"), false);
-    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("nostr"), false);
+    assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("nostr"), true);
     assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("fips"), true);
     assert.equal(globalThis.LocalDiscoveryProtocol.allowsRoomType("pollen"), true);
+});
+
+test("clearnet route preference gates only direct Nostr-signaled room types", () => {
+    storage.clear();
+    globalThis.ClearnetRouteProtocol.writeEnabled(false);
+
+    assert.equal(globalThis.ClearnetRouteProtocol.readEnabled(), false);
+    assert.equal(globalThis.ClearnetRouteProtocol.allowsRoomType("ip"), true);
+    assert.equal(globalThis.ClearnetRouteProtocol.allowsRoomType("nostr"), false);
+    assert.equal(globalThis.ClearnetRouteProtocol.allowsRoomType("fips"), true);
+    assert.equal(globalThis.ClearnetRouteProtocol.allowsRoomType("pollen"), true);
 });
 
 test("clearnet route support can exist without same-instance discovery", () => {
@@ -55,7 +69,7 @@ test("clearnet route support can exist without same-instance discovery", () => {
         };
 
         assert.equal(globalThis.LocalDiscoveryProtocol.localDiscoverySupportedFromConfig(config), false);
-        assert.equal(globalThis.LocalDiscoveryProtocol.clearnetRouteSupportedFromConfig(config), true);
+        assert.equal(globalThis.ClearnetRouteProtocol.routeSupportedFromConfig(config), true);
     }
     finally {
         delete globalThis.RuntimeCapabilities;

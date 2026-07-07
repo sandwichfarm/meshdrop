@@ -6,7 +6,7 @@ await import("../public/scripts/ui.js");
 const protocol = globalThis.PeerAvailabilityProtocol;
 const routeStatus = globalThis.PeerRouteStatusProtocol;
 
-test("peer availability exposes Clearnet, FIPS, Pollen, and Nostr-signaled room types", () => {
+test("peer availability exposes Instance, Clearnet, FIPS, Pollen, and Nostr-signaled room types", () => {
     const peer = {
         _roomIds: {
             fips: "meshdrop-fips",
@@ -19,7 +19,7 @@ test("peer availability exposes Clearnet, FIPS, Pollen, and Nostr-signaled room 
     assert.deepEqual(
         protocol.availability(peer).map(option => [option.id, option.label, option.shortLabel]),
         [
-            ["local", "Clearnet", "Clearnet"],
+            ["local", "Instance", "Instance"],
             ["webrtc", "Clearnet via Nostr", "Clearnet"],
             ["fips", "FIPS", "FIPS"],
             ["pollen-mesh", "Pollen", "Pollen"]
@@ -99,11 +99,11 @@ test("transfer options expose privacy and encryption metadata", () => {
         const pollen = options.find(option => option.id === "pollen");
 
         assert.equal(local.group, "Network routes");
-        assert.equal(local.privacy, "Direct clearnet path");
+        assert.equal(local.privacy, "Instance-assisted path");
         assert.deepEqual(local.details, [
             ["Discovery", "same MeshDrop instance"],
             ["Data path", "clearnet WebRTC ICE"],
-            ["Exclude with", "Clearnet toggle"]
+            ["Exclude with", "Instance toggle"]
         ]);
         assert.equal(fipsMesh.group, "Network routes");
         assert.equal(fipsMesh.privacy, "FIPS signaling, ICE data path");
@@ -162,7 +162,7 @@ test("peer counts summarize network posture badges", () => {
     assert.deepEqual(
         protocol.networkPostureCounts(peers).map(entry => [entry.id, entry.count, entry.shortLabel]),
         [
-            ["local", 1, "Clearnet"],
+            ["local", 1, "Instance"],
             ["webrtc", 1, "Clearnet"],
             ["fips", 2, "FIPS"],
             ["pollen-mesh", 2, "Pollen"]
@@ -219,7 +219,7 @@ test("route status text names the active network and phase", () => {
     assert.equal(routeStatus.text({route: "fips", state: "requested"}), "Trying FIPS...");
     assert.equal(routeStatus.text({route: "fips", state: "ice-checking"}), "Checking FIPS ICE...");
     assert.equal(routeStatus.text({route: "pollen", state: "timeout"}), "Pollen timed out");
-    assert.equal(routeStatus.text({route: "ip", state: "failed"}), "Clearnet failed");
+    assert.equal(routeStatus.text({route: "ip", state: "failed"}), "Instance failed");
     assert.equal(routeStatus.text({route: "nostr", state: "connected"}), "Connected on Clearnet");
     assert.equal(routeStatus.text({route: "nostr", state: "disabled"}), "Clearnet disabled");
     assert.equal(routeStatus.statusKey({route: "fips", state: "ice-checking"}), "route-fips-ice-checking");

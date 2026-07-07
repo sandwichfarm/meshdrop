@@ -784,7 +784,8 @@ test("disabled local discovery ignores late IP peer announcements", () => {
 
 test("disabled clearnet routes ignore direct Nostr peer announcements", () => {
     const {PeersManager, connections, context} = createHarness();
-    context.meshdropLocalDiscovery = {isEnabled: () => false};
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
     const manager = new PeersManager({send() {}});
     manager._onWsConfig({rtcConfig: {}, wsFallback: false});
 
@@ -801,7 +802,8 @@ test("disabled clearnet routes ignore direct Nostr peer announcements", () => {
 
 test("disabled clearnet uses Nostr presence to request private FIPS route", () => {
     const {PeersManager, connections, fired, context} = createHarness();
-    context.meshdropLocalDiscovery = {isEnabled: () => false};
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
     const manager = new PeersManager({send() {}});
     const pubkey = "f".repeat(64);
     const fipsTransport = {send() {}};
@@ -873,10 +875,10 @@ test("disabled clearnet uses Nostr presence to request private FIPS route", () =
     assert.equal(manager.peers[pubkey]._pendingPrivateRouteRequests.fips, undefined);
 });
 
-test("clearnet preference allows Nostr routes when local discovery is unsupported", () => {
+test("clearnet preference allows Nostr routes when instance sharing is disabled", () => {
     const {PeersManager, context} = createHarness();
-    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
-    context.meshdropLocalDiscovery = {isEnabled: () => false};
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => false};
+    context.ClearnetRouteProtocol = {allowsRoomType: () => true};
     const manager = new PeersManager({send() {}});
     manager._onWsConfig({rtcConfig: {}, wsFallback: false});
 
@@ -893,7 +895,8 @@ test("clearnet preference allows Nostr routes when local discovery is unsupporte
 
 test("disabling clearnet switches auto route from Nostr to FIPS", () => {
     const {PeersManager, fired, context} = createHarness();
-    context.meshdropLocalDiscovery = {isEnabled: () => false};
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
     const manager = new PeersManager({send() {}});
     const switches = [];
     const fipsTransport = {send() {}};
@@ -917,7 +920,7 @@ test("disabling clearnet switches auto route from Nostr to FIPS", () => {
         }
     };
 
-    manager._onClearnetRoutesChanged({enabled: false});
+    manager._onClearnetRoutesChanged({enabled: false, roomTypes: ["nostr"]});
 
     assert.equal(manager.peers["peer-a"]._roomIds.nostr, undefined);
     assert.deepEqual(switches, [{
@@ -935,6 +938,27 @@ test("disabling clearnet switches auto route from Nostr to FIPS", () => {
             && event.detail.state === "selected"),
         true
     );
+});
+
+test("disabling clearnet leaves same-instance route active", () => {
+    const {PeersManager, fired} = createHarness();
+    const manager = new PeersManager({send() {}});
+
+    manager.peers["peer-a"] = {
+        rtcSupported: true,
+        _roomIds: {ip: "127.0.0.1", nostr: "nostr-room"},
+        _getRoomTypes() {
+            return Object.keys(this._roomIds);
+        },
+        _removeRoomType(roomType) {
+            delete this._roomIds[roomType];
+        }
+    };
+
+    manager._onClearnetRoutesChanged({enabled: false, roomTypes: ["nostr"]});
+
+    assert.deepEqual(manager.peers["peer-a"]._roomIds, {ip: "127.0.0.1"});
+    assert.equal(fired.some(event => event.type === "peer-disconnected"), false);
 });
 
 test("accepted Pollen storage responses do not stream files over RTC", () => {

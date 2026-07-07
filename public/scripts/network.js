@@ -42,11 +42,24 @@ const ClearnetRoutePolicy = {
 
     allows(roomType) {
         if (!this.roomTypes.has(roomType)) return true;
+        if (roomType === "ip") return this._allowsInstanceRoute();
+        if (roomType === "nostr") return this._allowsDirectNostrRoute();
+        return true;
+    },
+
+    _allowsInstanceRoute() {
         if (globalThis.LocalDiscoveryProtocol?.allowsRoomType) {
-            return globalThis.LocalDiscoveryProtocol.allowsRoomType(roomType);
+            return globalThis.LocalDiscoveryProtocol.allowsRoomType("ip");
         }
         if (globalThis.meshdropLocalDiscovery?.isEnabled) {
             return globalThis.meshdropLocalDiscovery.isEnabled() !== false;
+        }
+        return true;
+    },
+
+    _allowsDirectNostrRoute() {
+        if (globalThis.ClearnetRouteProtocol?.allowsRoomType) {
+            return globalThis.ClearnetRouteProtocol.allowsRoomType("nostr");
         }
         return true;
     }
@@ -2531,8 +2544,10 @@ class PeersManager {
     _onClearnetRoutesChanged(detail = {}) {
         if (detail.enabled !== false) return;
 
-        this._disableRouteType("ip");
-        this._disableRouteType("nostr");
+        const roomTypes = Array.isArray(detail.roomTypes) && detail.roomTypes.length
+            ? detail.roomTypes
+            : ["nostr"];
+        for (const roomType of roomTypes) this._disableRouteType(roomType);
     }
 
     _disableRouteType(roomType) {
