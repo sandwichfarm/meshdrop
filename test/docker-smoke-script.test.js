@@ -20,6 +20,21 @@ const e2eSmoke = fs.readFileSync(new URL("../scripts/e2e-smoke.mjs", import.meta
 const ciWorkflow = fs.readFileSync(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 const packageJson = fs.readFileSync(new URL("../package.json", import.meta.url), "utf8");
 
+function functionBody(name) {
+    const start = e2eSmoke.indexOf(`async function ${name}`);
+    assert.notEqual(start, -1, `missing ${name}`);
+    const next = e2eSmoke.indexOf("\nasync function ", start + 1);
+    return e2eSmoke.slice(start, next === -1 ? undefined : next);
+}
+
+function assertBefore(source, first, second) {
+    const firstIndex = source.indexOf(first);
+    const secondIndex = source.indexOf(second);
+    assert.notEqual(firstIndex, -1, `missing ${first}`);
+    assert.notEqual(secondIndex, -1, `missing ${second}`);
+    assert(firstIndex < secondIndex, `${first} must appear before ${second}`);
+}
+
 test("Docker smoke initiates browser transfer proof against the built container", () => {
     assert.match(dockerSmoke, /MESHDROP_DOCKER_TRANSFER_BASE_URL/);
     assert.match(dockerSmoke, /scripts\/docker-browser-transfer-smoke\.mjs/);
@@ -72,6 +87,20 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(ciWorkflow, /docker_public_relay_urls:/);
     assert.match(ciWorkflow, /docker-public-relay-uat:/);
     assert.match(ciWorkflow, /MESHDROP_DOCKER_PUBLIC_RELAY_URLS: \$\{\{ inputs\.docker_public_relay_urls \}\}/);
+});
+
+test("Browser E2E binds fake backing services before selecting app ports", () => {
+    assertBefore(functionBody("main"), "const fips = await startFakeFips();", "const appPort = await freePort();");
+    assertBefore(
+        functionBody("runGenericFipsRouteCandidateScenario"),
+        "const fipsA = await startFakeFips",
+        "const portA = await freePort();"
+    );
+    assertBefore(
+        functionBody("runFederatedPollenWebRtcScenario"),
+        "const fipsA = await startFakeFips",
+        "const portA = await freePort();"
+    );
 });
 
 test("Docker packages FIPS binaries instead of mounting host tools", () => {

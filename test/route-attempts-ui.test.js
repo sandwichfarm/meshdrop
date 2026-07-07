@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 
 await import("../public/scripts/ui.js");
 
@@ -160,6 +161,43 @@ test("route attempt visual chips keep status words out of layout", () => {
     assert.match(chip.title, /FIPS/);
     assert.equal(chip.childNodes[0].className, "route-attempt-symbol");
     assert.equal(chip.childNodes[0].getAttribute("aria-hidden"), "true");
+});
+
+test("availability badges render route icons without visible words", () => {
+    installFakeDom();
+    const visual = routeStatus.visualAttempt(routeStatus.attempt({
+        route: "nostr",
+        state: "disabled",
+        reason: "clearnet-disabled"
+    }));
+    const pill = routeStatus.createAvailabilityPill({
+        id: "webrtc",
+        roomType: "nostr",
+        className: "badge-room-nostr",
+        label: "Clearnet via Nostr",
+        shortLabel: "Clearnet"
+    }, visual);
+
+    assert.equal(pill.textContent, "");
+    assert.equal(pill.className, "availability-pill badge-room-nostr");
+    assert.equal(pill.dataset.transport, "webrtc");
+    assert.equal(pill.dataset.route, "nostr");
+    assert.equal(pill.dataset.state, "disabled");
+    assert.equal(pill.dataset.tone, "blocked");
+    assert.equal(pill.getAttribute("role"), "img");
+    assert.match(pill.getAttribute("aria-label"), /Clearnet disabled/);
+    assert.match(pill.title, /Clearnet/);
+    assert.equal(pill.childNodes[0].className, "availability-pill-symbol");
+    assert.equal(pill.childNodes[0].getAttribute("aria-hidden"), "true");
+});
+
+test("availability badge styles animate pending routes and strike blocked routes", () => {
+    const styles = fs.readFileSync(new URL("../public/styles/styles-deferred.css", import.meta.url), "utf8");
+
+    assert.match(styles, /\.availability-pill\[data-tone="pending"\] \.availability-pill-symbol::after/);
+    assert.match(styles, /\.availability-pill\[data-tone="blocked"\] \.availability-pill-symbol::after/);
+    assert.match(styles, /x-peer\[status\]\[data-route-visual\] \.availability-row\s*\{\s*display: none;/);
+    assert.match(styles, /\.availability-pill-symbol/);
 });
 
 test("route choice options can expose route-attempt metadata for renderers", () => {

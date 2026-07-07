@@ -29,11 +29,11 @@ const E2E_PUBKEYS = Object.fromEntries(Object.entries(E2E_IDENTITY_KEYS).map(([n
 const helpers = [];
 
 async function main() {
-    const appPort = await freePort();
     const relay = await startFakeRelay();
     const blossom = await startFakeBlossom();
     const fips = await startFakeFips();
     const pollen = await startFakePollenCli();
+    const appPort = await freePort();
     const app = startApp(appPort, relay.port, blossom.port, fips.port, pollen);
     helpers.push(app);
 
@@ -447,10 +447,11 @@ async function runLocalRouteChoiceTransferScenario(browser, baseUrl) {
 }
 
 async function runGenericFipsRouteCandidateScenario(browser, relayPort, blossomPort, pollen) {
-    const portA = await freePort();
-    const portB = await freePort();
     const fipsA = await startFakeFips({ipv6Addr: "::1", peerName: "Server B"});
     const fipsB = await startFakeFips({ipv6Addr: "::1", peerName: "Server A"});
+    const portA = await freePort();
+    let portB = await freePort();
+    while (portB === portA) portB = await freePort();
     const appA = startApp(portA, relayPort, blossomPort, fipsA.port, pollen, {
         args: [],
         serverId: "fed-a",
@@ -495,10 +496,11 @@ async function runGenericFipsRouteCandidateScenario(browser, relayPort, blossomP
 }
 
 async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort, pollen) {
-    const portA = await freePort();
-    const portB = await freePort();
     const fipsA = await startFakeFips({ipv6Addr: "::1", peerName: "Server B"});
     const fipsB = await startFakeFips({ipv6Addr: "::1", peerName: "Server A"});
+    const portA = await freePort();
+    let portB = await freePort();
+    while (portB === portA) portB = await freePort();
     const secretA = "00000000000000000000000000000000000000000000000000000000000000a1";
     const secretB = "00000000000000000000000000000000000000000000000000000000000000b2";
     const appA = startApp(portA, relayPort, blossomPort, fipsA.port, pollen, {

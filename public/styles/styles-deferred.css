@@ -222,20 +222,26 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 3px;
+    gap: 4px;
     margin-top: 3px;
     max-width: var(--peer-width);
 }
 
 .availability-pill {
-    border-radius: 999px;
-    padding: 1px 5px;
-    background: var(--badge-color);
-    color: white;
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 14px;
-    text-transform: uppercase;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 22px;
+    width: 22px;
+    height: 16px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--badge-color) 55%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--badge-color) 18%, transparent);
+    color: color-mix(in srgb, var(--badge-color) 82%, white);
+    line-height: 1;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--badge-color) 18%, transparent);
 }
 
 .availability-pill[data-tone="pending"] {
@@ -244,8 +250,10 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
 
 .availability-pill[data-tone="blocked"],
 .availability-pill[data-tone="failed"] {
-    opacity: 0.42;
-    text-decoration: line-through;
+    background: rgba(var(--text-color), 0.05);
+    color: rgba(var(--text-color), 0.58);
+    opacity: 0.44;
+    box-shadow: none;
 }
 
 .route-attempts {
@@ -303,6 +311,7 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     --route-color: var(--public-room-color);
 }
 
+.availability-pill-symbol,
 .route-attempt-symbol {
     position: relative;
     flex: 0 0 auto;
@@ -312,6 +321,7 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     border-radius: 50%;
 }
 
+.availability-pill-symbol::before,
 .route-attempt-symbol::before {
     position: absolute;
     inset: 3px;
@@ -320,31 +330,37 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     content: "";
 }
 
+.availability-pill[data-route="nostr"] .availability-pill-symbol::before,
 .route-attempt[data-route="nostr"] .route-attempt-symbol::before {
     inset: 5px 2px;
     border-radius: 999px;
 }
 
+.availability-pill[data-route="nostr"] .availability-pill-symbol,
 .route-attempt[data-route="nostr"] .route-attempt-symbol {
     box-shadow:
         inset 0 3px 0 -2px currentColor,
         inset 0 -3px 0 -2px currentColor;
 }
 
+.availability-pill[data-route="fips"] .availability-pill-symbol,
 .route-attempt[data-route="fips"] .route-attempt-symbol {
     border-radius: 3px;
     transform: rotate(45deg);
 }
 
+.availability-pill[data-route="fips"] .availability-pill-symbol::before,
 .route-attempt[data-route="fips"] .route-attempt-symbol::before {
     inset: 3px;
     border-radius: 2px;
 }
 
+.availability-pill[data-route="pollen"] .availability-pill-symbol,
 .route-attempt[data-route="pollen"] .route-attempt-symbol {
     border: 0;
 }
 
+.availability-pill[data-route="pollen"] .availability-pill-symbol::before,
 .route-attempt[data-route="pollen"] .route-attempt-symbol::before {
     inset: 4px;
     box-shadow:
@@ -362,6 +378,8 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     box-shadow: none;
 }
 
+.availability-pill[data-tone="blocked"] .availability-pill-symbol::after,
+.availability-pill[data-tone="failed"] .availability-pill-symbol::after,
 .route-attempt[data-tone="blocked"] .route-attempt-symbol::after,
 .route-attempt[data-tone="failed"] .route-attempt-symbol::after {
     position: absolute;
@@ -379,6 +397,7 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     animation: route-chip-pulse 1400ms ease-in-out infinite;
 }
 
+.availability-pill[data-tone="pending"] .availability-pill-symbol::after,
 .route-attempt[data-tone="pending"] .route-attempt-symbol::after {
     position: absolute;
     inset: -4px;
@@ -651,6 +670,7 @@ x-peer.ws-peer .highlight-wrapper {
     text-align: center;
 }
 
+.device-descriptor > .availability-row,
 .device-descriptor > .route-attempts {
     white-space: normal;
     overflow: visible;
@@ -673,6 +693,10 @@ x-peer[status][data-route-visual] .status {
     clip: rect(0 0 0 0);
     clip-path: inset(50%);
     border: 0;
+}
+
+x-peer[status][data-route-visual] .availability-row {
+    display: none;
 }
 
 x-peer:not([status]) .status,
@@ -721,6 +745,7 @@ x-peer x-icon {
 
 @media (prefers-reduced-motion: reduce) {
     .availability-pill[data-tone="pending"],
+    .availability-pill[data-tone="pending"] .availability-pill-symbol::after,
     .route-attempt[data-tone="pending"],
     .route-attempt[data-tone="pending"] .route-attempt-symbol::after {
         animation: none;

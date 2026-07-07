@@ -176,6 +176,7 @@ Closed during this audit branch:
 | 2026-07-07 | `260707-6f1-separate-instance-assisted-webrtc-from-c` | complete | Instance toggle now gates only same-instance `ip`; new Clearnet toggle gates direct Nostr WebRTC only; Nostr signaling toggle preserves existing RTC routes; focused 103/103, `npm test` 299/299, e2e, Docker smoke, diff check, and changed-code slop pass; full-repo slop baseline remains policy-failing |
 | 2026-07-07 | `260707-prh-harden-private-route-presence` | complete | WOT presence uses one `meshdrop-webrtc` capability and omits public route/private fields; plaintext route detail events fail closed; focused 104/104, `npm test` 300/300, e2e, Docker smoke, diff check, and changed-code slop exit 0 |
 | 2026-07-07 | `260707-fips-stream-route-proof` | complete | FIPS HTTP stream over FIPS mesh IPv6 with encrypted payload route proof; focused 9/9; `npm run test:fips-stream` over two FIPS containers with `fips0` byte deltas; `npm test` 342/342; e2e; diff/slop gates |
+| 2026-07-07 | `260707-route-status-compact-badges` | complete | Peer route status now renders one icon-only row: blocked Clearnet crossed out, pending FIPS/Pollen animated, words preserved only in aria/title; focused 28/28; browser proof clean; `npm test` 359/359; diff check; changed-code slop exits 0 |
 
 ## Active Quick Task
 
@@ -190,4 +191,4 @@ Phase: 15 TURN Relay Proof
 Plan: `.planning/phases/15-turn-relay-proof/15-01-PLAN.md`
 Summary: `.planning/phases/15-turn-relay-proof/15-01-SUMMARY.md`
 Status: Complete
-Last activity: 2026-07-07 — Route badge motion polish complete; peer and transfer-choice route attempts are icon-only with accessible detail, blocked Clearnet styling, and pending FIPS/Pollen animation.
+Last activity: 2026-07-07 — Compact route-status badges complete; active peer cards hide route words and duplicate availability row while preserving accessible Clearnet/FIPS/Pollen status detail.
