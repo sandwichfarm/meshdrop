@@ -1,25 +1,25 @@
-# Roadmap: MeshDrop v0.6.0 Android Native Route Adapter
+# Roadmap: MeshDrop v0.7.0 FIPS Stream Route Proof
 
-## Phase 10: Android Native Route Adapter
+## Phase 11: FIPS Stream Route Proof
 
-Goal: wire the installed Android WebView native backend into the route adapter contract and prove bytes move through the native Pollen primitive.
+Goal: transfer encrypted payload bytes over a FIPS-backed HTTP stream through the sender's FIPS mesh address and emit route proof.
 
 Current status: complete.
 
-Requirements: ANDROID-NATIVE-01, ANDROID-NATIVE-02, ANDROID-NATIVE-03, ANDROID-NATIVE-04, ANDROID-NATIVE-05.
+Requirements: FIPS-STREAM-01, FIPS-STREAM-02, FIPS-STREAM-03, FIPS-STREAM-04, FIPS-STREAM-05.
 
 Success criteria:
 
-1. Focused tests fail first because no Android native adapter object exists.
-2. Android WebView registers an adapter that passes the generic route adapter contract only when the native backend loopback URL exists.
-3. Adapter Pollen send/receive uses the Android backend upload/download primitive and returns validated route proof.
-4. Adapter reports FIPS native status separately from Pollen byte-transfer support.
-5. Installed APK smoke validates route proof fields from the WebView against the generic route proof contract.
+1. Focused tests fail first because no FIPS stream store/protocol/request path exists.
+2. Server endpoints reject unavailable FIPS status and accept/download token-bound ciphertext only while the descriptor is live.
+3. Browser FIPS stream descriptors and proof seeds validate against `MeshDropRouteContract`.
+4. Recipient download/decrypt/hash verification emits route proof with `routeType=fips`, `dataPlanePrimitive=fips-http-stream`, `webRtcUsed=false`, `hashMatched=true`, and `fallbackUsed=false`.
+5. Docker smoke proves two real FIPS daemons connect, recipient B fetches bytes from sender A's FIPS mesh IPv6 URL, and proof validates.
 
 Verification:
 
-- Focused: Android native route adapter unit tests and mobile package artifact tests.
-- Runtime: `npm run test:android-fips-pollen`.
+- Focused: FIPS stream server/protocol tests.
+- Runtime: `npm run test:fips-stream`.
 - Broad local: `npm test`.
 - Hygiene: `git diff --check`.
 - AI-slop: `npx --yes aislop scan --changes .`.
@@ -28,9 +28,8 @@ Verification:
 
 These are not part of v0.5.0. Start a new GSD milestone for each slice after the previous PR is merged.
 
-1. FIPS instance relay or FIPS stream route proof.
-2. Generic instance relay: extend the Pollen-specific relay shape to FIPS, Tor, I2P, Loki, and future backends.
-3. Additional networks: add Tor/I2P/Loki/TURN adapters through the same descriptor/scoring/proof model.
+1. Generic instance relay: extend the Pollen-specific relay shape to FIPS, Tor, I2P, Loki, and future backends.
+2. Additional networks: add Tor/I2P/Loki/TURN adapters through the same descriptor/scoring/proof model.
 
 ---
-*Roadmap initialized: 2026-07-07 for milestone v0.5.0 SPA Route Honesty.*
+*Roadmap initialized: 2026-07-07 for milestone v0.7.0 FIPS Stream Route Proof.*

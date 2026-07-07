@@ -73,6 +73,7 @@ export default class PairDropServer {
                 },
                 fips: {
                     enabled: conf.fips.enabled,
+                    maxUploadBytes: conf.fipsStream?.maxUploadBytes || 0,
                     room: fipsRoom,
                     discoveryMode: conf.federation?.nostr?.discoveryMode || "wot"
                 },
@@ -91,7 +92,14 @@ export default class PairDropServer {
         });
 
         app.get('/fips/status', async (req, res) => {
-            res.send(await conf.fipsClient.status());
+            const status = await conf.fipsClient.status();
+            const streamTransfer = conf.fipsStreamClient
+                ? await conf.fipsStreamClient.status(status)
+                : {enabled: false, available: false};
+            res.send({
+                ...status,
+                streamTransfer
+            });
         });
 
         app.get('/pollen/status', async (req, res) => {
@@ -143,6 +151,54 @@ export default class PairDropServer {
             } catch (error) {
                 if (tempFile) await tempFile.cleanup();
                 res.status(502).send({error: error.message});
+            }
+        });
+
+        app.post('/fips/upload', async (req, res) => {
+            try {
+                const status = await conf.fipsClient.status();
+                const streamStatus = await conf.fipsStreamClient.status(status);
+                if (!streamStatus.available) {
+                    res.status(503).send({error: "FIPS stream transfer is unavailable"});
+                    return;
+                }
+
+                const descriptor = await conf.fipsStreamClient.uploadStream(req, {
+                    size: Number(req.headers["content-length"] || 0),
+                    type: req.headers["content-type"] || "application/octet-stream"
+                });
+                res.send(descriptor);
+            } catch (error) {
+                res.status(502).send({error: error.message});
+            }
+        });
+
+        app.options('/fips/download/:id', (req, res) => {
+            res.set("Access-Control-Allow-Origin", "*");
+            res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+            res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            res.status(204).end();
+        });
+
+        app.get('/fips/download/:id', async (req, res) => {
+            let download;
+            try {
+                const token = String(req.query.token || "").trim()
+                    || String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+                download = conf.fipsStreamClient.openDownload(req.params.id, token);
+                res.set("Access-Control-Allow-Origin", "*");
+                res.sendFile(download.path, {
+                    headers: {
+                        "Content-Type": download.type || "application/octet-stream",
+                        "Content-Length": String(download.size),
+                        "X-MeshDrop-FIPS-SHA256": download.sha256
+                    }
+                }, error => {
+                    if (error && !res.headersSent) res.status(502).send({error: error.message});
+                });
+            } catch (error) {
+                const status = /token|id/.test(error.message) ? 403 : 410;
+                res.status(status).send({error: error.message});
             }
         });
 

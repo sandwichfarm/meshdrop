@@ -14,15 +14,15 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.6.0 Android Native Route Adapter
+## Current Milestone: v0.7.0 FIPS Stream Route Proof
 
-**Goal:** make the installed Android WebView expose its native loopback FIPS/Pollen backend through the route adapter contract, with byte-transfer proof for the native Pollen data plane.
+**Goal:** add the first real FIPS byte-transfer path: encrypted payload bytes are staged locally, fetched by the recipient over the sender's FIPS mesh address, hash-verified, and reported through the route proof contract.
 
 **Target features:**
-- Register an Android native route adapter only when the Android WebView loopback backend is alive.
-- Expose native Pollen descriptor, upload/download, receive, and route proof methods through the generic adapter contract.
-- Expose native FIPS status honestly without claiming FIPS byte-transfer support before a FIPS data-plane proof exists.
-- Prove an installed APK sends and receives bytes through the native Pollen primitive, validates the hash, and emits route proof with no fallback.
+- Add backend `/fips/upload` and `/fips/download/:id` endpoints that are usable only when the local FIPS daemon reports an available mesh IPv6 address.
+- Add a browser FIPS stream protocol that builds short-lived, owner/session-bound route descriptors with `fips-http-stream` as the data-plane primitive.
+- Let the existing transfer flow send private encrypted payloads through the FIPS stream route and emit route proof after recipient hash verification.
+- Prove the path with two Docker containers connected by real FIPS daemons, fetching bytes over the sender's FIPS mesh address.
 
 ## Requirements
 
@@ -40,7 +40,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 ### Active
 
 - [x] Introduce a generic route adapter contract that answers: runtime availability, safe descriptor shape, data-plane behavior, encrypted send/receive primitive, and transfer proof.
-- [ ] Fit FIPS into that adapter contract with a first-class data-plane path that transfers encrypted file bytes over FIPS and reports proof.
+- [x] Fit FIPS into that adapter contract with a first-class data-plane path that transfers encrypted file bytes over FIPS and reports proof.
 - [x] Fit Pollen into that adapter contract with descriptor, upload/download or service substrate behavior, proof, and fail-closed fallback rules.
 - [x] Turn instance federation from discovery/signaling bridges into an encrypted file relay path under the same adapter contract.
 - [x] Show route attempts, choices, unavailable states, and privacy labels in the UI using proof-backed route status instead of optimistic transport badges.
@@ -72,6 +72,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - Current transfer paths include direct WebRTC data channel transfer, local WebSocket fallback, Blossom encrypted object transfer, Hashtree object transfer, and Pollen upload/download descriptor transfer through backend endpoints.
 - FIPS currently has status/config surfaces, a control client, browser capability gating, route descriptors, server-side peer discovery, and HTTP federation candidate handling. The missing part is first-class encrypted byte transfer over FIPS with proof.
 - Pollen currently appears as both a browser-facing transfer endpoint and a server/native `pln` substrate where available. It needs the same descriptor, send/receive, proof, and fallback shape as other route adapters.
+- The next FIPS slice uses the FIPS IPv6 adapter as the data plane: the sender's MeshDrop server exposes a short-lived download URL on its FIPS mesh address, while the recipient fetches ciphertext through FIPS and validates the decrypted payload hash.
 - Instance federation can track peers, expose snapshots, receive remote peer/signaling events, discover HTTP federation endpoints, and bridge Pollen services/FIPS-reachable base URLs. It still needs to become an encrypted file relay path instead of only a discovery bridge.
 - Runtime capability negotiation is baseline, not optional. SPA can use browser-available routes; it cannot claim backend-only FIPS/Pollen unless the host/browser can reach those networks directly or the transfer uses a reachable instance/object-store path.
 - Docker shared instance is multi-user and needs server-side admin control through a configured npub. SPA, native, and mobile are single-user contexts and should not inherit shared-instance admin assumptions.
@@ -103,8 +104,9 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Route labels require byte-path proof | Visible controls and descriptors are not proof unless the route carried verified file bytes | ✓ Good |
 | Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | ✓ Good |
 | Pollen instance relay is the first backend relay slice | Existing Pollen upload/download primitives give the shortest path to prove encrypted bytes through an instance-mediated backend route before FIPS stream work | ✓ Good |
+| FIPS stream proof uses the IPv6 adapter first | The shipped FIPS daemon already exposes mesh reachability to ordinary HTTP clients through `fips0`; a native FSP API can come later without blocking real byte proof | ✓ Good |
 | Route attempts need user-facing explanations | Users need to understand why a route is selected, unavailable, failed, or complete without reading protocol internals | ✓ Good |
 | SPA artifacts must fail closed for backend-only routes | Static/browser-only targets can transfer only through browser-available primitives and must not inherit server/native claims | Active runtime-honesty requirement |
 
 ---
-*Last updated: 2026-07-07 after starting milestone v0.5.0 SPA Route Honesty.*
+*Last updated: 2026-07-07 after verifying milestone v0.7.0 FIPS Stream Route Proof.*

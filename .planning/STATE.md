@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.6.0
-milestone_name: Android Native Route Adapter
-status: complete
-last_updated: "2026-07-07T16:05:00Z"
+milestone: v0.7.0
+milestone_name: FIPS Stream Route Proof
+status: in_progress
+last_updated: "2026-07-07T16:05:17Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** make the installed Android WebView native backend available through the route adapter contract with native Pollen byte proof.
+**Current focus:** prove encrypted payload bytes can move over the FIPS mesh IPv6 data plane with route proof.
 
 ## Milestone Audit: 2026-07-06
 
@@ -168,17 +168,19 @@ Closed during this audit branch:
 | 2026-07-07 | `260707-clearnet-exclusion-private-routes` | complete | Clearnet file-route exclusion keeps Nostr discovery as a private FIPS/Pollen route descriptor source without opening direct Nostr WebRTC; focused route/control tests, `npm test` 293/293, e2e, Docker smoke, diff check, and changed-code slop pass; full-repo slop baseline remains policy-failing |
 | 2026-07-07 | `260707-6f1-separate-instance-assisted-webrtc-from-c` | complete | Instance toggle now gates only same-instance `ip`; new Clearnet toggle gates direct Nostr WebRTC only; Nostr signaling toggle preserves existing RTC routes; focused 103/103, `npm test` 299/299, e2e, Docker smoke, diff check, and changed-code slop pass; full-repo slop baseline remains policy-failing |
 | 2026-07-07 | `260707-prh-harden-private-route-presence` | complete | WOT presence uses one `meshdrop-webrtc` capability and omits public route/private fields; plaintext route detail events fail closed; focused 104/104, `npm test` 300/300, e2e, Docker smoke, diff check, and changed-code slop exit 0 |
+| 2026-07-07 | `260707-fips-stream-route-proof` | complete | FIPS HTTP stream over FIPS mesh IPv6 with encrypted payload route proof; focused 9/9; `npm run test:fips-stream` over two FIPS containers with `fips0` byte deltas; `npm test` 342/342; e2e; diff/slop gates |
 
 ## Active Quick Task
 
-- None.
+None.
 
 ---
 *Initialized: 2026-07-04 from goal objective.*
 
 ## Current Position
 
-Phase: 10-android-native-route-adapter complete
-Plan: `.planning/phases/10-android-native-route-adapter/10-01-PLAN.md`
+Phase: 11-fips-stream-route-proof complete
+Plan: `.planning/phases/11-fips-stream-route-proof/11-01-PLAN.md`
+Summary: `.planning/phases/11-fips-stream-route-proof/11-01-SUMMARY.md`
 Status: Complete
-Last activity: 2026-07-07 — Android native adapter implemented and verified
+Last activity: 2026-07-07 — FIPS stream route proof implemented and verified
