@@ -6,6 +6,39 @@ await import("../public/scripts/ui.js");
 const availability = globalThis.PeerAvailabilityProtocol;
 const routeStatus = globalThis.PeerRouteStatusProtocol;
 
+class FakeElement {
+    constructor(tagName) {
+        this.tagName = tagName.toUpperCase();
+        this.attributes = new Map();
+        this.childNodes = [];
+        this.dataset = {};
+        this.className = "";
+        this.title = "";
+    }
+
+    append(...nodes) {
+        this.childNodes.push(...nodes);
+    }
+
+    setAttribute(name, value) {
+        this.attributes.set(name, String(value));
+    }
+
+    getAttribute(name) {
+        return this.attributes.get(name) || null;
+    }
+
+    get textContent() {
+        return this.childNodes.map(node => node.textContent || "").join("");
+    }
+}
+
+function installFakeDom() {
+    globalThis.document = {
+        createElement: tagName => new FakeElement(tagName)
+    };
+}
+
 test("route attempt summaries expose state, reason, and privacy labels without protocol jargon", () => {
     const attempt = routeStatus.attempt({
         route: "fips",
@@ -108,6 +141,25 @@ test("route attempt visuals keep peer cards compact while preserving accessible 
     assert.match(attempts[0].ariaLabel, /Clearnet unavailable/);
     assert.match(attempts[1].ariaLabel, /Private route requested/);
     assert.match(attempts[2].title, /Pollen/);
+});
+
+test("route attempt visual chips keep status words out of layout", () => {
+    installFakeDom();
+    const chip = routeStatus.createVisualAttemptChip(
+        routeStatus.attempt({route: "fips", state: "requested", reason: "private-route"}),
+        "transport-choice-route route-attempt"
+    );
+
+    assert.equal(chip.textContent, "");
+    assert.equal(chip.className, "transport-choice-route route-attempt");
+    assert.equal(chip.dataset.route, "fips");
+    assert.equal(chip.dataset.state, "requested");
+    assert.equal(chip.dataset.tone, "pending");
+    assert.equal(chip.getAttribute("role"), "img");
+    assert.match(chip.getAttribute("aria-label"), /Private route requested/);
+    assert.match(chip.title, /FIPS/);
+    assert.equal(chip.childNodes[0].className, "route-attempt-symbol");
+    assert.equal(chip.childNodes[0].getAttribute("aria-hidden"), "true");
 });
 
 test("route choice options can expose route-attempt metadata for renderers", () => {

@@ -575,18 +575,22 @@ x-peer.ws-peer .highlight-wrapper {
 }
 
 .transport-choice-attempt {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
-    color: rgb(var(--text-color));
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1.3;
-    opacity: 0.78;
-    overflow-wrap: anywhere;
+    min-height: 22px;
+    overflow: visible;
 }
 
 .transport-choice-attempt[hidden] {
     display: none;
+}
+
+.transport-choice-route.route-attempt {
+    flex-basis: 24px;
+    width: 24px;
+    height: 20px;
 }
 
 .transport-choice-details {
@@ -658,7 +662,8 @@ x-peer.ws-peer .highlight-wrapper {
     white-space: nowrap;
 }
 
-x-peer[status][data-route] .status {
+x-peer[status][data-route] .status,
+x-peer[status][data-route-visual] .status {
     position: absolute;
     width: 1px;
     height: 1px;

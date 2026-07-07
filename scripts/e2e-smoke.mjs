@@ -418,10 +418,17 @@ async function runLocalRouteChoiceTransferScenario(browser, baseUrl) {
             }));
             const localOption = document.querySelector('[data-transport-id="local"]');
             if (!localOption) throw new Error("Missing local route option");
-            const attempt = localOption.querySelector(".transport-choice-attempt")?.textContent || "";
-            const hasRouteState = attempt.includes("Available") || attempt.includes("Connected");
-            if (!hasRouteState || !attempt.includes("End-to-end encrypted")) {
-                throw new Error(`Local route option missing route-attempt proof copy: ${attempt}`);
+            const attempt = localOption.querySelector(".transport-choice-attempt");
+            const attemptDetail = [
+                attempt?.getAttribute("aria-label"),
+                attempt?.title
+            ].filter(Boolean).join(" ");
+            const hasRouteState = attemptDetail.includes("Available") || attemptDetail.includes("Connected");
+            if (!hasRouteState || !attemptDetail.includes("End-to-end encrypted")) {
+                throw new Error(`Local route option missing route-attempt proof detail: ${attemptDetail}`);
+            }
+            if ((attempt?.textContent || "").trim()) {
+                throw new Error(`Local route option leaked visible route-attempt text: ${attempt.textContent}`);
             }
             localOption.click();
         }, {to: peerId, payload: "local-route-ok"});
