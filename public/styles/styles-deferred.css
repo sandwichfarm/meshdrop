@@ -238,6 +238,58 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     text-transform: uppercase;
 }
 
+.route-attempts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 4px;
+    max-width: var(--peer-width);
+}
+
+.route-attempts[hidden] {
+    display: none;
+}
+
+.route-attempt {
+    display: inline-grid;
+    grid-auto-flow: column;
+    align-items: center;
+    max-width: 100%;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(var(--text-color), 0.07);
+    color: rgb(var(--text-color));
+    line-height: 1.25;
+}
+
+.route-attempt[data-state="disabled"],
+.route-attempt[data-state="unavailable"],
+.route-attempt[data-state="failed"],
+.route-attempt[data-state="timeout"],
+.route-attempt[data-state="expired"],
+.route-attempt[data-state="blocked-fallback"] {
+    background: rgba(245, 166, 35, 0.16);
+}
+
+.route-attempt[data-state="complete"],
+.route-attempt[data-state="connected"],
+.route-attempt[data-state="connection-connected"] {
+    background: rgba(76, 175, 80, 0.16);
+}
+
+.route-attempt-state {
+    font-weight: 800;
+}
+
+.route-attempt-route,
+.route-attempt-reason {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    opacity: 0.72;
+}
+
 x-peer:not([status]):hover x-icon,
 x-peer:not([status]):focus x-icon {
     transform: scale(1.05);
@@ -420,6 +472,21 @@ x-peer.ws-peer .highlight-wrapper {
     line-height: 1.3;
 }
 
+.transport-choice-attempt {
+    display: block;
+    min-width: 0;
+    color: rgb(var(--text-color));
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.3;
+    opacity: 0.78;
+    overflow-wrap: anywhere;
+}
+
+.transport-choice-attempt[hidden] {
+    display: none;
+}
+
 .transport-choice-details {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -476,6 +543,11 @@ x-peer.ws-peer .highlight-wrapper {
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: center;
+}
+
+.device-descriptor > .route-attempts {
+    white-space: normal;
+    overflow: visible;
 }
 
 .status,
