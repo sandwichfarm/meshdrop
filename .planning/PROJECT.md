@@ -14,15 +14,15 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.8.0 Generic Instance Relay
+## Current Milestone: v0.9.0 FIPS Instance Relay
 
-**Goal:** turn the proven Pollen instance-relay path into a reusable instance-relay contract so FIPS, Tor, I2P, Loki, and future backend-mediated routes can share descriptor, proof, and fail-closed rules.
+**Goal:** apply the generic instance-relay contract to the proven FIPS encrypted byte path so route proof says the sender instance relayed ciphertext over FIPS, while legacy FIPS stream metadata remains a compatibility fallback.
 
 **Target features:**
-- Add a generic browser instance-relay protocol for owner/session-bound descriptors, proof seeds, request validation, and route proof finalization.
-- Move the existing Pollen instance-relay descriptor/proof code onto the generic contract without changing live Pollen transfer behavior.
-- Document the generic instance-relay boundary in ADR form before adding more backend routes.
-- Keep new network adapters out of this slice; no FIPS/Tor/I2P/Loki route may claim support until it has byte-transfer proof.
+- Build FIPS `transportShape=instance-relay` descriptors with owner/session/expiry binding, FIPS mesh URL validation, encrypted/private/fail-closed constraints, and `instanceRelay=true`.
+- Attach `fipsInstanceRelay` metadata to private FIPS transfers alongside the existing `fipsStream` fallback.
+- Prefer `fipsInstanceRelay` validation and final route proof on receipt, producing `instanceRelayed=true`, `webRtcUsed=false`, byte counts, and hash match.
+- Preserve current FIPS stream download behavior when old peers send only `fipsStream`.
 
 ## Requirements
 
@@ -71,7 +71,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - The browser client currently owns UI, peer list, route selection, WebRTC setup, and file transfer flow. The Node/Express server serves the app, owns WebSocket signaling, exposes runtime config, and can provide backend transport endpoints.
 - Current discovery/signaling surfaces include local instance rooms, secret/public rooms, Nostr mesh presence and encrypted WebRTC signaling, FIPS/Pollen pairwise route rooms derived from Nostr identities, and server federation over FIPS/Pollen HTTP descriptors.
 - Current transfer paths include direct WebRTC data channel transfer, local WebSocket fallback, Blossom encrypted object transfer, Hashtree object transfer, and Pollen upload/download descriptor transfer through backend endpoints.
-- FIPS currently has status/config surfaces, a control client, browser capability gating, route descriptors, server-side peer discovery, and HTTP federation candidate handling. The missing part is first-class encrypted byte transfer over FIPS with proof.
+- FIPS currently has status/config surfaces, a control client, browser capability gating, route descriptors, server-side peer discovery, HTTP federation candidate handling, and encrypted byte transfer over its FIPS mesh IPv6 address. The next missing part is first-class generic instance-relay descriptor/proof semantics for that byte path.
 - Pollen currently appears as both a browser-facing transfer endpoint and a server/native `pln` substrate where available. Its instance-relay proof is the baseline for the generic relay contract.
 - FIPS now has a first byte-transfer path through HTTP over the FIPS IPv6 adapter: the sender's MeshDrop server exposes a short-lived download URL on its FIPS mesh address, while the recipient fetches ciphertext through FIPS and validates the decrypted payload hash.
 - Instance federation can track peers, expose snapshots, receive remote peer/signaling events, discover HTTP federation endpoints, and bridge Pollen services/FIPS-reachable base URLs. Pollen instance relay and FIPS stream proof now provide concrete byte-transfer shapes that need shared descriptor/proof code before more networks are added.
@@ -111,4 +111,4 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Generic instance relay comes before more networks | Pollen proved the first backend-mediated byte path; future FIPS/Tor/I2P/Loki routes need shared descriptor/proof semantics before more one-off adapters | ✓ Good |
 
 ---
-*Last updated: 2026-07-07 after completing milestone v0.8.0 Generic Instance Relay.*
+*Last updated: 2026-07-07 after completing milestone v0.9.0 FIPS Instance Relay.*

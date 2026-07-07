@@ -6,6 +6,7 @@ const FipsStreamTransferProtocol = {
     downloadPath: "fips/download",
     primitive: "fips-http-stream",
     descriptorTtlMs: 10 * 60 * 1000,
+    instanceRelayTtlMs: 10 * 60 * 1000,
     idPattern: /^[0-9a-f]{32}$/i,
     tokenPattern: /^[0-9a-f]{64}$/i,
     hashPattern: /^[0-9a-f]{64}$/i,
@@ -129,6 +130,59 @@ const FipsStreamTransferProtocol = {
         };
     },
 
+    buildInstanceRelayDescriptor({
+        ownerPubkey,
+        sessionId,
+        baseUrl,
+        files = [],
+        expiresAt = Date.now() + this.instanceRelayTtlMs,
+        runtimeId = this.runtimeId()
+    } = {}) {
+        if (!globalThis.InstanceRelayTransferProtocol) {
+            throw new Error("Instance relay protocol is unavailable");
+        }
+
+        const normalizedBaseUrl = this.assertFipsMeshBaseUrl(baseUrl);
+        const descriptors = files.map(file => this.validateFileDescriptor(file));
+        if (!descriptors.length) throw new Error("FIPS instance relay files are missing");
+
+        try {
+            return InstanceRelayTransferProtocol.buildDescriptor({
+                routeId: `fips-instance-relay:${sessionId}`,
+                routeType: "fips",
+                primitive: this.primitive,
+                ownerPubkey,
+                sessionId,
+                expiresAt,
+                runtimeId,
+                endpoint: {
+                    baseUrl: normalizedBaseUrl,
+                    downloadPath: this.downloadPath,
+                    files: descriptors
+                }
+            });
+        } catch (error) {
+            throw new Error(error.message.replace(/^Instance relay/, "FIPS instance relay"));
+        }
+    },
+
+    buildInstanceRelayProofSeed({senderRuntime = this.runtimeId(), bytesSent = 0} = {}) {
+        if (!globalThis.InstanceRelayTransferProtocol) {
+            throw new Error("Instance relay protocol is unavailable");
+        }
+
+        try {
+            return InstanceRelayTransferProtocol.buildProofSeed({
+                routeType: "fips",
+                primitive: this.primitive,
+                senderRuntime,
+                bytesSent
+            });
+        } catch (error) {
+            throw new Error(error.message.replace(/^Instance relay/, "FIPS instance relay"));
+        }
+    },
+
     validateStreamRequest(request = {}, {now = Date.now()} = {}) {
         const stream = request.fipsStream || {};
         const descriptor = stream.descriptor;
@@ -171,6 +225,33 @@ const FipsStreamTransferProtocol = {
         };
     },
 
+    validateInstanceRelayRequest(request = {}, {now = Date.now()} = {}) {
+        if (!globalThis.InstanceRelayTransferProtocol) {
+            throw new Error("Instance relay protocol is unavailable");
+        }
+
+        let relay;
+        try {
+            relay = InstanceRelayTransferProtocol.validateRequest(request, {
+                metadataKey: "fipsInstanceRelay",
+                routeType: "fips",
+                primitive: this.primitive,
+                now
+            });
+        } catch (error) {
+            throw new Error(error.message.replace(/^Instance relay/, "FIPS instance relay"));
+        }
+
+        relay.descriptor.endpoint.baseUrl = this.assertFipsMeshBaseUrl(relay.descriptor.endpoint?.baseUrl);
+        relay.descriptor.endpoint.files = (relay.descriptor.endpoint?.files || [])
+            .map(file => this.validateFileDescriptor(file));
+        if (!relay.descriptor.endpoint.files.length) {
+            throw new Error("FIPS instance relay files are missing");
+        }
+
+        return relay;
+    },
+
     async payloadHashMatched(request = {}, decryptedFiles = []) {
         const integrity = request.payloadIntegrity;
         if (integrity?.algorithm !== "SHA-256" || !Array.isArray(integrity.files)) {
@@ -211,6 +292,29 @@ const FipsStreamTransferProtocol = {
         if (!result?.ok) throw new Error(`FIPS stream proof rejected: ${result?.reason || "invalid-proof"}`);
 
         return result.proof;
+    },
+
+    async finalizeInstanceRelayProof({
+        request,
+        encryptedFiles = [],
+        decryptedFiles = [],
+        recipientRuntime = this.runtimeId(),
+        now = Date.now()
+    } = {}) {
+        const relay = this.validateInstanceRelayRequest(request, {now});
+        if (!recipientRuntime) throw new Error("FIPS instance relay recipient runtime is missing");
+        const hashMatched = await this.payloadHashMatched(request, decryptedFiles);
+
+        try {
+            return InstanceRelayTransferProtocol.finalizeProof({
+                relay,
+                encryptedFiles,
+                recipientRuntime,
+                hashMatched
+            });
+        } catch (error) {
+            throw new Error(error.message.replace(/^Instance relay/, "FIPS instance relay"));
+        }
     }
 };
 

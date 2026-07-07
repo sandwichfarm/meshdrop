@@ -81,6 +81,7 @@ const MeshDropFipsStreamIntegration = {
                 });
                 const fipsStream = this._createFipsStreamMetadata(payload, fipsUpload);
                 if (!fipsStream) throw new Error("FIPS stream descriptor could not be built");
+                const fipsInstanceRelay = this._createFipsInstanceRelayMetadata(payload, fipsUpload);
 
                 Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
                 this.sendJSON({
@@ -88,7 +89,8 @@ const MeshDropFipsStreamIntegration = {
                     ...request,
                     ...payload.requestFields,
                     fipsDescriptors: fipsUpload.descriptors,
-                    fipsStream
+                    fipsStream,
+                    ...(fipsInstanceRelay ? {fipsInstanceRelay} : {})
                 });
                 Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer});
             } catch (error) {
@@ -101,8 +103,7 @@ const MeshDropFipsStreamIntegration = {
             }
         };
 
-        proto._createFipsStreamMetadata = function createFipsStreamMetadata(payload, fipsUpload) {
-            if (!globalThis.FipsStreamTransferProtocol?.buildStreamDescriptor) return null;
+        proto._fipsPrivateRouteContext = function fipsPrivateRouteContext(payload) {
             if (payload.requestFields?.payloadPrivacy?.mode !== "private") return null;
             if (!this._roomIds?.fips) return null;
 
@@ -118,9 +119,18 @@ const MeshDropFipsStreamIntegration = {
             const sessionId = payload.requestFields?.payloadEncryption?.transferId;
             const payloadHeaders = payload.payloadHeaders || [];
             const bytesSent = payloadHeaders.reduce((total, header) => total + Number(header.size || 0), 0);
+
+            return {identity, sessionId, bytesSent};
+        };
+
+        proto._createFipsStreamMetadata = function createFipsStreamMetadata(payload, fipsUpload) {
+            if (!globalThis.FipsStreamTransferProtocol?.buildStreamDescriptor) return null;
+            const routeContext = this._fipsPrivateRouteContext(payload);
+            if (!routeContext) return null;
+
             const descriptor = FipsStreamTransferProtocol.buildStreamDescriptor({
-                ownerPubkey: identity.pubkey,
-                sessionId,
+                ownerPubkey: routeContext.identity.pubkey,
+                sessionId: routeContext.sessionId,
                 baseUrl: fipsUpload.baseUrl,
                 files: fipsUpload.descriptors
             });
@@ -128,14 +138,35 @@ const MeshDropFipsStreamIntegration = {
             return {
                 descriptor,
                 proofSeed: FipsStreamTransferProtocol.buildStreamProofSeed({
-                    bytesSent,
+                    bytesSent: routeContext.bytesSent,
+                    senderRuntime: globalThis.meshdropFipsStreamTransfer?.runtimeId?.() || FipsStreamTransferProtocol.runtimeId()
+                })
+            };
+        };
+
+        proto._createFipsInstanceRelayMetadata = function createFipsInstanceRelayMetadata(payload, fipsUpload) {
+            if (!globalThis.FipsStreamTransferProtocol?.buildInstanceRelayDescriptor) return null;
+            const routeContext = this._fipsPrivateRouteContext(payload);
+            if (!routeContext) return null;
+
+            const descriptor = FipsStreamTransferProtocol.buildInstanceRelayDescriptor({
+                ownerPubkey: routeContext.identity.pubkey,
+                sessionId: routeContext.sessionId,
+                baseUrl: fipsUpload.baseUrl,
+                files: fipsUpload.descriptors
+            });
+
+            return {
+                descriptor,
+                proofSeed: FipsStreamTransferProtocol.buildInstanceRelayProofSeed({
+                    bytesSent: routeContext.bytesSent,
                     senderRuntime: globalThis.meshdropFipsStreamTransfer?.runtimeId?.() || FipsStreamTransferProtocol.runtimeId()
                 })
             };
         };
 
         proto._onFipsFilesTransferRequest = function onFipsFilesTransferRequest(request) {
-            if (!request.fipsStream?.descriptor) {
+            if (!request.fipsInstanceRelay?.descriptor && !request.fipsStream?.descriptor) {
                 this.sendJSON({type: 'files-transfer-response', accepted: false, reason: 'fips-stream-required'});
                 Events.fire('notify-user', Localization.getTranslation("notifications.fips-stream-required"));
                 return;
@@ -184,7 +215,10 @@ const MeshDropFipsStreamIntegration = {
 
         proto._downloadFipsFiles = async function downloadFipsFiles(request) {
             try {
-                const stream = FipsStreamTransferProtocol.validateStreamRequest(request);
+                const relay = request.fipsInstanceRelay?.descriptor
+                    ? FipsStreamTransferProtocol.validateInstanceRelayRequest(request)
+                    : null;
+                const stream = relay || FipsStreamTransferProtocol.validateStreamRequest(request);
                 const downloadedFiles = [];
                 const expectedTotalSize = request.payloadHeaders
                     ? request.payloadHeaders.reduce((total, payloadHeader) => total + payloadHeader.size, 0)
@@ -202,12 +236,15 @@ const MeshDropFipsStreamIntegration = {
                     downloadedFiles.push(file);
                 }
                 const files = await this._decryptPayloadFiles(downloadedFiles, request);
-                const proof = await FipsStreamTransferProtocol.finalizeStreamProof({
+                const proofContext = {
                     request,
                     encryptedFiles: downloadedFiles,
                     decryptedFiles: files,
                     recipientRuntime: globalThis.meshdropFipsStreamTransfer?.runtimeId?.() || FipsStreamTransferProtocol.runtimeId()
-                });
+                };
+                const proof = relay
+                    ? await FipsStreamTransferProtocol.finalizeInstanceRelayProof(proofContext)
+                    : await FipsStreamTransferProtocol.finalizeStreamProof(proofContext);
                 Events.fire('route-proof', proof);
 
                 this._filesReceived = files;
