@@ -15,9 +15,11 @@ Verification:
 - `node --test test/route-attempts-ui.test.js test/peer-availability-protocol.test.js test/service-worker-version.test.js test/ui-safe-dom.test.js` passed 28/28.
 - Browser proof on local `node server/index.js --localhost-only` passed with no page errors: status text visually hidden, active availability row hidden, 3 visible route-attempt icons, no visible chip text, Clearnet blocked, FIPS/Pollen pending.
 - Screenshot written to `/tmp/meshdrop-route-status-compact-20260707.png`.
-- `npm test` passed 360/360 after the CI workflow hardening test was added.
+- `npm test` passed 361/361 after the CI workflow and e2e harness hardening tests were added.
 - `node --test test/ci-workflow.test.js` failed red again after CI showed the runner used `azure-cli.sources`; the workflow now strips `azure-cli.*` and `microsoft-prod.*`.
 - `node --test test/ci-workflow.test.js test/docker-smoke-script.test.js test/spa-artifact.test.js` passed 15/15 after stripping flaky runner Microsoft apt feeds before Playwright dependency installs in `.github/workflows/docker-image.yml`.
+- `node --test test/docker-smoke-script.test.js` failed red for selecting app ports before fake FIPS servers bound; `scripts/e2e-smoke.mjs` now binds fake backing services first.
+- `npm run test:e2e` passed after the harness port-order fix.
 - `git diff --check` passed.
 - `npx --yes aislop scan --changes --base origin/master .` exited 0 with 0 AI-slop/security/lint issues; it still reports pre-existing `public/scripts/ui.js` size/duplicate code-quality warnings.
 - `npx --yes aislop scan --changes .` and `npx --yes aislop scan --staged .` both exited 0 but reported 0 files, so branch-base scan was used for changed-code evidence.
