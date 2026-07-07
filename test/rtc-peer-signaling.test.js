@@ -799,6 +799,66 @@ test("disabled clearnet routes ignore direct Nostr peer announcements", () => {
     assert.equal(connections.length, 0);
 });
 
+test("disabled clearnet uses Nostr presence to request private FIPS route", () => {
+    const {PeersManager, connections, fired, context} = createHarness();
+    context.meshdropLocalDiscovery = {isEnabled: () => false};
+    const manager = new PeersManager({send() {}});
+    const pubkey = "f".repeat(64);
+    const fipsTransport = {send() {}};
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager._onPeerJoined({
+        peer: {
+            id: pubkey,
+            rtcSupported: true,
+            routeCapabilities: ["fips"],
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room"
+    });
+
+    assert.equal(connections.length, 0);
+    assert.deepEqual(Object.keys(manager.peers[pubkey]._roomIds), []);
+    assert.equal(manager.peers[pubkey]._pendingPrivateRouteRequests.fips, true);
+    assert.deepEqual(
+        fired
+            .filter(event => event.type === "nostr-route-request-needed")
+            .map(event => ({
+                peerId: event.detail.peerId,
+                recipientPubkey: event.detail.recipientPubkey,
+                routeType: event.detail.routeType,
+                failedRoute: event.detail.failedRoute,
+                reason: event.detail.reason
+            })),
+        [{
+            peerId: pubkey,
+            recipientPubkey: pubkey,
+            routeType: "fips",
+            failedRoute: "",
+            reason: "clearnet-disabled"
+        }]
+    );
+
+    manager._onPeerJoined({
+        peer: {
+            id: "fips-peer",
+            rtcSupported: true,
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "fips",
+        roomId: "fips-room",
+        transport: fipsTransport
+    });
+
+    assert.equal(connections.length, 1);
+    assert.equal(manager.peers[pubkey]._roomIds.fips, "fips-room");
+    assert.equal(manager.peers[pubkey]._peerIdsByRoomType.fips, "fips-peer");
+    assert.equal(manager.peers[pubkey]._pendingPrivateRouteRequests.fips, undefined);
+});
+
 test("clearnet preference allows Nostr routes when local discovery is unsupported", () => {
     const {PeersManager, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};

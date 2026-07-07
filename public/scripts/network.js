@@ -2122,13 +2122,17 @@ class PeersManager {
                 ...peerInfo.routeCapabilities
             ])];
         }
+        if (peerInfo._pendingPrivateRouteRequests) {
+            peer._pendingPrivateRouteRequests = {
+                ...peer._pendingPrivateRouteRequests,
+                ...peerInfo._pendingPrivateRouteRequests
+            };
+        }
         if (peerInfo.sessionPeerId) peer.sessionPeerId = peerInfo.sessionPeerId;
         return peer;
     }
 
     _createOrRefreshPeer(isCaller, peerId, roomType, roomId, rtcSupported, transport = this._server, peerInfo = null) {
-        if (!this._routeAllowed(roomType)) return;
-
         if (!this._wsConfig) {
             this._pendingPeerMessages.push([isCaller, peerId, roomType, roomId, rtcSupported, transport, peerInfo]);
             return;
@@ -2141,8 +2145,24 @@ class PeersManager {
         const canonicalPeerId = this._canonicalPeerId(peerId, policyPeer, roomType);
         this._rememberPeerAliases(canonicalPeerId, policyPeer, peerId);
 
+        if (!this._routeAllowed(roomType)) {
+            this._requestPrivateRouteFromDisallowedDiscovery(canonicalPeerId, isCaller, peerId, roomType, transport, policyPeer);
+            return;
+        }
+
         if (this._peerExists(canonicalPeerId)) {
             const peer = this.peers[canonicalPeerId];
+            const pendingInfo = peer._pendingPrivateRouteSeed && !SignalingRoomPriority.primary(peer._roomIds)
+                ? this._pendingPeerInfo(peer, policyPeer)
+                : null;
+            if (pendingInfo) {
+                delete this.peers[canonicalPeerId];
+                if (this._startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, pendingInfo, "private-route")) {
+                    return;
+                }
+                this.peers[canonicalPeerId] = peer;
+            }
+
             this._rememberPeerRoute(peer, isCaller, roomType, transport || this._server, peerId);
             const currentRoomType = SignalingRoomPriority.primary(peer._roomIds);
             const connected = peer._isConnected?.() === true;
@@ -2172,30 +2192,107 @@ class PeersManager {
             return;
         }
 
+        this._startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer, "initial");
+    }
+
+    _startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer = null, reason = "initial") {
         if (window.isRtcSupported && rtcSupported) {
-            this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, "reason=initial");
+            this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, `reason=${reason}`);
             this.peers[canonicalPeerId] = new RTCPeer(transport, isCaller, canonicalPeerId, roomType, roomId, this._wsConfig.rtcConfig);
             this._applyPeerInfo(this.peers[canonicalPeerId], policyPeer);
             this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, transport || this._server, peerId);
-            this._emitRouteStatus(canonicalPeerId, roomType, "selected", "initial", {
+            if (this.peers[canonicalPeerId]._pendingPrivateRouteRequests) {
+                delete this.peers[canonicalPeerId]._pendingPrivateRouteRequests[roomType];
+            }
+            delete this.peers[canonicalPeerId]._pendingPrivateRouteSeed;
+            this._emitRouteStatus(canonicalPeerId, roomType, "selected", reason, {
                 routePeerId: peerId,
                 routes: this.peers[canonicalPeerId]._getRoomTypes()
             });
+            return true;
         }
         else if (roomType !== 'nostr' && this._wsConfig.wsFallback) {
             this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, "reason=websocket-fallback");
             this.peers[canonicalPeerId] = new WSPeer(this._server, isCaller, canonicalPeerId, roomType, roomId);
             this._applyPeerInfo(this.peers[canonicalPeerId], policyPeer);
             this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, this._server, peerId);
+            if (this.peers[canonicalPeerId]._pendingPrivateRouteRequests) {
+                delete this.peers[canonicalPeerId]._pendingPrivateRouteRequests[roomType];
+            }
+            delete this.peers[canonicalPeerId]._pendingPrivateRouteSeed;
             this._emitRouteStatus(canonicalPeerId, roomType, "selected", "websocket-fallback", {
                 routePeerId: peerId,
                 routes: this.peers[canonicalPeerId]._getRoomTypes()
             });
+            return true;
         }
         else {
             console.warn("Websocket fallback is not activated on this instance.\n" +
                 "Activate WebRTC in this browser or ask the admin of this instance to activate the websocket fallback.")
         }
+        return false;
+    }
+
+    _requestPrivateRouteFromDisallowedDiscovery(canonicalPeerId, isCaller, peerId, roomType, transport, policyPeer = null) {
+        if (roomType !== "nostr") return false;
+
+        const peer = this.peers[canonicalPeerId] || this._pendingPrivateRoutePeer(canonicalPeerId);
+        peer._pendingPrivateRouteSeed = true;
+        this._applyPeerInfo(peer, policyPeer);
+        this._rememberPeerRoute(peer, isCaller, roomType, transport || this._server, peerId);
+
+        if (!this._nextPrivateRouteType(peer, "")) return false;
+
+        this.peers[canonicalPeerId] = peer;
+        this._rememberPeerAliases(canonicalPeerId, peer, peerId);
+        this._traceRoute("route candidate disabled", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, "reason=route-policy");
+        this._emitRouteStatus(canonicalPeerId, roomType, "disabled", "route-policy", {
+            routePeerId: peerId,
+            routes: peer._getRoomTypes()
+        });
+        return this._requestPrivateRouteDescriptor(canonicalPeerId, peer, {reason: "clearnet-disabled"});
+    }
+
+    _pendingPrivateRoutePeer(peerId) {
+        return {
+            _peerId: peerId,
+            rtcSupported: true,
+            _intentionalDisconnect: false,
+            _roomIds: {},
+            _transportsByRoomType: {},
+            _peerIdsByRoomType: {},
+            _isCallerByRoomType: {},
+            _pendingPrivateRouteRequests: {},
+            _pendingPrivateRouteSeed: true,
+            _isConnected: () => false,
+            _getRoomTypes() {
+                return Object.keys(this._roomIds);
+            },
+            _removeRoomType(roomType) {
+                delete this._roomIds[roomType];
+                delete this._peerIdsByRoomType?.[roomType];
+            },
+            _routePeerId(roomType) {
+                return this._peerIdsByRoomType?.[roomType] || this._peerId;
+            }
+        };
+    }
+
+    _pendingPeerInfo(peer, peerInfo = null) {
+        return {
+            ...peerInfo,
+            nostrIdentity: {
+                ...peer.nostrIdentity,
+                ...peerInfo?.nostrIdentity
+            },
+            routeCapabilities: [...new Set([
+                ...(peer.routeCapabilities || []),
+                ...(peerInfo?.routeCapabilities || [])
+            ])],
+            _pendingPrivateRouteRequests: {
+                ...peer._pendingPrivateRouteRequests
+            }
+        };
     }
 
     _onPeerJoined(message) {

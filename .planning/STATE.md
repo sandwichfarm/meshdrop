@@ -138,6 +138,7 @@ Closed during this audit branch:
 | 2026-07-07 | `260707-ctl-clearnet-route-control-visibility` | complete | Clearnet file-route control stays visible for direct Nostr-signaled WebRTC without same-instance discovery; footer badges and FIPS/Pollen copy distinguish discovery/signaling from ICE data path; WebRTC-over-FIPS/Pollen relay requirements documented; focused route/control/copy tests and `npm test` pass |
 | 2026-07-07 | `260707-smoke-clearnet-route-visibility` | complete | SPA and target artifact smoke expectations updated for visible Clearnet file-route exclusion in backend-free Nostr WebRTC runtimes; e2e Pollen scenario label updated; `npm run test:spa-artifact`, `npm run test:target-artifacts`, `npm run test:e2e`, `npm run test:docker`, and `npm test` pass |
 | 2026-07-07 | `260707-4x8-implement-privacy-preserving-two-stage-n` | complete | Public Nostr presence minimized; FIPS/Pollen route descriptors exchanged on-demand through NIP-44 after direct route failure; focused route/privacy tests, `npm test`, e2e, Docker smoke, diff check, and changed-code slop pass; full-repo slop baseline remains policy-failing |
+| 2026-07-07 | `260707-clearnet-exclusion-private-routes` | complete | Clearnet file-route exclusion keeps Nostr discovery as a private FIPS/Pollen route descriptor source without opening direct Nostr WebRTC; focused route/control tests, `npm test` 293/293, e2e, Docker smoke, diff check, and changed-code slop pass; full-repo slop baseline remains policy-failing |
 
 ## Active Quick Task
 
