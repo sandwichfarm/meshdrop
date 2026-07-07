@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.14.0
-milestone_name: I2P Byte Transfer Proof
+milestone: v0.15.0
+milestone_name: Loki Byte Transfer Proof
 status: complete
-last_updated: "2026-07-07T23:05:31.293Z"
+last_updated: "2026-07-08T00:31:00.000Z"
 last_activity: 2026-07-08
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-08)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** Phase 18 I2P Byte Transfer Proof is complete; Tor and I2P have reproducible overlay byte-transfer evidence while Loki remains tracked in issue #151.
+**Current focus:** Phase 19 Loki Byte Transfer Proof is complete; Tor, I2P, and Loki have reproducible overlay daemon/proxy byte-transfer evidence.
 
 ## Milestone Audit: 2026-07-06
 
@@ -45,7 +45,6 @@ Merged PRs through #105 satisfy the source/runtime/harness portions of the origi
 
 Current hard gaps:
 
-- Loki byte-transfer proof remains blocked on a reproducible local daemon/proxy dial surface; Tor and I2P now have route-specific daemon/proxy proof: https://github.com/sandwichfarm/meshdrop/issues/151.
 - FIPS/Pollen route-specific WebRTC relay proof is blocked on a relay endpoint reachable through the named overlay: https://github.com/sandwichfarm/meshdrop/issues/152.
 - `npm run verify:ghcr-anonymous -- v0.1.5` fails with GHCR `unauthorized`: https://github.com/sandwichfarm/meshdrop/issues/156.
 - `gh api /orgs/sandwichfarm/packages/container/meshdrop` fails with `403` because this token lacks `read:packages`, so
@@ -57,6 +56,7 @@ Current hard gaps:
 Closed during this audit branch:
 
 - GitHub issue tracking is now enabled for `sandwichfarm/meshdrop`, and route/release/UAT blockers are linked in issues #151, #152, #156, #157, and #158.
+- Tor, I2P, and Loki now have route-specific daemon/proxy byte-transfer proof; issue #151 can close after this Loki proof branch merges.
 
 - `npm run test:android-physical-device` passed on Google Pixel 7 Pro `28031FDH300BS5`, proving APK install, WebView
   capability, WebView Nostr WebRTC transfer, Android share-intent transfer, and native picker UI on physical hardware.
@@ -184,6 +184,7 @@ Closed during this audit branch:
 | 2026-07-07 | `260707-route-status-compact-badges` | complete | Peer route status now renders one icon-only row: blocked Clearnet crossed out, pending FIPS/Pollen animated, words preserved only in aria/title; focused 28/28; browser proof clean; `npm test` 359/359; diff check; changed-code slop exits 0 |
 | 2026-07-07 | `260707-tor-byte-transfer-proof` | complete | Generic overlay stream upload/download endpoints; Dockerized Tor hidden-service smoke emits `Proof tor-http-stream` with generated `.onion`, 42/42 bytes, hash matched, fallback disabled; focused 31/31; `npm test` 368/368; diff check |
 | 2026-07-08 | `260708-i2p-byte-transfer-proof` | complete | Dockerized i2pd HTTP proxy/server tunnel smoke emits `Proof i2p-http-stream` with generated `.b32.i2p`, 42/42 bytes, hash matched, fallback disabled; focused 33/33; `npm test` 369/369 |
+| 2026-07-08 | `260708-loki-byte-transfer-proof` | complete | Dockerized Lokinet daemon/SNApp smoke emits `Proof loki-http-stream` with generated `.loki`, resolver `127.3.2.1:53`, interface `lokitun0`, 43/43 bytes, hash matched, fallback disabled; focused 16/16; `npm test` 370/370 |
 
 ## Active Quick Task
 
@@ -194,7 +195,7 @@ None.
 
 ## Current Position
 
-Phase: 18 I2P Byte Transfer Proof
-Plan: `.planning/phases/18-i2p-byte-transfer-proof/18-01-PLAN.md`
+Phase: 19 Loki Byte Transfer Proof
+Plan: `.planning/phases/19-loki-byte-transfer-proof/19-01-PLAN.md`
 Status: Complete
-Last activity: 2026-07-08 — I2P byte-transfer proof completed with Dockerized `.b32.i2p` route evidence.
+Last activity: 2026-07-08 — Loki byte-transfer proof completed with Dockerized `.loki` route evidence.

@@ -18,6 +18,7 @@ const turnRelaySmokePath = new URL("../scripts/turn-relay-smoke.mjs", import.met
 const turnRelaySmokeBrowserPath = new URL("../scripts/turn-relay-smoke-browser.mjs", import.meta.url);
 const torStreamSmokePath = new URL("../scripts/tor-stream-smoke.mjs", import.meta.url);
 const i2pStreamSmokePath = new URL("../scripts/i2p-stream-smoke.mjs", import.meta.url);
+const lokiStreamSmokePath = new URL("../scripts/loki-stream-smoke.mjs", import.meta.url);
 const e2eSmoke = fs.readFileSync(new URL("../scripts/e2e-smoke.mjs", import.meta.url), "utf8");
 const ciWorkflow = fs.readFileSync(new URL("../.github/workflows/docker-image.yml", import.meta.url), "utf8");
 const packageJson = fs.readFileSync(new URL("../package.json", import.meta.url), "utf8");
@@ -101,6 +102,17 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(i2pStreamSmoke, /inbound\.length = 0/);
     assert.match(i2pStreamSmoke, /--proxy/);
     assert.match(i2pStreamSmoke, /fallbackUsed: false/);
+    assert.match(packageJson, /"test:loki-stream": "node scripts\/loki-stream-smoke\.mjs"/);
+    assert.equal(fs.existsSync(lokiStreamSmokePath), true);
+    const lokiStreamSmoke = fs.existsSync(lokiStreamSmokePath)
+        ? fs.readFileSync(lokiStreamSmokePath, "utf8")
+        : "";
+    assert.match(lokiStreamSmoke, /Proof loki-http-stream/);
+    assert.match(lokiStreamSmoke, /deb\.oxen\.io/);
+    assert.match(lokiStreamSmoke, /lokinet/);
+    assert.match(lokiStreamSmoke, /127\.3\.2\.1:53/);
+    assert.match(lokiStreamSmoke, /--noproxy/);
+    assert.match(lokiStreamSmoke, /fallbackUsed: false/);
     assert.match(ciWorkflow, /Install Chromium[\s\S]*npx playwright install --with-deps chromium/);
     assert.match(ciWorkflow, /docker_public_relay_urls:/);
     assert.match(ciWorkflow, /docker-public-relay-uat:/);

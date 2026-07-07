@@ -14,16 +14,16 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.14.0 I2P Byte Transfer Proof
+## Current Milestone: v0.15.0 Loki Byte Transfer Proof
 
-**Goal:** turn the I2P portion of blocker #151 from "no daemon/proxy" into a reproducible byte-transfer proof using a Dockerized i2pd HTTP proxy and server tunnel route.
+**Goal:** close the Loki portion of blocker #151 with a reproducible byte-transfer proof using a Dockerized Lokinet daemon, local `.loki` SNApp address, and plain `.loki` DNS resolution through Lokinet.
 
 **Target features:**
-- Reuse the generic overlay stream transfer endpoint for configured I2P adapters without adding I2P-only storage behavior.
-- Generate and validate I2P stream descriptors with `.b32.i2p` endpoint evidence, short-lived tokens, byte limits, hash metadata, and fail-closed constraints.
-- Add a Dockerized i2pd runtime smoke that starts an I2P HTTP server tunnel, fetches the MeshDrop payload through the i2pd HTTP proxy, and emits route proof for `i2p-http-stream`.
-- Keep Loki unsupported until equivalent reproducible daemon/proxy proof exists.
-- Update blocker #151 for the I2P portion while leaving remaining Loki overlay gaps explicit.
+- Reuse the generic overlay stream transfer endpoint for configured Loki adapters without adding Loki-only storage behavior.
+- Generate and validate Loki stream descriptors with `.loki` endpoint evidence, short-lived tokens, byte limits, hash metadata, and fail-closed constraints.
+- Add a Dockerized Lokinet runtime smoke that starts Lokinet inside an isolated NET_ADMIN container, serves MeshDrop on the Lokinet interface, fetches the payload through plain `.loki` DNS resolution, and emits route proof for `loki-http-stream`.
+- Keep Loki WebRTC and public Lokinet reachability separate from this local daemon byte proof.
+- Update blocker #151 for the final Tor/I2P/Loki daemon/proxy byte-transfer proof.
 
 ## Requirements
 
@@ -53,6 +53,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Document remaining blocked route/release/UAT work in live GitHub issues with acceptance evidence.
 - [x] Prove a Tor overlay stream route transfers bytes through a reproducible Dockerized `.onion` path, validates the payload hash, and emits proof with fallback disabled.
 - [x] Prove an I2P overlay stream route transfers bytes through a reproducible Dockerized `.b32.i2p` path, validates the payload hash, and emits proof with fallback disabled.
+- [x] Prove a Loki overlay stream route transfers bytes through a reproducible Dockerized `.loki` path, validates the payload hash, and emits proof with fallback disabled.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag. Blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
 - [ ] Run deployed StartOS and Umbrel node UAT with `npm run test:start9-deployed` and `npm run test:umbrel-deployed` against real installed services. Blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
 - [ ] Run the signed iOS device-install harness on macOS hardware, then complete iOS device file-picker/share-sheet/native
@@ -119,6 +120,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Blocked transport claims live in GitHub issues | Future work needs a tracker-owned acceptance contract, not stale notes buried in PR bodies | ✓ Good |
 | Dockerized Tor proof unblocks local daemon absence | A route-specific smoke can provide its own Tor daemon/proxy surface instead of depending on host-installed Tor | ✓ Good |
 | Dockerized i2pd proof uses a local zero-hop tunnel first | i2pd can provide a deterministic HTTP proxy/server tunnel smoke without depending on host I2P state; public I2P reachability and WebRTC remain separate future work | ✓ Good |
+| Dockerized Lokinet proof runs MeshDrop inside the Lokinet container | Lokinet configures a network interface and resolver, so the proof avoids mutating host networking while still proving `.loki` DNS and interface-routed bytes | ✓ Good |
 
 ---
-*Last updated: 2026-07-08 completing Phase 18 I2P Byte Transfer Proof.*
+*Last updated: 2026-07-08 completing Phase 19 Loki Byte Transfer Proof.*

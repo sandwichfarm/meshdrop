@@ -1,43 +1,42 @@
-# Roadmap: MeshDrop v0.14.0 I2P Byte Transfer Proof
+# Roadmap: MeshDrop v0.15.0 Loki Byte Transfer Proof
 
-## Phase 18: I2P Byte Transfer Proof
+## Phase 19: Loki Byte Transfer Proof
 
-Goal: prove a real I2P overlay stream data path by transferring bytes through a Dockerized i2pd `.b32.i2p` endpoint and emitting route proof.
+Goal: prove a real Loki overlay stream data path by transferring bytes through a Dockerized Lokinet `.loki` endpoint and emitting route proof.
 
 Current status: complete.
 
-Requirements: I2P-BYTE-01, I2P-BYTE-02, I2P-BYTE-03, I2P-BYTE-04, I2P-BYTE-05.
+Requirements: LOKI-BYTE-01, LOKI-BYTE-02, LOKI-BYTE-03, LOKI-BYTE-04, LOKI-BYTE-05.
 
 Success criteria:
 
-1. Generic overlay stream upload/download endpoints continue serving short-lived I2P payloads without route-specific storage.
-2. I2P stream descriptors validate `.b32.i2p` endpoints and preserve private/encrypted/fail-closed route constraints.
-3. `npm run test:i2p-stream` starts i2pd in Docker, publishes a MeshDrop HTTP server tunnel, downloads the payload through the i2pd HTTP proxy, and proves the hash and byte counts.
-4. The emitted route proof has `routeType=i2p`, `dataPlanePrimitive=i2p-http-stream`, `webRtcUsed=false`, `fallbackUsed=false`, and topology evidence naming the `.b32.i2p` endpoint.
-5. Loki remains fail-closed and issue #151 stays open for its future proof.
+1. Generic overlay stream upload/download endpoints continue serving short-lived Loki payloads without route-specific storage.
+2. Loki stream descriptors validate `.loki` endpoints and preserve private/encrypted/fail-closed route constraints.
+3. `npm run test:loki-stream` starts Lokinet in Docker, publishes MeshDrop on the Lokinet interface, downloads the payload through plain `.loki` DNS resolution, and proves the hash and byte counts.
+4. The emitted route proof has `routeType=loki`, `dataPlanePrimitive=loki-http-stream`, `webRtcUsed=false`, `fallbackUsed=false`, and topology evidence naming the `.loki` endpoint, resolver, and interface.
+5. Issue #151 can close after the merged PR because Tor, I2P, and Loki all have route-specific daemon/proxy byte-transfer proof.
 
 Verification:
 
-- Focused: route contract, runtime capability, Docker smoke script, and overlay stream transfer unit tests.
-- Runtime: `npm run test:i2p-stream`.
+- Focused: route contract, Docker smoke script, blocker issue, runtime capability, and overlay stream transfer unit tests.
+- Runtime: `npm run test:loki-stream`.
 - Broad: `npm test`.
 - Hygiene: `git diff --check`.
 - AI-slop: `npx --yes aislop scan --changes .`.
 
 Completion evidence:
 
-- Red guard: `node --test test/docker-smoke-script.test.js test/route-contract.test.js test/route-blocker-issues.test.js` failed until `test:i2p-stream` and `scripts/i2p-stream-smoke.mjs` existed.
-- `node --test test/overlay-stream-transfer.test.js test/overlay-network-adapters.test.js test/route-contract.test.js test/runtime-capabilities.test.js test/docker-smoke-script.test.js test/route-blocker-issues.test.js` -> 33/33 pass.
-- `npm run test:i2p-stream` -> `Proof i2p-http-stream` with a generated `.b32.i2p` endpoint, `i2p-http-stream`, 42/42 bytes, hash matched, and fallback disabled.
-- `npm test` -> 369/369 pass.
+- Red guard: `node --test test/docker-smoke-script.test.js test/route-contract.test.js test/route-blocker-issues.test.js` failed until `test:loki-stream`, `scripts/loki-stream-smoke.mjs`, and Phase 19 state existed.
+- `node --test test/docker-smoke-script.test.js test/route-contract.test.js test/route-blocker-issues.test.js` -> 16/16 pass.
+- `npm run test:loki-stream` -> `Proof loki-http-stream` with a generated `.loki` endpoint, `loki-http-stream`, 43/43 bytes, hash matched, and fallback disabled.
+- `npm test` -> 370/370 pass.
 
 ## Future Milestone Queue
 
-1. Loki byte-transfer proof with real local daemon/proxy dial evidence. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/151.
-2. FIPS/Pollen route-specific WebRTC relay proof using the generic TURN proof harness once a relay endpoint is reachable through those overlays. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/152.
-3. GHCR anonymous release image readback once package visibility or authenticated distribution policy is decided. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
-4. Deployed StartOS/Umbrel UAT once real installed service URLs are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
-5. Signed iOS device/share-transfer UAT once macOS signing hardware and a real device are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/158.
+1. FIPS/Pollen route-specific WebRTC relay proof using the generic TURN proof harness once a relay endpoint is reachable through those overlays. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/152.
+2. GHCR anonymous release image readback once package visibility or authenticated distribution policy is decided. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
+3. Deployed StartOS/Umbrel UAT once real installed service URLs are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
+4. Signed iOS device/share-transfer UAT once macOS signing hardware and a real device are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/158.
 
 ---
-*Roadmap updated: 2026-07-08 completing Phase 18 I2P Byte Transfer Proof.*
+*Roadmap updated: 2026-07-08 completing Phase 19 Loki Byte Transfer Proof.*

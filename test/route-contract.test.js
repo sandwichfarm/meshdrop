@@ -359,6 +359,32 @@ test("validates I2P stream route proof with b32 topology evidence", () => {
     });
 });
 
+test("validates Loki stream route proof with resolver topology evidence", () => {
+    const proof = {
+        senderRuntime: "meshdrop-node",
+        recipientRuntime: "lokinet-client",
+        routeType: "loki",
+        dataPlanePrimitive: "loki-http-stream",
+        webRtcUsed: false,
+        instanceRelayed: false,
+        bytesSent: 43,
+        bytesReceived: 43,
+        hashMatched: true,
+        fallbackUsed: false,
+        topologyEvidence: {
+            overlay: "loki",
+            destination: "meshdropabcd.loki",
+            resolver: "127.3.2.1:53",
+            interface: "lokitun0"
+        }
+    };
+
+    assert.deepEqual(contract.validateRouteProof(proof), {
+        ok: true,
+        proof
+    });
+});
+
 test("validates relay WebRTC proof only when selected ICE candidate is relay", () => {
     const proof = {
         senderRuntime: "browser-a",
