@@ -1,4 +1,4 @@
-# Requirements: MeshDrop v0.14.0 I2P Byte Transfer Proof
+# Requirements: MeshDrop v0.15.0 Loki Byte Transfer Proof
 
 **Defined:** 2026-07-08
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
@@ -14,6 +14,16 @@
 - FIPS stream proof proves encrypted payload bytes over the sender's FIPS mesh IPv6 address and emits route proof.
 - TURN relay proof proves browser WebRTC can be forced through a relay candidate before route-specific overlay WebRTC claims are allowed.
 - Tor/I2P/Loki runtime capability surfaces already fail closed unless configured with explicit overlay stream endpoints.
+
+## v0.15.0 Requirements
+
+### Loki Byte Transfer Proof
+
+- [x] **LOKI-BYTE-01**: MeshDrop reuses the generic backend overlay stream upload/download primitive for configured Loki stream routes without changing Tor, I2P, FIPS, or Pollen behavior.
+- [x] **LOKI-BYTE-02**: Loki stream descriptors require a valid `.loki` endpoint, route type `loki`, primitive `loki-http-stream`, owner/session binding, expiry, byte limit metadata, and private/encrypted/fail-closed constraints.
+- [x] **LOKI-BYTE-03**: A runtime smoke starts a reproducible Dockerized Lokinet daemon path, transfers a proof payload through a generated `.loki` endpoint using plain Lokinet DNS resolution, validates byte counts and SHA-256, and rejects Clearnet fallback as success.
+- [x] **LOKI-BYTE-04**: Loki route proof names sender runtime, recipient runtime, route type, data-plane primitive, WebRTC flag, instance-relay flag, byte counts, hash match, fallback status, and topology evidence for the Lokinet route.
+- [x] **LOKI-BYTE-05**: Issue #151 can close after merge because Tor, I2P, and Loki all have reproducible route-specific daemon/proxy byte-transfer proof.
 
 ## v0.14.0 Requirements
 
@@ -67,7 +77,6 @@
 
 ## Future Requirements
 
-- **LOKI-BYTE-01**: Loki adapters transfer encrypted bytes only after a local instance/native runtime can prove daemon/proxy dial support, selected route type, byte counts, hash match, and fallback disabled. Tracked by https://github.com/sandwichfarm/meshdrop/issues/151.
 - **OVERLAY-WEBRTC-01**: FIPS/Pollen route-specific WebRTC relay claims stay unavailable until a relay endpoint reachable through that route proves selected relay candidates and no Clearnet fallback. Tracked by https://github.com/sandwichfarm/meshdrop/issues/152.
 
 ## v0.11.0 Requirements
@@ -94,7 +103,8 @@
 
 | Feature | Reason |
 |---------|--------|
-| Loki byte-transfer support | This milestone proves I2P only; Loki needs an equivalent daemon/proxy harness before support claims. |
+| Public Lokinet reachability | This milestone proves a deterministic local Lokinet daemon/SNApp byte path; public network reachability has separate bootstrap and availability concerns. |
+| Loki WebRTC transport | This milestone proves non-WebRTC `loki-http-stream`; route-specific WebRTC needs relay-candidate proof like other overlays. |
 | FIPS instance-to-instance chunk relay | FIPS has direct FIPS stream proof; instance-to-instance relay is the next transport-specific slice. |
 | Native FSP daemon API | Current FIPS release exposes ordinary IPv6/TCP through `fips0`; native FSP remains future work. |
 | TURN overlay relay | Separate route type with different WebRTC proof needs. |
@@ -105,6 +115,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| LOKI-BYTE-01 | Phase 19 | Complete |
+| LOKI-BYTE-02 | Phase 19 | Complete |
+| LOKI-BYTE-03 | Phase 19 | Complete |
+| LOKI-BYTE-04 | Phase 19 | Complete |
+| LOKI-BYTE-05 | Phase 19 | Complete |
 | I2P-BYTE-01 | Phase 18 | Complete |
 | I2P-BYTE-02 | Phase 18 | Complete |
 | I2P-BYTE-03 | Phase 18 | Complete |
@@ -142,10 +157,10 @@
 | BLOCKER-05 | Phase 16 | Complete |
 
 **Coverage:**
-- v0.14.0 requirements: 5 total
+- v0.15.0 requirements: 5 total
 - Mapped to phases: 5
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-08*
-*Last updated: 2026-07-08 completing Phase 18 I2P Byte Transfer Proof.*
+*Last updated: 2026-07-08 completing Phase 19 Loki Byte Transfer Proof.*

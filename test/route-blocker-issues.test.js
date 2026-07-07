@@ -24,5 +24,5 @@ test('route expansion blockers are tracked with live GitHub issue links', () => 
   assert.doesNotMatch(combined, /GitHub issues are disabled/i);
   assert.match(phase16Summary, /Phase 16 Summary: Route Blocker Issue Tracking/);
   assert.match(phase16Summary, /Complete\./);
-  assert.match(state, /Phase: 18 I2P Byte Transfer Proof/);
+  assert.match(state, /Phase: 19 Loki Byte Transfer Proof/);
 });
