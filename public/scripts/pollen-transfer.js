@@ -6,6 +6,9 @@ const PollenTransferProtocol = {
     downloadPath: "pollen/download",
     storageKey: "meshdrop_pollen_transfer_enabled",
     hashPattern: /^[0-9a-f]{64}$/i,
+    pubkeyPattern: /^[0-9a-f]{64}$/i,
+    instanceRelayPrimitive: "pollen-object-store",
+    instanceRelayTtlMs: 10 * 60 * 1000,
 
     readEnabled(storage = globalThis.localStorage) {
         return storage?.getItem?.(this.storageKey) === "true";
@@ -50,6 +53,170 @@ const PollenTransferProtocol = {
         if (!baseUrl) return path;
 
         return `${baseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+    },
+
+    runtimeId() {
+        return `browser:${globalThis.location?.host || "unknown"}`;
+    },
+
+    buildInstanceRelayDescriptor({
+        ownerPubkey,
+        sessionId,
+        rooms = [],
+        expiresAt = Date.now() + this.instanceRelayTtlMs,
+        endpoint = {},
+        runtimeId = this.runtimeId()
+    } = {}) {
+        if (!this.pubkeyPattern.test(ownerPubkey || "")) {
+            throw new Error("Pollen instance relay owner pubkey is invalid");
+        }
+        if (!sessionId) throw new Error("Pollen instance relay session is missing");
+
+        const descriptor = {
+            version: 1,
+            routeId: `pollen-instance-relay:${sessionId}`,
+            routeType: "pollen",
+            transportShape: "instance-relay",
+            sessionId,
+            ownerPubkey: ownerPubkey.toLowerCase(),
+            expiresAt,
+            endpoint: {
+                primitive: this.instanceRelayPrimitive,
+                uploadPath: this.uploadPath,
+                downloadPath: this.downloadPath,
+                rooms: [...new Set((rooms || []).filter(Boolean))],
+                runtimeId,
+                ...endpoint
+            },
+            overlayIdentity: {},
+            constraints: {
+                encrypted: true,
+                private: true,
+                fallback: false
+            },
+            capabilities: {
+                instanceRelay: true,
+                webRtcDataPath: false
+            }
+        };
+
+        const result = globalThis.MeshDropRouteContract?.validateDescriptor?.(descriptor, {
+            expectedOwnerPubkey: descriptor.ownerPubkey,
+            expectedSessionId: descriptor.sessionId,
+            now: Date.now()
+        });
+        if (result && !result.ok) throw new Error(`Pollen instance relay descriptor rejected: ${result.reason}`);
+
+        return descriptor;
+    },
+
+    buildInstanceRelayProofSeed({senderRuntime = this.runtimeId(), bytesSent = 0} = {}) {
+        if (!senderRuntime) throw new Error("Pollen instance relay sender runtime is missing");
+        if (!Number.isFinite(bytesSent) || bytesSent <= 0) {
+            throw new Error("Pollen instance relay byte count is invalid");
+        }
+
+        return {
+            senderRuntime,
+            routeType: "pollen",
+            dataPlanePrimitive: this.instanceRelayPrimitive,
+            webRtcUsed: false,
+            instanceRelayed: true,
+            bytesSent,
+            fallbackUsed: false
+        };
+    },
+
+    validateInstanceRelayRequest(request = {}, {now = Date.now()} = {}) {
+        const relay = request.pollenInstanceRelay || {};
+        const descriptor = relay.descriptor;
+        const proofSeed = relay.proofSeed || {};
+        if (!descriptor) throw new Error("Pollen instance relay descriptor is missing");
+        if (!proofSeed.senderRuntime) throw new Error("Pollen instance relay sender runtime is missing");
+        if (proofSeed.fallbackUsed === true) throw new Error("Pollen instance relay fallback is forbidden");
+        if (proofSeed.routeType !== "pollen") throw new Error("Pollen instance relay route type mismatch");
+        if (proofSeed.dataPlanePrimitive !== this.instanceRelayPrimitive) {
+            throw new Error("Pollen instance relay data-plane primitive mismatch");
+        }
+        if (proofSeed.webRtcUsed !== false) throw new Error("Pollen instance relay WebRTC byte path is forbidden");
+        if (proofSeed.instanceRelayed !== true) throw new Error("Pollen instance relay flag is missing");
+
+        const expectedOwnerPubkey = request.payloadEncryption?.keyDelivery?.senderPubkey;
+        const expectedSessionId = request.payloadEncryption?.transferId;
+        if (!this.pubkeyPattern.test(expectedOwnerPubkey || "")) {
+            throw new Error("Pollen instance relay owner binding is missing");
+        }
+        if (!expectedSessionId) {
+            throw new Error("Pollen instance relay session binding is missing");
+        }
+        const result = globalThis.MeshDropRouteContract?.validateDescriptor?.(descriptor, {
+            expectedOwnerPubkey,
+            expectedSessionId,
+            now
+        });
+        if (!result?.ok) {
+            const reason = result?.reason || "invalid-descriptor";
+            if (reason === "session-mismatch") throw new Error("Pollen instance relay session mismatch");
+            if (reason === "owner-mismatch") throw new Error("Pollen instance relay owner mismatch");
+            if (reason === "expired") throw new Error("Pollen instance relay descriptor expired");
+            throw new Error(`Pollen instance relay descriptor rejected: ${reason}`);
+        }
+        if (result.descriptor.routeType !== "pollen") throw new Error("Pollen instance relay descriptor route mismatch");
+        if (result.descriptor.transportShape !== "instance-relay") {
+            throw new Error("Pollen instance relay descriptor shape mismatch");
+        }
+        if (result.descriptor.endpoint?.primitive !== this.instanceRelayPrimitive) {
+            throw new Error("Pollen instance relay descriptor primitive mismatch");
+        }
+
+        return {
+            descriptor: result.descriptor,
+            proofSeed: {...proofSeed}
+        };
+    },
+
+    async payloadHashMatched(request = {}, decryptedFiles = []) {
+        const integrity = request.payloadIntegrity;
+        if (integrity?.algorithm !== "SHA-256" || !Array.isArray(integrity.files)) {
+            throw new Error("Pollen instance relay payload integrity is missing");
+        }
+        if (!globalThis.BlossomTransferProtocol?.sha256Hex) {
+            throw new Error("Pollen instance relay hash verification is unavailable");
+        }
+
+        for (const entry of integrity.files) {
+            const file = decryptedFiles[entry.index];
+            if (!file) throw new Error("Pollen instance relay decrypted file is missing");
+            const actual = await globalThis.BlossomTransferProtocol.sha256Hex(file);
+            if (actual !== entry.sha256) throw new Error("Pollen instance relay hash mismatch");
+        }
+
+        return true;
+    },
+
+    async finalizeInstanceRelayProof({
+        request,
+        encryptedFiles = [],
+        decryptedFiles = [],
+        recipientRuntime = this.runtimeId(),
+        now = Date.now()
+    } = {}) {
+        const relay = this.validateInstanceRelayRequest(request, {now});
+        if (!recipientRuntime) throw new Error("Pollen instance relay recipient runtime is missing");
+        const bytesReceived = encryptedFiles.reduce((total, file) => total + Number(file?.size || 0), 0);
+        const hashMatched = await this.payloadHashMatched(request, decryptedFiles);
+        const proof = {
+            ...relay.proofSeed,
+            recipientRuntime,
+            bytesReceived,
+            hashMatched
+        };
+        const result = globalThis.MeshDropRouteContract?.validateRouteProof?.(proof);
+        if (!result?.ok) {
+            throw new Error(`Pollen instance relay proof rejected: ${result?.reason || "invalid-proof"}`);
+        }
+
+        return result.proof;
     }
 };
 

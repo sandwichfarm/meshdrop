@@ -801,7 +801,12 @@ class Peer {
         return /^[0-9a-f]{64}$/i.test(value || "");
     }
 
-    async _createBlossomKeyDelivery(contentKey) {
+    _recipientNostrPubkey() {
+        const pubkey = this.nostrIdentity?.pubkey || (this._isNostrPubkey(this._peerId) ? this._peerId : "");
+        return this._isNostrPubkey(pubkey) ? pubkey.toLowerCase() : "";
+    }
+
+    async _createBlossomKeyDelivery(contentKey, {allowTrustedChannel = true} = {}) {
         const key = BlossomTransferProtocol.bytesToBase64Url(await BlossomTransferProtocol.exportContentKey(contentKey));
         const keyEnvelope = {
             version: BlossomTransferProtocol.keyEnvelopeVersion,
@@ -809,7 +814,7 @@ class Peer {
             key
         };
 
-        if (this._isBlossomKeyDeliveryChannelTrusted()) {
+        if (allowTrustedChannel && this._isBlossomKeyDeliveryChannelTrusted()) {
             return {
                 type: "rtc-data-channel",
                 version: keyEnvelope.version,
@@ -820,14 +825,15 @@ class Peer {
 
         const identityController = globalThis.meshdropNostrIdentity;
         const senderIdentity = identityController?.getIdentity?.();
-        if (senderIdentity?.pubkey && this._isNostrPubkey(this._peerId) && identityController.canNip44?.()) {
+        const recipientPubkey = this._recipientNostrPubkey();
+        if (senderIdentity?.pubkey && recipientPubkey && identityController.canNip44?.()) {
             return {
                 type: "nip44",
                 version: keyEnvelope.version,
                 algorithm: keyEnvelope.algorithm,
                 senderPubkey: senderIdentity.pubkey,
-                recipientPubkey: this._peerId,
-                ciphertext: await identityController.encryptNip44To(this._peerId, JSON.stringify(keyEnvelope))
+                recipientPubkey,
+                ciphertext: await identityController.encryptNip44To(recipientPubkey, JSON.stringify(keyEnvelope))
             };
         }
 
@@ -851,13 +857,20 @@ class Peer {
         }
 
         const contentKey = await BlossomTransferProtocol.generateContentKey();
-        const keyDelivery = await this._createBlossomKeyDelivery(contentKey);
+        const keyDelivery = await this._createBlossomKeyDelivery(contentKey, {
+            allowTrustedChannel: !(transfer?.id === "pollen" && this._roomIds?.pollen)
+        });
         const transferId = BlossomTransferProtocol.createTransferId();
         const encryptedFiles = [];
         const payloadHeaders = [];
         const fileEnvelopes = [];
+        const integrityFiles = [];
 
         for (let i = 0; i < files.length; i++) {
+            integrityFiles.push({
+                index: i,
+                sha256: await BlossomTransferProtocol.sha256Hex(files[i])
+            });
             const encrypted = await BlossomTransferProtocol.encryptFile(files[i], contentKey, {
                 transferId,
                 index: i,
@@ -888,6 +901,10 @@ class Peer {
                     transferId,
                     files: fileEnvelopes,
                     keyDelivery
+                },
+                payloadIntegrity: {
+                    algorithm: "SHA-256",
+                    files: integrityFiles
                 }
             }
         };
@@ -959,13 +976,15 @@ class Peer {
             const pollenDescriptors = await globalThis.meshdropPollenTransfer.uploadFiles(payload.files, progress => {
                 Events.fire('set-progress', {peerId: this._peerId, progress: 0.8 + 0.2 * progress, status: 'prepare', transport: transfer});
             });
+            const pollenInstanceRelay = this._createPollenInstanceRelayMetadata(payload, pollenDescriptors);
 
             Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
             this.sendJSON({
                 type: 'pollen-request',
                 ...request,
                 ...payload.requestFields,
-                pollenDescriptors
+                pollenDescriptors,
+                ...(pollenInstanceRelay ? {pollenInstanceRelay} : {})
             });
             Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
         }
@@ -977,6 +996,42 @@ class Peer {
                 `${Localization.getTranslation("notifications.pollen-transfer-upload-failed")}: ${error.message}`
             );
         }
+    }
+
+    _createPollenInstanceRelayMetadata(payload, pollenDescriptors) {
+        if (!globalThis.PollenTransferProtocol?.buildInstanceRelayDescriptor) return null;
+        if (payload.requestFields?.payloadPrivacy?.mode !== "private") return null;
+        const pollenRoom = this._roomIds?.pollen;
+        if (!pollenRoom) return null;
+
+        const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
+        const keyDelivery = payload.requestFields?.payloadEncryption?.keyDelivery;
+        if (
+            keyDelivery?.type !== "nip44"
+            || !this._isNostrPubkey(keyDelivery.senderPubkey)
+            || !this._isNostrPubkey(keyDelivery.recipientPubkey)
+        ) return null;
+        if (!this._isNostrPubkey(identity?.pubkey) || !this._recipientNostrPubkey()) return null;
+
+        const sessionId = payload.requestFields?.payloadEncryption?.transferId;
+        const payloadHeaders = payload.payloadHeaders || [];
+        const bytesSent = payloadHeaders.reduce((total, header) => total + Number(header.size || 0), 0);
+        const descriptor = PollenTransferProtocol.buildInstanceRelayDescriptor({
+            ownerPubkey: identity.pubkey,
+            sessionId,
+            rooms: [pollenRoom],
+            endpoint: {
+                hashes: (pollenDescriptors || []).map(descriptor => descriptor.hash).filter(Boolean)
+            }
+        });
+
+        return {
+            descriptor,
+            proofSeed: PollenTransferProtocol.buildInstanceRelayProofSeed({
+                bytesSent,
+                senderRuntime: globalThis.meshdropPollenTransfer?.runtimeId?.() || PollenTransferProtocol.runtimeId()
+            })
+        };
     }
 
     async _createFileTransferRequest(files, transfer = null) {
@@ -1453,6 +1508,15 @@ class Peer {
                 downloadedFiles.push(file);
             }
             const files = await this._decryptPayloadFiles(downloadedFiles, request);
+            if (request.pollenInstanceRelay) {
+                const proof = await PollenTransferProtocol.finalizeInstanceRelayProof({
+                    request,
+                    encryptedFiles: downloadedFiles,
+                    decryptedFiles: files,
+                    recipientRuntime: globalThis.meshdropPollenTransfer?.runtimeId?.() || PollenTransferProtocol.runtimeId()
+                });
+                Events.fire('route-proof', proof);
+            }
 
             this._filesReceived = files;
             files.forEach(file => Events.fire('file-received', file));
