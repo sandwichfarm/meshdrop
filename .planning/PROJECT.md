@@ -14,15 +14,15 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.2.0 Route Adapter Contract
+## Current Milestone: v0.3.0 Pollen Instance Relay Proof
 
-**Goal:** create the shared route descriptor, adapter, and scoring vocabulary needed before FIPS, Pollen, instance relay, native, and future transports can become data-plane adapters.
+**Goal:** make one instance-mediated backend route carry encrypted file bytes end to end, with proof that Pollen moved the data and no silent fallback took over.
 
 **Target features:**
-- Define a generic route descriptor contract that can validate route type, transport shape, session binding, trust binding, expiration, endpoint metadata, and proof requirements without changing live transport behavior.
-- Define the minimum route adapter contract and route proof terms future transport slices must satisfy before a route may claim file-transfer support.
-- Add behavior-first tests for descriptor validation, expiration, trust binding, adapter shape, and deterministic route scoring.
-- Record an ADR that separates identity/control-plane concerns from data-plane route adapters.
+- Add an instance relay path where sender browser uploads encrypted chunks to its local MeshDrop instance, that instance forwards them through Pollen, and recipient browser downloads from its own instance.
+- Preserve client-side encryption: instances may see route/session metadata and ciphertext chunk sizes, but never plaintext file bytes.
+- Emit route proof that names sender runtime, recipient runtime, route type, data-plane primitive, WebRTC use, instance relay use, bytes sent/received, hash match, and fallback status.
+- Keep the route contract from v0.2.0 as the boundary for descriptors, adapters, and proof; do not build a Pollen-only architecture that bypasses it.
 
 ## Requirements
 
@@ -41,8 +41,8 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 
 - [x] Introduce a generic route adapter contract that answers: runtime availability, safe descriptor shape, data-plane behavior, encrypted send/receive primitive, and transfer proof.
 - [ ] Fit FIPS into that adapter contract with a first-class data-plane path that transfers encrypted file bytes over FIPS and reports proof.
-- [ ] Fit Pollen into that adapter contract with descriptor, upload/download or service substrate behavior, proof, and fail-closed fallback rules.
-- [ ] Turn instance federation from discovery/signaling bridges into an encrypted file relay path under the same adapter contract.
+- [x] Fit Pollen into that adapter contract with descriptor, upload/download or service substrate behavior, proof, and fail-closed fallback rules.
+- [x] Turn instance federation from discovery/signaling bridges into an encrypted file relay path under the same adapter contract.
 - [ ] Implement WebRTC overlay relay candidates for FIPS and Pollen, or explicitly ship a differently named non-WebRTC live-transfer fallback where browser ICE cannot be constrained. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [ ] Make `ghcr.io/sandwichfarm/meshdrop` publicly readable, or otherwise prove anonymous GHCR manifest readback for the next `v0.*.*` release tag.
@@ -100,6 +100,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Discovery/signaling is not byte transport proof | FIPS/Pollen can currently discover and signal peers while browser ICE still carries bytes over direct candidates | Active relay requirement |
 | Route labels require byte-path proof | Visible controls and descriptors are not proof unless the route carried verified file bytes | ✓ Good |
 | Docker shared-instance admin is scoped to configured npub | Shared instances need server-side settings without exposing controls to every user | ✓ Good |
+| Pollen instance relay is the first backend relay slice | Existing Pollen upload/download primitives give the shortest path to prove encrypted bytes through an instance-mediated backend route before FIPS stream work | ✓ Good |
 
 ---
-*Last updated: 2026-07-07 after starting milestone v0.2.0 Route Adapter Contract.*
+*Last updated: 2026-07-07 after starting milestone v0.3.0 Pollen Instance Relay Proof.*

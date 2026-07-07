@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.2.0
-milestone_name: Route Adapter Contract
-status: planning
-last_updated: "2026-07-07T12:20:04.754Z"
+milestone: v0.3.0
+milestone_name: Pollen Instance Relay Proof
+status: verification
+last_updated: "2026-07-07T12:58:42.504Z"
 last_activity: 2026-07-07
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # GSD State
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-07)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** define and implement the route descriptor, adapter, proof, and scoring contract before adding new transport data-plane behavior.
+**Current focus:** prove one instance-mediated backend route by moving encrypted file bytes through Pollen with route proof and no silent fallback.
 
 ## Milestone Audit: 2026-07-06
 
@@ -176,7 +176,7 @@ Closed during this audit branch:
 
 ## Current Position
 
-Phase: 6 Route Contract And Test Harness
-Plan: Phase 6 route contract and test harness
-Status: Complete locally; PR/CI/merge pending
-Last activity: 2026-07-07 — Route contract implemented; focused route suite and `npm test` pass
+Phase: 7 Pollen Instance Relay Proof
+Plan: 07-01 implemented locally
+Status: Verification gates in progress
+Last activity: 2026-07-07 — Pollen instance relay implementation and browser runtime proof added

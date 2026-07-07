@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 
+import {finalizeEvent, getPublicKey} from "nostr-tools";
 import {WebSocketServer} from "ws";
 
 const repoRoot = new URL("..", import.meta.url);
@@ -16,6 +17,14 @@ const PROOF_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="6
   <rect width="64" height="64" rx="12" fill="#1b806a"/>
   <path d="M18 34 28 44 47 21" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
+const E2E_IDENTITY_KEYS = {
+    a: "0000000000000000000000000000000000000000000000000000000000000001",
+    b: "0000000000000000000000000000000000000000000000000000000000000002"
+};
+const E2E_PUBKEYS = Object.fromEntries(Object.entries(E2E_IDENTITY_KEYS).map(([name, hex]) => [
+    name,
+    getPublicKey(Uint8Array.from(Buffer.from(hex, "hex")))
+]));
 
 const helpers = [];
 
@@ -176,8 +185,8 @@ async function runVisibilityScenario(browser, baseUrl) {
 }
 
 async function runProofTransferScenario(browser, baseUrl, options) {
-    const contextA = await newContext(browser, `${options.name}-a`, {blossomServer: options.blossomServer || ""});
-    const contextB = await newContext(browser, `${options.name}-b`, {blossomServer: options.blossomServer || ""});
+    const contextA = await newContext(browser, `${options.name}-a`, {origin: baseUrl, blossomServer: options.blossomServer || ""});
+    const contextB = await newContext(browser, `${options.name}-b`, {origin: baseUrl, blossomServer: options.blossomServer || ""});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const logs = watchPages(options.name, [pageA, pageB]);
@@ -220,19 +229,23 @@ async function runProofTransferScenario(browser, baseUrl, options) {
 }
 
 async function newContext(browser, identityName, options = {}) {
+    const seededIdentity = options.signer === false
+        ? null
+        : buildSignedNostrIdentity(identityName, options.origin || "", options.blossomServer || "");
     const context = await browser.newContext({
         serviceWorkers: "block"
     });
 
-    await context.addInitScript(({name, signer, blossomServer}) => {
+    await context.addInitScript(({name, signer, identity, pubkeys}) => {
         globalThis.__meshdropDisableNostrRelayNetwork = true;
         const originalConsoleError = console.error.bind(console);
         console.error = (...args) => originalConsoleError(...args.map(arg => arg?.stack || arg));
 
-        const pubkey = name === "a" || name.endsWith("-a")
-            ? "1".repeat(64)
-            : "2".repeat(64);
-        const displayName = `npub ${pubkey.slice(0, 8)}`;
+        const pubkey = identity?.pubkey || (
+            name === "a" || name.endsWith("-a")
+                ? pubkeys.a
+                : pubkeys.b
+        );
         let counter = 0;
 
         if (signer) {
@@ -247,37 +260,21 @@ async function newContext(browser, identityName, options = {}) {
                 nip04: {
                     encrypt: async (_pubkey, plaintext) => plaintext,
                     decrypt: async (_pubkey, ciphertext) => ciphertext
+                },
+                nip44: {
+                    encrypt: async (_pubkey, plaintext) => plaintext,
+                    decrypt: async (_pubkey, ciphertext) => ciphertext
                 }
             };
 
-            localStorage.setItem("meshdrop_nostr_identity", JSON.stringify({
-                pubkey,
-                displayName,
-                picture: "",
-                relays: {read: [], write: []},
-                blossomServers: blossomServer ? [blossomServer] : [],
-                blossomServerListStatus: blossomServer ? "found" : "missing",
-                followPubkeys: ["1".repeat(64), "2".repeat(64)],
-                followListStatus: "found",
-                event: {
-                    kind: 27235,
-                    created_at: Math.floor(Date.now() / 1000),
-                    tags: [
-                        ["client", "meshdrop"],
-                        ["origin", location.origin],
-                        ["name", displayName]
-                    ],
-                    content: "MeshDrop Nostr identity",
-                    pubkey,
-                    id: `${pubkey.slice(0, 32)}${"0".repeat(32)}`,
-                    sig: "3".repeat(128)
-                }
-            }));
+            if (identity) localStorage.setItem("meshdrop_nostr_identity", JSON.stringify(identity));
         }
 
         globalThis.__meshdropE2E = {
             connected: [],
             received: [],
+            routeProofs: [],
+            pubkeys,
             configLoaded: false,
             wsConnected: false
         };
@@ -312,9 +309,49 @@ async function newContext(browser, identityName, options = {}) {
             })));
             globalThis.__meshdropE2E.received.push({peerId: event.detail.peerId, files});
         });
-    }, {name: identityName, signer: options.signer !== false, blossomServer: options.blossomServer || ""});
+
+        window.addEventListener("route-proof", event => {
+            globalThis.__meshdropE2E.routeProofs.push(event.detail);
+        });
+    }, {
+        name: identityName,
+        signer: options.signer !== false,
+        identity: seededIdentity,
+        pubkeys: E2E_PUBKEYS
+    });
 
     return context;
+}
+
+function buildSignedNostrIdentity(identityName, origin, blossomServer = "") {
+    if (!origin) return null;
+
+    const keyName = identityName === "a" || identityName.endsWith("-a") ? "a" : "b";
+    const secretKey = Uint8Array.from(Buffer.from(E2E_IDENTITY_KEYS[keyName], "hex"));
+    const pubkey = E2E_PUBKEYS[keyName];
+    const displayName = `npub ${pubkey.slice(0, 8)}`;
+    const event = finalizeEvent({
+        kind: 27235,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+            ["client", "meshdrop"],
+            ["origin", origin],
+            ["name", displayName]
+        ],
+        content: "MeshDrop Nostr identity"
+    }, secretKey);
+
+    return {
+        pubkey,
+        displayName,
+        picture: "",
+        relays: {read: [], write: []},
+        blossomServers: blossomServer ? [blossomServer] : [],
+        blossomServerListStatus: blossomServer ? "found" : "missing",
+        followPubkeys: Object.values(E2E_PUBKEYS),
+        followListStatus: "found",
+        event
+    };
 }
 
 function watchPages(name, pages) {
@@ -327,6 +364,7 @@ function watchPages(name, pages) {
             if (message.type() !== "error") return;
             const text = message.text();
             if (text.includes("RTCErrorEvent")) return;
+            if (text.includes("RTCPeerConnectionIceErrorEvent")) return;
             if (text === "rtc connection failed") return;
             const location = message.location();
             const source = location.url ? `${location.url}:${location.lineNumber}:${location.columnNumber}` : "";
@@ -354,8 +392,8 @@ async function waitForHydration(page) {
 }
 
 async function runLocalRouteChoiceTransferScenario(browser, baseUrl) {
-    const contextA = await newContext(browser, "local-route-a");
-    const contextB = await newContext(browser, "local-route-b");
+    const contextA = await newContext(browser, "local-route-a", {origin: baseUrl});
+    const contextB = await newContext(browser, "local-route-b", {origin: baseUrl});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const logs = watchPages("local-route", [pageA, pageB]);
@@ -414,8 +452,8 @@ async function runGenericFipsRouteCandidateScenario(browser, relayPort, blossomP
     });
     helpers.push(appA, appB);
 
-    const contextA = await newContext(browser, "fed-a");
-    const contextB = await newContext(browser, "fed-b");
+    const contextA = await newContext(browser, "fed-a", {origin: `http://127.0.0.1:${portA}`});
+    const contextB = await newContext(browser, "fed-b", {origin: `http://127.0.0.1:${portB}`});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const logs = watchPages("generic-fips", [pageA, pageB]);
@@ -466,8 +504,8 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
     });
     helpers.push(appA, appB);
 
-    const contextA = await newContext(browser, "fed-pollen-a");
-    const contextB = await newContext(browser, "fed-pollen-b");
+    const contextA = await newContext(browser, "fed-pollen-a", {origin: `http://127.0.0.1:${portA}`});
+    const contextB = await newContext(browser, "fed-pollen-b", {origin: `http://127.0.0.1:${portB}`});
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
     const logs = watchPages("federated-pollen", [pageA, pageB]);
@@ -511,8 +549,27 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
             fileName: "meshdrop-proof-icon.svg",
             contents: [PROOF_ICON]
         }, received);
+
+        const priorReceived = await pageB.evaluate(() => globalThis.__meshdropE2E.received.length);
+        const priorProofs = await pageB.evaluate(() => globalThis.__meshdropE2E.routeProofs.length);
+        await sendPrivatePollenProofIcon(pageA, peerId);
+        const relayed = await waitForReceivedFilesAfter(pageB, priorReceived, 1, "federated-pollen-instance-relay", [pageA, pageB]);
+        const relayProof = await waitForRouteProofAfter(pageB, priorProofs, "federated-pollen-instance-relay", [pageA, pageB]);
+        assertReceived({
+            name: "federated-pollen-instance-relay",
+            fileName: "meshdrop-proof-icon.svg",
+            contents: [PROOF_ICON]
+        }, relayed);
+        assert(relayProof.routeType === "pollen", `unexpected route type ${relayProof.routeType}`);
+        assert(relayProof.dataPlanePrimitive === "pollen-object-store", `unexpected primitive ${relayProof.dataPlanePrimitive}`);
+        assert(relayProof.webRtcUsed === false, "relay proof used WebRTC byte path");
+        assert(relayProof.instanceRelayed === true, "relay proof did not mark instance relay");
+        assert(relayProof.bytesSent === relayProof.bytesReceived, "relay proof byte counts differ");
+        assert(relayProof.hashMatched === true, "relay proof hash check failed");
+        assert(relayProof.fallbackUsed === false, "relay proof used fallback");
         assert(!logs.pageErrors.length, `federated-pollen: page errors: ${logs.pageErrors.join("\n")}`);
         console.log("Proof federated-pollen-signaled-webrtc: Pollen discovery/signaling delivered meshdrop-proof-icon.svg across two MeshDrop servers using browser ICE data path");
+        console.log(`Proof federated-pollen-instance-relay: Pollen object relay delivered encrypted bytes across two MeshDrop servers with proof=${JSON.stringify(relayProof)}`);
     }
     finally {
         await Promise.allSettled([contextA.close(), contextB.close(), appA.close(), appB.close()]);
@@ -553,7 +610,7 @@ async function setProtocolServers(page, serverUrl) {
 async function setFollowList(page) {
     await page.evaluate(() => {
         const identity = globalThis.meshdropNostrIdentity.getIdentity();
-        identity.followPubkeys = ["1".repeat(64), "2".repeat(64)];
+        identity.followPubkeys = Object.values(globalThis.__meshdropE2E?.pubkeys || {});
         identity.followListStatus = "found";
     });
 }
@@ -683,8 +740,14 @@ async function debugPageState(page) {
             signalingState: peer._conn?.signalingState || "",
             iceConnectionState: peer._conn?.iceConnectionState || "",
             connectionState: peer._conn?.connectionState || "",
-            signalSessionId: peer._signalSessionId || ""
+            signalSessionId: peer._signalSessionId || "",
+            nostrIdentity: peer.nostrIdentity || null
         })),
+        receivedCount: globalThis.__meshdropE2E.received.length,
+        routeProofCount: globalThis.__meshdropE2E.routeProofs.length,
+        lastPollenRequest: globalThis.__meshdropE2E.lastPollenRequest || null,
+        canNip44: globalThis.meshdropNostrIdentity?.canNip44?.() || false,
+        localNostrPubkey: globalThis.meshdropNostrIdentity?.getIdentity?.()?.pubkey || "",
         nostrActive: globalThis.meshdropNostrMesh?._active,
         relaySockets: globalThis.meshdropNostrMesh?._sockets?.size
     }));
@@ -724,6 +787,43 @@ async function sendProofIcon(page, peerId, transportId) {
     });
 }
 
+async function sendPrivatePollenProofIcon(page, peerId) {
+    await page.evaluate(async ({to, icon}) => {
+        const peer = globalThis.__meshdropE2E?.peersManager?.peers?.[to];
+        if (!peer) throw new Error(`Missing peer ${to}`);
+        if (!peer.__meshdropE2EWrappedPollenSend) {
+            const sendJSON = peer.sendJSON.bind(peer);
+            peer.sendJSON = message => {
+                if (message?.type === "pollen-request") {
+                    globalThis.__meshdropE2E.lastPollenRequest = {
+                        privacy: message.payloadPrivacy?.mode || "",
+                        hasRelay: !!message.pollenInstanceRelay,
+                        keyDeliveryType: message.payloadEncryption?.keyDelivery?.type || "",
+                        keyDeliverySender: message.payloadEncryption?.keyDelivery?.senderPubkey || "",
+                        keyDeliveryRecipient: message.payloadEncryption?.keyDelivery?.recipientPubkey || "",
+                        routeType: message.pollenInstanceRelay?.descriptor?.routeType || "",
+                        transportShape: message.pollenInstanceRelay?.descriptor?.transportShape || "",
+                        rooms: message.pollenInstanceRelay?.descriptor?.endpoint?.rooms || []
+                    };
+                }
+                return sendJSON(message);
+            };
+            peer.__meshdropE2EWrappedPollenSend = true;
+        }
+
+        const file = new File([icon], "meshdrop-proof-icon.svg", {type: "image/svg+xml"});
+        await peer.requestPollenFileTransfer([file], {
+            id: "pollen",
+            type: "storage",
+            label: "Pollen",
+            privacyMode: "private"
+        });
+    }, {
+        to: peerId,
+        icon: PROOF_ICON
+    });
+}
+
 async function waitForReceivedFiles(page, expectedCount, name = "transfer", debugPages = [page]) {
     let handle;
     try {
@@ -735,6 +835,38 @@ async function waitForReceivedFiles(page, expectedCount, name = "transfer", debu
     } catch (error) {
         const states = await Promise.all(debugPages.map(safeDebugPageState));
         throw new Error(`${name}: ${error.message}\nstates=${JSON.stringify(states)}`);
+    }
+
+    return handle.jsonValue();
+}
+
+async function waitForReceivedFilesAfter(page, previousCount, expectedCount, name = "transfer", debugPages = [page]) {
+    let handle;
+    try {
+        handle = await page.waitForFunction(({previous, count}) => {
+            if (globalThis.__meshdropE2E.received.length <= previous) return null;
+            const batch = globalThis.__meshdropE2E.received.at(-1);
+            if (!batch || batch.files.length !== count) return null;
+            return batch.files;
+        }, {previous: previousCount, count: expectedCount}, {timeout: 45000});
+    } catch (error) {
+        const states = await Promise.all(debugPages.map(safeDebugPageState));
+        throw new Error(`${name}: ${error.message}\nstates=${JSON.stringify(states)}`);
+    }
+
+    return handle.jsonValue();
+}
+
+async function waitForRouteProofAfter(page, previousCount, name = "transfer", debugPages = [page]) {
+    let handle;
+    try {
+        handle = await page.waitForFunction(previous => {
+            if (globalThis.__meshdropE2E.routeProofs.length <= previous) return null;
+            return globalThis.__meshdropE2E.routeProofs.at(-1);
+        }, previousCount, {timeout: 45000});
+    } catch (error) {
+        const states = await Promise.all(debugPages.map(safeDebugPageState));
+        throw new Error(`${name}: route proof missing: ${error.message}\nstates=${JSON.stringify(states)}`);
     }
 
     return handle.jsonValue();
@@ -796,7 +928,9 @@ function startApp(port, relayPort, blossomPort, fipsPort, pollen, options = {}) 
     child.stdout.on("data", chunk => {
         if (process.env.MESHDROP_E2E_LOGS) process.stdout.write(chunk);
     });
-    child.stderr.on("data", chunk => process.stderr.write(chunk));
+    child.stderr.on("data", chunk => {
+        if (process.env.MESHDROP_E2E_LOGS) process.stderr.write(chunk);
+    });
 
     return {
         async close() {
