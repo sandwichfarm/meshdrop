@@ -42,6 +42,7 @@
     "test:ios-device-app": "node scripts/ios-device-app-package-smoke.mjs",
     "test:ios-signed-device": "node scripts/ios-signed-device-uat.mjs",
     "test:external-uat": "node scripts/external-uat-finishline.mjs",
+    "status:external-uat": "node scripts/external-uat-finishline.mjs --status",
     "test:desktop-native": "node scripts/desktop-native-runtime-smoke.mjs",
     "test:desktop-chromium": "node scripts/desktop-chromium-shell-smoke.mjs",
     "test:desktop-chromium-bundled": "node scripts/desktop-chromium-bundled-smoke.mjs",
