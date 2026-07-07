@@ -5,11 +5,13 @@ import {readFile} from "node:fs/promises";
 test("Nostr discovery tooltips do not describe relay signaling as the payload transport", async () => {
     const locale = JSON.parse(await readFile(new URL("../public/lang/en.json", import.meta.url), "utf8"));
 
-    assert.equal(locale.header["nostr-mesh-connect_title"], "Use Nostr to discover direct clearnet WebRTC peers");
-    assert.equal(locale.header["nostr-mesh-disconnect_title"], "Stop direct Nostr-signaled clearnet routing");
+    assert.equal(locale.header["nostr-mesh-connect_title"], "Use Nostr discovery and signaling");
+    assert.equal(locale.header["nostr-mesh-disconnect_title"], "Stop Nostr discovery signaling");
     assert.equal(locale.footer["webrtc-discovery"], "Nostr signal");
     assert.match(locale.footer["webrtc-discovery_title"], /Nostr is discovery and signaling/);
-    assert.match(locale.footer["webrtc-discovery_title"], /direct clearnet WebRTC/);
+    assert.match(locale.footer["webrtc-discovery_title"], /without turning off Nostr discovery/);
+    assert.match(locale.footer["fips-discovery_title"], /unless a FIPS relay candidate exists/);
+    assert.match(locale.footer["pollen-discovery_title"], /unless a Pollen relay candidate exists/);
 });
 
 test("header protocol toggles are grouped without visible text labels", async () => {

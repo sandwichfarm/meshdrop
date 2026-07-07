@@ -13,10 +13,25 @@ const LocalDiscoveryProtocol = {
         storage?.setItem?.(this.storageKey, enabled ? "true" : "false");
     },
 
-    enabledFromConfig(config) {
+    localDiscoverySupportedFromConfig(config) {
         return globalThis.RuntimeCapabilities
             ? globalThis.RuntimeCapabilities.transportSupported(config, "localDiscovery", true)
             : true;
+    },
+
+    nostrClearnetRouteSupportedFromConfig(config) {
+        if (!globalThis.RuntimeCapabilities) return true;
+        return globalThis.RuntimeCapabilities.transportSupported(config, "nostr", true)
+            && globalThis.RuntimeCapabilities.transportSupported(config, "webrtc", true);
+    },
+
+    clearnetRouteSupportedFromConfig(config) {
+        return this.localDiscoverySupportedFromConfig(config)
+            || this.nostrClearnetRouteSupportedFromConfig(config);
+    },
+
+    enabledFromConfig(config) {
+        return this.localDiscoverySupportedFromConfig(config);
     },
 
     allowsRoomType(roomType, storage = globalThis.localStorage) {
@@ -32,7 +47,8 @@ class LocalDiscoveryController {
     constructor() {
         this.$button = $("local-discovery");
         this._enabled = LocalDiscoveryProtocol.readEnabled();
-        this._supported = true;
+        this._localDiscoverySupported = true;
+        this._routeSupported = true;
         this._joined = false;
 
         if (this.$button) {
@@ -54,7 +70,11 @@ class LocalDiscoveryController {
     }
 
     isEnabled() {
-        return this._supported && this._enabled;
+        return this._routeSupported && this._enabled;
+    }
+
+    localDiscoveryEnabled() {
+        return this._localDiscoverySupported && this._enabled;
     }
 
     toggle() {
@@ -77,7 +97,7 @@ class LocalDiscoveryController {
     }
 
     join() {
-        if (!this.isEnabled() || this._joined) return;
+        if (!this.localDiscoveryEnabled() || this._joined) return;
         this._joined = true;
         Events.fire("join-ip-room");
     }
@@ -88,26 +108,27 @@ class LocalDiscoveryController {
     }
 
     _onServerReady() {
-        if (!this.isEnabled()) return;
+        if (!this.localDiscoveryEnabled()) return;
         this.join();
     }
 
     _onConfig(config) {
-        const wasSupported = this._supported;
-        this._supported = LocalDiscoveryProtocol.enabledFromConfig(config);
-        if (wasSupported && !this._supported) this.leave();
+        const wasLocalDiscoverySupported = this._localDiscoverySupported;
+        this._localDiscoverySupported = LocalDiscoveryProtocol.localDiscoverySupportedFromConfig(config);
+        this._routeSupported = LocalDiscoveryProtocol.clearnetRouteSupportedFromConfig(config);
+        if (wasLocalDiscoverySupported && !this._localDiscoverySupported) this.leave();
         this._render();
     }
 
     _render() {
         if (!this.$button) return;
 
-        const userCount = globalThis.meshdropPeerAvailabilityCounts?.ip;
-        this.$button.toggleAttribute("hidden", !this._supported);
+        const userCount = this._clearnetPeerCount();
+        this.$button.toggleAttribute("hidden", !this._routeSupported);
         this.$button.classList.toggle("selected", this.isEnabled());
         this.$button.setAttribute("aria-pressed", String(this.isEnabled()));
         this.$button.title = this.isEnabled()
-            ? "Clearnet routes enabled. Auto selection may use same-instance or direct Nostr-signaled WebRTC."
+            ? "Clearnet file routes enabled. Auto selection may use same-instance or direct Nostr-signaled WebRTC when available."
             : "Clearnet routes disabled. Nostr discovery stays available; file sharing skips same-instance and direct Nostr-signaled WebRTC.";
         if (this.isEnabled()) {
             this.$button.setAttribute("data-badge", String(typeof userCount === "number" ? userCount : 0));
@@ -115,6 +136,11 @@ class LocalDiscoveryController {
             this.$button.removeAttribute("data-badge");
         }
         Events.fire("footer-discovery-changed");
+    }
+
+    _clearnetPeerCount() {
+        const counts = globalThis.meshdropPeerAvailabilityCounts || {};
+        return (Number(counts.ip) || 0) + (Number(counts.nostr) || 0);
     }
 }
 

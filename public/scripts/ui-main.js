@@ -279,7 +279,9 @@ class FooterUI {
 
     _discoveryState() {
         return {
-            local: globalThis.meshdropLocalDiscovery?.isEnabled?.() ?? true,
+            local: globalThis.meshdropLocalDiscovery?.localDiscoveryEnabled?.()
+                ?? globalThis.meshdropLocalDiscovery?.isEnabled?.()
+                ?? true,
             webrtc: !!globalThis.meshdropNostrMesh?._active,
             fips: !!globalThis.meshdropFipsDiscovery?.isActive?.(),
             pollen: !!globalThis.meshdropPollenTransfer?.isActive?.(),
