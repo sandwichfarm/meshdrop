@@ -67,24 +67,50 @@ const ClearnetRoutePolicy = {
 
 globalThis.ClearnetRoutePolicy = ClearnetRoutePolicy;
 
-const OverlayRelayPolicy = {
+const OverlayIceBridgePolicy = {
     roomTypes: new Set(["fips", "pollen"]),
 
     applies(roomType) {
         return this.roomTypes.has(roomType);
     },
 
-    relayIceSupported(config, roomType) {
+    iceBridgeSupported(config, roomType, routeMetadata = null) {
         if (!this.applies(roomType)) return true;
-        if (globalThis.RuntimeCapabilities?.relayIceSupported) {
-            return globalThis.RuntimeCapabilities.relayIceSupported(config, roomType);
+        const iceBridge = routeMetadata?.iceBridge || routeMetadata?.relayIce || null;
+        if (globalThis.RuntimeCapabilities?.iceBridgeSupported) {
+            return globalThis.RuntimeCapabilities.iceBridgeSupported(config, roomType, iceBridge);
         }
-        const relayIce = config?.capabilities?.transports?.[roomType]?.relayIce;
-        return relayIce?.supported === true && Array.isArray(relayIce.rtcConfig?.iceServers);
+        const fallbackIceBridge = iceBridge || config?.capabilities?.transports?.[roomType]?.relayIce;
+        return fallbackIceBridge?.supported === true && Array.isArray(fallbackIceBridge.rtcConfig?.iceServers);
+    },
+
+    iceBridgeConfig(config, roomType, routeMetadata = null) {
+        const iceBridge = routeMetadata?.iceBridge || routeMetadata?.relayIce || null;
+        if (globalThis.RuntimeCapabilities?.iceBridgeConfig) {
+            return globalThis.RuntimeCapabilities.iceBridgeConfig(config, roomType, iceBridge);
+        }
+        return iceBridge?.rtcConfig || config?.capabilities?.transports?.[roomType]?.relayIce?.rtcConfig || null;
+    },
+
+    routeSelectionReason(roomType, fallbackReason, routeMetadata = null) {
+        const iceBridge = routeMetadata?.iceBridge || routeMetadata?.relayIce;
+        if (this.applies(roomType) && iceBridge?.source === "instance") {
+            return "instance-ice-bridge";
+        }
+        return fallbackReason;
+    },
+
+    relayIceSupported(config, roomType, routeMetadata = null) {
+        return this.iceBridgeSupported(config, roomType, routeMetadata);
+    },
+
+    relayIceConfig(config, roomType, routeMetadata = null) {
+        return this.iceBridgeConfig(config, roomType, routeMetadata);
     }
 };
 
-globalThis.OverlayRelayPolicy = OverlayRelayPolicy;
+globalThis.OverlayIceBridgePolicy = OverlayIceBridgePolicy;
+globalThis.OverlayRelayPolicy = OverlayIceBridgePolicy;
 
 const ServerConnectionIdentityProtocol = {
     key(identity = null) {
@@ -589,6 +615,7 @@ class Peer {
 
         this._roomIds = {};
         this._peerIdsByRoomType = {};
+        this._routeMetadataByRoomType = {};
         this._updateRoomIds(roomType, roomId, peerId);
 
         this._filesQueue = [];
@@ -665,6 +692,7 @@ class Peer {
     _removeRoomType(roomType) {
         delete this._roomIds[roomType];
         delete this._peerIdsByRoomType?.[roomType];
+        delete this._routeMetadataByRoomType?.[roomType];
 
         Events.fire('room-type-removed', {
             peerId: this._peerId,
@@ -1613,8 +1641,9 @@ class Peer {
 
 class RTCPeer extends Peer {
 
-    constructor(serverConnection, isCaller, peerId, roomType, roomId, rtcConfig) {
+    constructor(serverConnection, isCaller, peerId, roomType, roomId, rtcConfig, routeMetadata = null) {
         super(serverConnection, isCaller, peerId, roomType, roomId);
+        if (routeMetadata) this._routeMetadataByRoomType[roomType] = routeMetadata;
 
         this.rtcSupported = true;
         this.rtcConfig = rtcConfig
@@ -1994,7 +2023,7 @@ class RTCPeer extends Peer {
         return this._channel && this._channel.readyState === 'connecting';
     }
 
-    switchSignalingRoute(isCaller, roomType, roomId, transport, routePeerId = null, rtcConfig = null) {
+    switchSignalingRoute(isCaller, roomType, roomId, transport, routePeerId = null, rtcConfig = null, routeMetadata = null) {
         this._clearRouteAttemptTimeout();
         this._intentionalDisconnect = true;
         if (this._channel) {
@@ -2017,6 +2046,12 @@ class RTCPeer extends Peer {
             ...this._peerIdsByRoomType,
             [roomType]: routePeerId || this._routePeerId(roomType)
         };
+        if (routeMetadata) {
+            this._routeMetadataByRoomType = {
+                ...this._routeMetadataByRoomType,
+                [roomType]: routeMetadata
+            };
+        }
 
         this._routeStatus(this._isCaller ? "selected" : "waiting", "route-switch");
         if (this._isCaller) this._connect();
@@ -2035,6 +2070,11 @@ class RTCPeer extends Peer {
             roomId: this._roomIds[route] || "",
             routePeerId: this._routePeerId(route),
             routes: this._getRoomTypes(),
+            iceBridgeSource: (
+                this._routeMetadataByRoomType?.[route]?.iceBridge?.source
+                || this._routeMetadataByRoomType?.[route]?.relayIce?.source
+                || ""
+            ),
             state,
             reason,
             isCaller: this._isCaller,
@@ -2183,11 +2223,17 @@ class PeersManager {
         this.peers[peerId].onServerMessage(message);
     }
 
-    _refreshPeer(peerId, roomType, roomId, peerInfo = null, routePeerId = peerId) {
+    _refreshPeer(peerId, roomType, roomId, peerInfo = null, routePeerId = peerId, routeMetadata = null) {
         if (!this._peerExists(peerId)) return false;
 
         const peer = this.peers[peerId];
         this._applyPeerInfo(peer, peerInfo);
+        if (routeMetadata) {
+            peer._routeMetadataByRoomType = {
+                ...peer._routeMetadataByRoomType,
+                [roomType]: routeMetadata
+            };
+        }
         const currentPrimaryRoomType = SignalingRoomPriority.primary(peer._roomIds);
         const roomTypesDiffer = currentPrimaryRoomType !== roomType;
         const roomIdsDiffer = peer._roomIds[roomType] !== roomId;
@@ -2230,6 +2276,12 @@ class PeersManager {
                 ...peerInfo._pendingPrivateRouteRequests
             };
         }
+        if (peerInfo._routeMetadataByRoomType) {
+            peer._routeMetadataByRoomType = {
+                ...peer._routeMetadataByRoomType,
+                ...peerInfo._routeMetadataByRoomType
+            };
+        }
         if (peerInfo.sessionPeerId) peer.sessionPeerId = peerInfo.sessionPeerId;
         return peer;
     }
@@ -2247,7 +2299,8 @@ class PeersManager {
         const canonicalPeerId = this._canonicalPeerId(peerId, policyPeer, roomType);
         this._rememberPeerAliases(canonicalPeerId, policyPeer, peerId);
 
-        const blockedReason = this._routeSelectionBlockedReason(roomType);
+        const routeMetadata = this._routeMetadataFor(roomType, roomId, policyPeer);
+        const blockedReason = this._routeSelectionBlockedReason(roomType, routeMetadata);
         if (blockedReason === "route-policy") {
             this._requestPrivateRouteFromDisallowedDiscovery(canonicalPeerId, isCaller, peerId, roomType, transport, policyPeer);
             return;
@@ -2256,6 +2309,7 @@ class PeersManager {
             this._traceRoute("route candidate disabled", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, `reason=${blockedReason}`);
             this._emitRouteStatus(canonicalPeerId, roomType, "disabled", blockedReason, {
                 routePeerId: peerId,
+                routeMetadata,
                 routes: this.peers[canonicalPeerId]?._getRoomTypes?.() || []
             });
             return;
@@ -2268,13 +2322,13 @@ class PeersManager {
                 : null;
             if (pendingInfo) {
                 delete this.peers[canonicalPeerId];
-                if (this._startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, pendingInfo, "private-route")) {
+                if (this._startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, pendingInfo, "private-route", routeMetadata)) {
                     return;
                 }
                 this.peers[canonicalPeerId] = peer;
             }
 
-            this._rememberPeerRoute(peer, isCaller, roomType, transport || this._server, peerId);
+            this._rememberPeerRoute(peer, isCaller, roomType, transport || this._server, peerId, routeMetadata);
             const currentRoomType = SignalingRoomPriority.primary(peer._roomIds);
             const connected = peer._isConnected?.() === true;
             const awaitingPrivateRoute = peer._pendingPrivateRouteRequests?.[roomType] === true;
@@ -2290,34 +2344,38 @@ class PeersManager {
                 `connected=${connected}`,
                 `selected=${preferNewRoute}`
             );
-            this._refreshPeer(canonicalPeerId, roomType, roomId, policyPeer, peerId);
+            this._refreshPeer(canonicalPeerId, roomType, roomId, policyPeer, peerId, routeMetadata);
             if (preferNewRoute && peer.switchSignalingRoute) {
-                this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, "reason=priority");
-                this._emitRouteStatus(canonicalPeerId, roomType, "selected", "priority", {
+                const reason = OverlayIceBridgePolicy.routeSelectionReason(roomType, "priority", routeMetadata);
+                this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, `reason=${reason}`);
+                this._emitRouteStatus(canonicalPeerId, roomType, "selected", reason, {
                     routePeerId: peerId,
+                    routeMetadata,
                     routes: peer._getRoomTypes()
                 });
                 if (peer._pendingPrivateRouteRequests) delete peer._pendingPrivateRouteRequests[roomType];
-                peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server, peerId, this._rtcConfigForRoute(roomType));
+                peer.switchSignalingRoute(isCaller, roomType, roomId, transport || this._server, peerId, this._rtcConfigForRoute(roomType, routeMetadata), routeMetadata);
             }
             return;
         }
 
-        this._startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer, "initial");
+        this._startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer, "initial", routeMetadata);
     }
 
-    _startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer = null, reason = "initial") {
+    _startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer = null, reason = "initial", routeMetadata = null) {
         if (window.isRtcSupported && rtcSupported) {
+            reason = OverlayIceBridgePolicy.routeSelectionReason(roomType, reason, routeMetadata);
             this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, `reason=${reason}`);
-            this.peers[canonicalPeerId] = new RTCPeer(transport, isCaller, canonicalPeerId, roomType, roomId, this._rtcConfigForRoute(roomType));
+            this.peers[canonicalPeerId] = new RTCPeer(transport, isCaller, canonicalPeerId, roomType, roomId, this._rtcConfigForRoute(roomType, routeMetadata), routeMetadata);
             this._applyPeerInfo(this.peers[canonicalPeerId], policyPeer);
-            this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, transport || this._server, peerId);
+            this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, transport || this._server, peerId, routeMetadata);
             if (this.peers[canonicalPeerId]._pendingPrivateRouteRequests) {
                 delete this.peers[canonicalPeerId]._pendingPrivateRouteRequests[roomType];
             }
             delete this.peers[canonicalPeerId]._pendingPrivateRouteSeed;
             this._emitRouteStatus(canonicalPeerId, roomType, "selected", reason, {
                 routePeerId: peerId,
+                routeMetadata,
                 routes: this.peers[canonicalPeerId]._getRoomTypes()
             });
             return true;
@@ -2326,13 +2384,14 @@ class PeersManager {
             this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, "reason=websocket-fallback");
             this.peers[canonicalPeerId] = new WSPeer(this._server, isCaller, canonicalPeerId, roomType, roomId);
             this._applyPeerInfo(this.peers[canonicalPeerId], policyPeer);
-            this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, this._server, peerId);
+            this._rememberPeerRoute(this.peers[canonicalPeerId], isCaller, roomType, this._server, peerId, routeMetadata);
             if (this.peers[canonicalPeerId]._pendingPrivateRouteRequests) {
                 delete this.peers[canonicalPeerId]._pendingPrivateRouteRequests[roomType];
             }
             delete this.peers[canonicalPeerId]._pendingPrivateRouteSeed;
             this._emitRouteStatus(canonicalPeerId, roomType, "selected", "websocket-fallback", {
                 routePeerId: peerId,
+                routeMetadata,
                 routes: this.peers[canonicalPeerId]._getRoomTypes()
             });
             return true;
@@ -2372,6 +2431,7 @@ class PeersManager {
             _roomIds: {},
             _transportsByRoomType: {},
             _peerIdsByRoomType: {},
+            _routeMetadataByRoomType: {},
             _isCallerByRoomType: {},
             _pendingPrivateRouteRequests: {},
             _pendingPrivateRouteSeed: true,
@@ -2382,6 +2442,7 @@ class PeersManager {
             _removeRoomType(roomType) {
                 delete this._roomIds[roomType];
                 delete this._peerIdsByRoomType?.[roomType];
+                delete this._routeMetadataByRoomType?.[roomType];
             },
             _routePeerId(roomType) {
                 return this._peerIdsByRoomType?.[roomType] || this._peerId;
@@ -2402,6 +2463,9 @@ class PeersManager {
             ])],
             _pendingPrivateRouteRequests: {
                 ...peer._pendingPrivateRouteRequests
+            },
+            _routeMetadataByRoomType: {
+                ...peer._routeMetadataByRoomType
             }
         };
     }
@@ -2533,6 +2597,7 @@ class PeersManager {
             peer._removeRoomType(failedRoomType);
             delete peer._transportsByRoomType?.[failedRoomType];
             delete peer._isCallerByRoomType?.[failedRoomType];
+            delete peer._routeMetadataByRoomType?.[failedRoomType];
             this._traceRoute(
                 "route failed",
                 `peer=${peerId}`,
@@ -2589,6 +2654,7 @@ class PeersManager {
         peer._removeRoomType(failedRoomType);
         delete peer._transportsByRoomType?.[failedRoomType];
         delete peer._isCallerByRoomType?.[failedRoomType];
+        delete peer._routeMetadataByRoomType?.[failedRoomType];
         this._dropDisallowedRoutes(peerId, peer);
 
         const nextRoomType = SignalingRoomPriority.primary(peer._roomIds);
@@ -2602,6 +2668,8 @@ class PeersManager {
         const nextTransport = peer._transportsByRoomType?.[nextRoomType] || this._server;
         const nextIsCaller = peer._isCallerByRoomType?.[nextRoomType] ?? peer._isCaller;
         const nextRoutePeerId = routePeerIdFor(nextRoomType);
+        const nextRouteMetadata = peer._routeMetadataByRoomType?.[nextRoomType]
+            || this._routeMetadataFor(nextRoomType, nextRoomId, peer);
         this._traceRoute(
             "route failed",
             `peer=${peerId}`,
@@ -2613,12 +2681,14 @@ class PeersManager {
             roomId: failedRoomId,
             routes: peer._getRoomTypes()
         });
-        this._traceRoute("selected route", `peer=${peerId}`, `route=${nextRoomType}`, `target=${nextRoutePeerId}`, "reason=fallback");
-        this._emitRouteStatus(peerId, nextRoomType, "selected", "fallback", {
+        const reason = OverlayIceBridgePolicy.routeSelectionReason(nextRoomType, "fallback", nextRouteMetadata);
+        this._traceRoute("selected route", `peer=${peerId}`, `route=${nextRoomType}`, `target=${nextRoutePeerId}`, `reason=${reason}`);
+        this._emitRouteStatus(peerId, nextRoomType, "selected", reason, {
             routePeerId: nextRoutePeerId,
+            routeMetadata: nextRouteMetadata,
             routes: peer._getRoomTypes()
         });
-        peer.switchSignalingRoute(nextIsCaller, nextRoomType, nextRoomId, nextTransport, nextRoutePeerId, this._rtcConfigForRoute(nextRoomType));
+        peer.switchSignalingRoute(nextIsCaller, nextRoomType, nextRoomId, nextTransport, nextRoutePeerId, this._rtcConfigForRoute(nextRoomType, nextRouteMetadata), nextRouteMetadata);
         return true;
     }
 
@@ -2659,44 +2729,46 @@ class PeersManager {
         return "route-policy";
     }
 
-    _routeSelectionBlockedReason(roomType) {
+    _routeSelectionBlockedReason(roomType, routeMetadata = null) {
         if (!this._routeRuntimeSupported(roomType)) return this._routeRuntimeBlockedReason(roomType);
         if (!this._routeAllowed(roomType)) return "route-policy";
-        if (!this._overlayRelayRequired(roomType)) return "";
-        if (OverlayRelayPolicy.relayIceSupported(this._config, roomType)) return "";
-        return "overlay-relay-unavailable";
+        if (!this._overlayBridgeRequired(roomType)) return "";
+        if (OverlayIceBridgePolicy.iceBridgeSupported(this._config, roomType, routeMetadata)) return "";
+        return "overlay-bridge-unavailable";
     }
 
-    _overlayRelayRequired(roomType) {
-        return OverlayRelayPolicy.applies(roomType) && !ClearnetRoutePolicy.allows("nostr");
+    _overlayBridgeRequired(roomType) {
+        return OverlayIceBridgePolicy.applies(roomType) && !ClearnetRoutePolicy.allows("nostr");
     }
 
-    _rtcConfigForRoute(roomType) {
+    _rtcConfigForRoute(roomType, routeMetadata = null) {
         const rtcConfig = this._wsConfig?.rtcConfig || {};
-        if (!this._overlayRelayRequired(roomType) || !OverlayRelayPolicy.relayIceSupported(this._config, roomType)) {
+        if (!this._overlayBridgeRequired(roomType) || !OverlayIceBridgePolicy.iceBridgeSupported(this._config, roomType, routeMetadata)) {
             return rtcConfig;
         }
 
-        const relayRtcConfig = globalThis.RuntimeCapabilities?.relayIceConfig?.(this._config, roomType)
-            || this._config?.capabilities?.transports?.[roomType]?.relayIce?.rtcConfig
+        const bridgeRtcConfig = OverlayIceBridgePolicy.iceBridgeConfig(this._config, roomType, routeMetadata)
             || {};
         return {
             ...rtcConfig,
-            ...relayRtcConfig,
+            ...bridgeRtcConfig,
             iceTransportPolicy: "relay"
         };
     }
 
     _dropDisallowedRoutes(peerId, peer) {
         for (const roomType of peer._getRoomTypes()) {
-            const blockedReason = this._routeSelectionBlockedReason(roomType);
+            const routeMetadata = peer._routeMetadataByRoomType?.[roomType];
+            const blockedReason = this._routeSelectionBlockedReason(roomType, routeMetadata);
             if (!blockedReason) continue;
             const routePeerId = peer._peerIdsByRoomType?.[roomType] || peer._peerId || peerId;
             peer._removeRoomType(roomType);
             delete peer._transportsByRoomType?.[roomType];
             delete peer._isCallerByRoomType?.[roomType];
+            delete peer._routeMetadataByRoomType?.[roomType];
             this._emitRouteStatus(peerId, roomType, "disabled", blockedReason, {
                 routePeerId,
+                routeMetadata,
                 routes: peer._getRoomTypes()
             });
         }
@@ -2844,7 +2916,22 @@ class PeersManager {
         });
     }
 
-    _rememberPeerRoute(peer, isCaller, roomType, transport, routePeerId = peer?._peerId) {
+    _routeMetadataFor(roomType, roomId, peerInfo = null) {
+        const routeMetadata = peerInfo?._routeMetadataByRoomType?.[roomType]
+            || peerInfo?.routeMetadata
+            || peerInfo?.routeDescriptor;
+        if (routeMetadata?.routeType === roomType || routeMetadata?.iceBridge || routeMetadata?.relayIce) {
+            return routeMetadata;
+        }
+
+        const controller = {
+            fips: globalThis.meshdropFipsDiscovery,
+            pollen: globalThis.meshdropPollenTransfer
+        }[roomType];
+        return controller?.routeMetadataForRoom?.(roomId) || null;
+    }
+
+    _rememberPeerRoute(peer, isCaller, roomType, transport, routePeerId = peer?._peerId, routeMetadata = null) {
         if (!peer || !roomType) return;
 
         if (routePeerId) {
@@ -2861,6 +2948,12 @@ class PeersManager {
             ...peer._isCallerByRoomType,
             [roomType]: !!isCaller
         };
+        if (routeMetadata) {
+            peer._routeMetadataByRoomType = {
+                ...peer._routeMetadataByRoomType,
+                [roomType]: routeMetadata
+            };
+        }
     }
 
     _forgetPeerAliases(peerId) {

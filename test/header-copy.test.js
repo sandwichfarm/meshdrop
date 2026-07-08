@@ -10,8 +10,8 @@ test("Nostr discovery tooltips do not describe relay signaling as the payload tr
     assert.equal(locale.footer["webrtc-discovery"], "Nostr signal");
     assert.match(locale.footer["webrtc-discovery_title"], /Nostr is discovery and signaling/);
     assert.match(locale.footer["webrtc-discovery_title"], /without turning off Nostr discovery/);
-    assert.match(locale.footer["fips-discovery_title"], /unless a FIPS relay candidate exists/);
-    assert.match(locale.footer["pollen-discovery_title"], /unless a Pollen relay candidate exists/);
+    assert.match(locale.footer["fips-discovery_title"], /unless a FIPS ICE bridge descriptor exists/);
+    assert.match(locale.footer["pollen-discovery_title"], /unless a Pollen ICE bridge descriptor exists/);
 });
 
 test("header protocol toggles are grouped without visible text labels", async () => {

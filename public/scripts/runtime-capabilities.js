@@ -78,6 +78,7 @@ const RuntimeCapabilities = {
                         room: "",
                         maxUploadBytes: 0,
                         unavailableReason: this.backendOnlyUnavailableReason(staticTransports.pollen),
+                        iceBridge: this.iceBridgeCapability("pollen", staticTransports.pollen, targetManifest),
                         relayIce: this.relayIceCapability("pollen", staticTransports.pollen, targetManifest)
                     },
                     fips: {
@@ -90,6 +91,7 @@ const RuntimeCapabilities = {
                             primitive: "fips-http-stream",
                             maxUploadBytes: 0
                         },
+                        iceBridge: this.iceBridgeCapability("fips", staticTransports.fips, targetManifest),
                         relayIce: this.relayIceCapability("fips", staticTransports.fips, targetManifest)
                     },
                     ...this.overlayNetworkCapabilities(staticTransports)
@@ -201,21 +203,48 @@ const RuntimeCapabilities = {
     },
 
     relayIceCapability(routeType, transportSupported, targetManifest = null) {
-        const relayIce = targetManifest?.capabilities?.transports?.[routeType]?.relayIce || {};
-        if (transportSupported && relayIce.supported === true) {
-            const relayRtcConfig = this.relayIceRtcConfig(relayIce);
-            if (relayRtcConfig) {
-                return {
-                    supported: true,
-                    rtcConfig: relayRtcConfig
-                };
-            }
+        const relayIce = targetManifest?.capabilities?.transports?.[routeType]?.iceBridge
+            || targetManifest?.capabilities?.transports?.[routeType]?.relayIce
+            || {};
+        const descriptor = this.relayIceDescriptor({capabilities: {transports: {[routeType]: {relayIce}}}}, routeType);
+        if (transportSupported && descriptor) {
+            return descriptor;
         }
 
         return {
             supported: false,
             unavailableReason: `${routeType}-relay-ice-not-configured`
         };
+    },
+
+    iceBridgeCapability(routeType, transportSupported, targetManifest = null) {
+        const capability = this.relayIceCapability(routeType, transportSupported, targetManifest);
+        return capability.supported === true ? {kind: "ice-bridge", ...capability} : capability;
+    },
+
+    iceBridgeDescriptor(configOrRelayIce = {}, transport = "") {
+        const descriptor = this.relayIceDescriptor(configOrRelayIce, transport);
+        return descriptor ? {kind: "ice-bridge", ...descriptor} : null;
+    },
+
+    relayIceDescriptor(configOrRelayIce = {}, transport = "") {
+        const relayIce = configOrRelayIce?.rtcConfig || configOrRelayIce?.supported !== undefined
+            ? configOrRelayIce
+            : this.transports(configOrRelayIce)[transport]?.iceBridge || this.transports(configOrRelayIce)[transport]?.relayIce;
+        const rtcConfig = this.relayIceRtcConfig(relayIce);
+        if (!rtcConfig) return null;
+
+        const descriptor = {
+            supported: true,
+            rtcConfig
+        };
+        for (const key of ["source", "relayRole", "bridgeRole"]) {
+            if (relayIce?.[key]) descriptor[key] = String(relayIce[key]);
+        }
+        if (relayIce?.topologyEvidence && typeof relayIce.topologyEvidence === "object") {
+            descriptor.topologyEvidence = relayIce.topologyEvidence;
+        }
+        return descriptor;
     },
 
     relayIceRtcConfig(relayIce = {}) {
@@ -273,13 +302,20 @@ const RuntimeCapabilities = {
         return !!fallback;
     },
 
-    relayIceSupported(config, transport) {
-        const relayIce = this.transports(config)[transport]?.relayIce;
-        return relayIce?.supported === true && !!this.relayIceRtcConfig(relayIce);
+    iceBridgeSupported(config, transport, bridgeOverride = null) {
+        return !!this.iceBridgeDescriptor(bridgeOverride || config, transport);
     },
 
-    relayIceConfig(config, transport) {
-        return this.relayIceRtcConfig(this.transports(config)[transport]?.relayIce);
+    iceBridgeConfig(config, transport, bridgeOverride = null) {
+        return this.iceBridgeDescriptor(bridgeOverride || config, transport)?.rtcConfig || null;
+    },
+
+    relayIceSupported(config, transport, relayIceOverride = null) {
+        return this.iceBridgeSupported(config, transport, relayIceOverride);
+    },
+
+    relayIceConfig(config, transport, relayIceOverride = null) {
+        return this.iceBridgeConfig(config, transport, relayIceOverride);
     },
 
     serverActionSupported(config, action) {

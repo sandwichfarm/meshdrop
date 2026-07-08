@@ -14,15 +14,16 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.16.0 Overlay Relay Proof Preflight
+## Current Milestone: v0.17.0 Instance-Backed FIPS/Pollen ICE Bridge
 
-**Goal:** prevent false FIPS/Pollen WebRTC overlay claims by requiring route-specific topology evidence before any overlay `webrtc-relay-ice` proof can pass, and provide an opt-in preflight harness for the real relay endpoint work tracked by #152.
+**Goal:** allow trusted WOT-negotiated FIPS/Pollen routes to establish browser WebRTC with an instance-backed ICE bridge sourced from the selected MeshDrop instance, without requiring public federation advertisement or Nostr relay terminology.
 
 **Target features:**
-- Keep generic TURN relay proof valid for `turn-relay` without relabeling it as FIPS/Pollen.
-- Require topology evidence that names the selected overlay and relay endpoint for FIPS/Pollen/Tor/I2P/Loki WebRTC relay proofs.
-- Add a fail-closed preflight command that validates route-specific relay ICE config and topology evidence before runtime UAT.
-- Keep issue #152 open until a real FIPS/Pollen relay endpoint carries browser transfer bytes with selected `relay` candidates and no Clearnet fallback.
+- Expose instance-backed FIPS/Pollen ICE bridge descriptors through runtime capabilities.
+- Carry trusted ICE bridge descriptors inside encrypted WOT route metadata.
+- Use selected route metadata when creating bridge-constrained `RTCPeerConnection` config for FIPS/Pollen.
+- Keep discovery/signaling, ICE bridge, and FIPS stream/Pollen storage transfer labels separate.
+- Fail closed when a selected private overlay route has no usable instance ICE bridge descriptor.
 
 ## Requirements
 
@@ -49,6 +50,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Add Tor, I2P, and Loki route adapter capability surfaces that fail closed until a local instance/native runtime can prove dial support.
 - [x] Prove relay-only WebRTC transfer through a configured TURN path before labeling FIPS/Pollen overlay WebRTC as byte-carrying routes. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
 - [x] Require route-specific topology evidence and add a fail-closed preflight before any FIPS/Pollen overlay WebRTC relay proof can pass. Blocker: https://github.com/sandwichfarm/meshdrop/issues/152.
+- [x] Use trusted FIPS/Pollen WOT route descriptors as instance-backed WebRTC ICE bridge config so Clearnet-disabled private routes can establish only through the selected instance bridge.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [x] Document remaining blocked route/release/UAT work in live GitHub issues with acceptance evidence.
 - [x] Prove a Tor overlay stream route transfers bytes through a reproducible Dockerized `.onion` path, validates the payload hash, and emits proof with fallback disabled.
@@ -118,10 +120,11 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Overlay networks start fail-closed | Tor/I2P/Loki need local dial proof before MeshDrop can claim transfer support | ✓ Good |
 | TURN relay proof precedes overlay WebRTC claims | Browser WebRTC can only count as FIPS/Pollen/Tor/I2P/Loki when stats prove file bytes used a relay candidate constrained to that route | ✓ Good |
 | Overlay WebRTC proof needs route-specific topology evidence | A selected relay ICE candidate proves relay use, but not that the TURN endpoint was reached through FIPS/Pollen/Tor/I2P/Loki | ✓ Good |
+| Instance-backed ICE bridge is private route metadata | FIPS/Pollen peer discovery is client-side WOT; route-specific ICE bridge metadata must travel in trusted encrypted route descriptors, not public federation advertisement | Active ICE bridge requirement |
 | Blocked transport claims live in GitHub issues | Future work needs a tracker-owned acceptance contract, not stale notes buried in PR bodies | ✓ Good |
 | Dockerized Tor proof unblocks local daemon absence | A route-specific smoke can provide its own Tor daemon/proxy surface instead of depending on host-installed Tor | ✓ Good |
 | Dockerized i2pd proof uses a local zero-hop tunnel first | i2pd can provide a deterministic HTTP proxy/server tunnel smoke without depending on host I2P state; public I2P reachability and WebRTC remain separate future work | ✓ Good |
 | Dockerized Lokinet proof runs MeshDrop inside the Lokinet container | Lokinet configures a network interface and resolver, so the proof avoids mutating host networking while still proving `.loki` DNS and interface-routed bytes | ✓ Good |
 
 ---
-*Last updated: 2026-07-08 completing Phase 20 Overlay Relay Proof Preflight.*
+*Last updated: 2026-07-08 completing Phase 21 Instance-Backed FIPS/Pollen ICE Bridge.*

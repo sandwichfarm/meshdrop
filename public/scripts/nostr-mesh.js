@@ -827,11 +827,84 @@ class NostrMeshConnection {
             .map(room => globalThis.NpubNetworkProtocol?.normalizeRoom?.(room) || "")
             .filter(Boolean))];
         if (!rooms.length) return null;
+        const iceBridge = this._normalizeIceBridgeDescriptor(routeType, descriptor.iceBridge || descriptor.relayIce);
         return {
             routeType,
             rooms,
+            ...(iceBridge ? {iceBridge} : {}),
             expiresAt: Number(descriptor.expiresAt || 0)
         };
+    }
+
+    _normalizeIceBridgeDescriptor(routeType, iceBridge = null) {
+        if (!iceBridge || typeof iceBridge !== "object") return null;
+        if (globalThis.RuntimeCapabilities?.iceBridgeDescriptor) {
+            return globalThis.RuntimeCapabilities.iceBridgeDescriptor({
+                capabilities: {
+                    transports: {
+                        [routeType]: {relayIce: iceBridge}
+                    }
+                }
+            }, routeType);
+        }
+
+        return this._normalizeRelayIceDescriptor(routeType, iceBridge);
+    }
+
+    _normalizeRelayIceDescriptor(routeType, relayIce = null) {
+        if (!relayIce || typeof relayIce !== "object") return null;
+        if (globalThis.RuntimeCapabilities?.relayIceDescriptor) {
+            return globalThis.RuntimeCapabilities.relayIceDescriptor({
+                capabilities: {
+                    transports: {
+                        [routeType]: {relayIce}
+                    }
+                }
+            }, routeType);
+        }
+
+        const rtcConfig = relayIce.rtcConfig || {};
+        if (!Array.isArray(rtcConfig.iceServers)) return null;
+        const iceServers = rtcConfig.iceServers
+            .map(server => this._normalizeRelayIceServer(server))
+            .filter(Boolean);
+        if (!iceServers.length) return null;
+
+        const descriptor = {
+            supported: true,
+            rtcConfig: {
+                ...rtcConfig,
+                iceServers,
+                iceTransportPolicy: "relay"
+            }
+        };
+        for (const key of ["source", "relayRole", "bridgeRole"]) {
+            if (relayIce[key]) descriptor[key] = String(relayIce[key]);
+        }
+        if (relayIce.topologyEvidence && typeof relayIce.topologyEvidence === "object") {
+            descriptor.topologyEvidence = relayIce.topologyEvidence;
+        }
+        return descriptor;
+    }
+
+    _normalizeRelayIceServer(server = {}) {
+        const urls = this._normalizeRelayIceUrls(server.urls);
+        if (!urls) return null;
+
+        const normalized = {urls};
+        for (const key of ["username", "credential", "credentialType"]) {
+            if (server[key]) normalized[key] = server[key];
+        }
+        return normalized;
+    }
+
+    _normalizeRelayIceUrls(urls) {
+        const list = Array.isArray(urls) ? urls : [urls];
+        const relayUrls = list
+            .map(url => String(url || "").trim())
+            .filter(url => /^turns?:/i.test(url));
+        if (!relayUrls.length) return null;
+        return Array.isArray(urls) ? relayUrls : relayUrls[0];
     }
 
     _isExpired(expiresAt, nowSeconds = Math.floor(Date.now() / 1000)) {

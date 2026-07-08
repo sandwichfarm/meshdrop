@@ -18,17 +18,18 @@ const meshdropNetworkRouteMeta = (meta, privacyTone = "direct") => ({
     privacyTone,
     ...meta
 });
-const meshdropMeshSignaledRouteMeta = (id, label, className, substrate) => meshdropNetworkRouteMeta({
+const meshdropMeshSignaledRouteMeta = (id, label, className, substrate, transferPrimitive) => meshdropNetworkRouteMeta({
     id,
     label,
     shortLabel: label,
     className,
-    description: `WebRTC route discovered and signaled through ${substrate}`,
-    privacy: `${substrate} signaling, ICE data path`,
+    description: `WebRTC route discovered through Nostr WOT and signaled through ${substrate}`,
+    privacy: `${substrate} signaling, instance ICE bridge when configured`,
     details: [
+        ["Discovery", "Nostr WOT route request"],
         ["Signaling", `${substrate} substrate`],
-        ["Data path", "browser WebRTC ICE"],
-        ["Clearnet bytes", "possible unless relay-only ICE exists"]
+        ["ICE bridge", "instance-scoped when descriptor exists"],
+        ["Transfer primitive", transferPrimitive]
     ]
 });
 
@@ -82,8 +83,8 @@ const PeerAvailabilityProtocol = {
                 ["Nostr events", "discovery/signaling only"]
             ]
         }),
-        "fips": meshdropMeshSignaledRouteMeta("fips", "FIPS", "badge-room-fips", "FIPS"),
-        "pollen": meshdropMeshSignaledRouteMeta("pollen-mesh", "Pollen", "badge-room-pollen", "Pollen"),
+        "fips": meshdropMeshSignaledRouteMeta("fips", "FIPS", "badge-room-fips", "FIPS", "FIPS stream is separate"),
+        "pollen": meshdropMeshSignaledRouteMeta("pollen-mesh", "Pollen", "badge-room-pollen", "Pollen", "Pollen storage is separate"),
         "public-id": meshdropNetworkRouteMeta({
             id: "room",
             label: "Room",
@@ -402,7 +403,10 @@ const PeerRouteStatusProtocol = {
         "peer-route-expired": "Peer route expired",
         "fallback-disabled": "Fallback disabled by privacy policy",
         "route-policy": "Fallback disabled by privacy policy",
+        "overlay-bridge-unavailable": "Instance ICE bridge unavailable",
+        "overlay-relay-unavailable": "Instance ICE bridge unavailable",
         "clearnet-disabled": "Clearnet disabled",
+        "instance-ice-bridge": "Instance ICE bridge",
         "private-route": "Private route requested",
         "priority": "Best available route",
         "local-description": "Local offer prepared",

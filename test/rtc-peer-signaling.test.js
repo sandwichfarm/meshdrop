@@ -133,6 +133,25 @@ function createHarness() {
     };
 }
 
+function instanceIceBridgeDescriptor(routeType, roomId, url) {
+    return {
+        routeType,
+        rooms: [roomId],
+        iceBridge: {
+            supported: true,
+            source: "instance",
+            bridgeRole: `${routeType}-instance-ice-bridge`,
+            rtcConfig: {
+                iceServers: [{urls: url}]
+            },
+            topologyEvidence: {
+                overlay: routeType,
+                instance: `${routeType}-instance`
+            }
+        }
+    };
+}
+
 test("RTC signaling tags locally created offers with a negotiation session", async () => {
     const {RTCPeer} = createHarness();
     const sent = [];
@@ -801,7 +820,7 @@ test("disabled clearnet routes ignore direct Nostr peer announcements", () => {
     assert.equal(connections.length, 0);
 });
 
-test("disabled clearnet requests private FIPS signaling but blocks WebRTC without relay ICE", () => {
+test("disabled clearnet requests private FIPS signaling but blocks WebRTC without ICE bridge", () => {
     const {PeersManager, connections, fired, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
     context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
@@ -879,12 +898,12 @@ test("disabled clearnet requests private FIPS signaling but blocks WebRTC withou
             && event.detail.peerId === pubkey
             && event.detail.route === "fips"
             && event.detail.state === "disabled"
-            && event.detail.reason === "overlay-relay-unavailable"),
+            && event.detail.reason === "overlay-bridge-unavailable"),
         true
     );
 });
 
-test("disabled clearnet uses relay-only RTC config when FIPS relay ICE is available", () => {
+test("disabled clearnet uses bridge-constrained RTC config when FIPS global route bridge config is available", () => {
     const {PeersManager, connections, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
     context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
@@ -933,6 +952,107 @@ test("disabled clearnet uses relay-only RTC config when FIPS relay ICE is availa
     assert.equal(connections.length, 1);
     assert.equal(connections[0].config.iceTransportPolicy, "relay");
     assert.deepEqual(connections[0].config.iceServers, [{urls: "turn:fips-relay.test"}]);
+});
+
+test("disabled clearnet uses trusted FIPS descriptor ICE bridge without global TURN env", () => {
+    const {PeersManager, connections, fired, context} = createHarness();
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
+    context.meshdropFipsDiscovery = {
+        routeMetadataForRoom(roomId) {
+            return roomId === "fips-room"
+                ? instanceIceBridgeDescriptor("fips", roomId, "turn:fips-instance.test:3478?transport=tcp")
+                : null;
+        }
+    };
+    const manager = new PeersManager({send() {}});
+    const pubkey = "d".repeat(64);
+    const fipsTransport = {send() {}};
+
+    manager._onWsConfig({rtcConfig: {iceServers: [{urls: "stun:default.example:19302"}]}, wsFallback: false});
+    manager._onPeerJoined({
+        peer: {
+            id: pubkey,
+            rtcSupported: true,
+            routeCapabilities: ["fips"],
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room"
+    });
+    manager._onPeerJoined({
+        peer: {
+            id: "fips-peer",
+            rtcSupported: true,
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "fips",
+        roomId: "fips-room",
+        transport: fipsTransport
+    });
+
+    assert.equal(connections.length, 1);
+    assert.equal(connections[0].config.iceTransportPolicy, "relay");
+    assert.deepEqual(connections[0].config.iceServers, [{urls: "turn:fips-instance.test:3478?transport=tcp"}]);
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.route === "fips"
+            && event.detail.reason === "instance-ice-bridge"
+            && event.detail.routeMetadata?.iceBridge?.source === "instance"),
+        true
+    );
+});
+
+test("disabled clearnet uses trusted Pollen descriptor ICE bridge without global TURN env", () => {
+    const {PeersManager, connections, fired, context} = createHarness();
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
+    context.meshdropPollenTransfer = {
+        routeMetadataForRoom(roomId) {
+            return roomId === "pollen-room"
+                ? instanceIceBridgeDescriptor("pollen", roomId, "turn:pollen-instance.test:3478?transport=tcp")
+                : null;
+        }
+    };
+    const manager = new PeersManager({send() {}});
+    const pubkey = "a".repeat(64);
+    const pollenTransport = {send() {}};
+
+    manager._onWsConfig({rtcConfig: {iceServers: [{urls: "stun:default.example:19302"}]}, wsFallback: false});
+    manager._onPeerJoined({
+        peer: {
+            id: pubkey,
+            rtcSupported: true,
+            routeCapabilities: ["pollen"],
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room"
+    });
+    manager._onPeerJoined({
+        peer: {
+            id: "pollen-peer",
+            rtcSupported: true,
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "pollen",
+        roomId: "pollen-room",
+        transport: pollenTransport
+    });
+
+    assert.equal(connections.length, 1);
+    assert.equal(connections[0].config.iceTransportPolicy, "relay");
+    assert.deepEqual(connections[0].config.iceServers, [{urls: "turn:pollen-instance.test:3478?transport=tcp"}]);
+    assert.equal(
+        fired.some(event => event.type === "peer-route-status"
+            && event.detail.route === "pollen"
+            && event.detail.reason === "instance-ice-bridge"),
+        true
+    );
 });
 
 test("clearnet preference allows Nostr routes when instance sharing is disabled", () => {
@@ -1003,7 +1123,7 @@ test("backend-free config refuses peer-advertised FIPS as a selectable signaling
     );
 });
 
-test("disabling clearnet refuses FIPS fallback when relay ICE is unavailable", () => {
+test("disabling clearnet refuses FIPS fallback when ICE bridge is unavailable", () => {
     const {PeersManager, fired, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
     context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
@@ -1041,12 +1161,12 @@ test("disabling clearnet refuses FIPS fallback when relay ICE is unavailable", (
             && event.detail.peerId === "peer-a"
             && event.detail.route === "fips"
             && event.detail.state === "disabled"
-            && event.detail.reason === "overlay-relay-unavailable"),
+            && event.detail.reason === "overlay-bridge-unavailable"),
         true
     );
 });
 
-test("disabling clearnet allows FIPS fallback when relay ICE is available", () => {
+test("disabling clearnet allows FIPS fallback when global bridge config is available", () => {
     const {PeersManager, fired, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
     context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};

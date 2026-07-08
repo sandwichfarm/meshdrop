@@ -37,9 +37,17 @@ test("runtime capabilities describe backend transport support", () => {
         supported: false,
         unavailableReason: "fips-relay-ice-not-configured"
     });
+    assert.deepEqual(capabilities.transports.fips.iceBridge, {
+        supported: false,
+        unavailableReason: "fips-relay-ice-not-configured"
+    });
     assert.equal(capabilities.transports.pollen.supported, true);
     assert.equal(capabilities.transports.pollen.maxUploadBytes, 1024);
     assert.deepEqual(capabilities.transports.pollen.relayIce, {
+        supported: false,
+        unavailableReason: "pollen-relay-ice-not-configured"
+    });
+    assert.deepEqual(capabilities.transports.pollen.iceBridge, {
         supported: false,
         unavailableReason: "pollen-relay-ice-not-configured"
     });
@@ -79,7 +87,7 @@ test("runtime capabilities expose configured overlay stream adapters without cha
     assert.equal(capabilities.transports.loki.supported, false);
 });
 
-test("runtime capabilities require TURN relay config before advertising overlay relay ICE", () => {
+test("runtime capabilities require TURN bridge config before advertising overlay ICE bridge", () => {
     const bare = createRuntimeCapabilities({
         runtime: {target: "standalone"},
         fips: {enabled: true, relayIce: {supported: true}},
@@ -133,6 +141,56 @@ test("runtime capabilities require TURN relay config before advertising overlay 
             iceTransportPolicy: "relay"
         }
     });
+});
+
+test("runtime capabilities preserve instance ICE bridge metadata on route relay config", () => {
+    const capabilities = createRuntimeCapabilities({
+        runtime: {target: "standalone"},
+        fips: {
+            enabled: true,
+            relayIce: {
+                supported: true,
+                source: "instance",
+                bridgeRole: "fips-instance-ice-bridge",
+                topologyEvidence: {overlay: "fips", instance: "meshdrop-a"},
+                rtcConfig: {
+                    iceServers: [{urls: "turn:fips-instance.test:3478?transport=tcp"}]
+                }
+            }
+        },
+        pollen: {
+            enabled: true,
+            relayIce: {
+                supported: true,
+                source: "instance",
+                bridgeRole: "pollen-instance-ice-bridge",
+                topologyEvidence: {overlay: "pollen", instance: "meshdrop-b"},
+                rtcConfig: {
+                    iceServers: [{urls: "turn:pollen-instance.test:3478?transport=tcp"}]
+                }
+            }
+        },
+        admin: {enabled: false}
+    });
+
+    assert.deepEqual(capabilities.transports.fips.relayIce, {
+        supported: true,
+        source: "instance",
+        bridgeRole: "fips-instance-ice-bridge",
+        topologyEvidence: {overlay: "fips", instance: "meshdrop-a"},
+        rtcConfig: {
+            iceServers: [{urls: "turn:fips-instance.test:3478?transport=tcp"}],
+            iceTransportPolicy: "relay"
+        }
+    });
+    assert.deepEqual(capabilities.transports.fips.iceBridge, {
+        kind: "ice-bridge",
+        ...capabilities.transports.fips.relayIce
+    });
+    assert.equal(capabilities.transports.pollen.relayIce.source, "instance");
+    assert.equal(capabilities.transports.pollen.relayIce.bridgeRole, "pollen-instance-ice-bridge");
+    assert.equal(capabilities.transports.pollen.iceBridge.kind, "ice-bridge");
+    assert.equal(capabilities.transports.pollen.iceBridge.source, "instance");
 });
 
 test("server runtime config reports the configured deployment target", () => {

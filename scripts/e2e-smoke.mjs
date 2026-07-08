@@ -555,9 +555,9 @@ async function runFederatedPollenWebRtcScenario(browser, relayPort, blossomPort,
         await assertRouteChoice(pageA, peerId, {
             id: "pollen-mesh",
             label: "Pollen",
-            privacy: "Pollen signaling, ICE data path",
-            discoveryDetail: "SignalingPollen substrate",
-            dataPathDetail: "Data pathbrowser WebRTC ICE"
+            privacy: "Pollen signaling, instance ICE bridge when configured",
+            discoveryDetail: "DiscoveryNostr WOT route request",
+            dataPathDetail: "ICE bridgeinstance-scoped when descriptor exists"
         });
         await sendProofIcon(pageA, peerId, "pollen-mesh");
 
