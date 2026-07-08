@@ -32,8 +32,8 @@ services:
       - pollen-data:/var/lib/meshdrop/pln
     ports:
       - "3000:3000" # Web UI, exposed to this LAN for local-device testing.
-      - "2121:2121/udp" # FIPS UDP transport.
-      - "8443:8443" # FIPS TCP transport.
+      - "12121:2121/udp" # FIPS UDP transport, non-default host port.
+      - "18443:8443" # FIPS TCP transport, non-default host port.
       - "60611:60611/udp" # Pollen QUIC transport.
 
 volumes:
