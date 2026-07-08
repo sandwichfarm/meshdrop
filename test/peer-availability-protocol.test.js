@@ -316,6 +316,106 @@ test("Nostr identity keys normalize pubkey case before grouping peers", () => {
     );
 });
 
+test("Nostr identity keys include private route descriptor peer pubkeys", () => {
+    assert.deepEqual(
+        protocol.identityKeys({
+            id: "meshdrop-fed-random",
+            routeMetadata: {
+                routeType: "pollen",
+                peerPubkey: "B".repeat(64)
+            }
+        }, "pollen"),
+        [`nostr:${"b".repeat(64)}`]
+    );
+});
+
+test("PeersUI blocks unbound FIPS and Pollen candidates before drawing bubbles", () => {
+    const ui = Object.create(globalThis.PeersUI.prototype);
+    const pubkey = "c".repeat(64);
+
+    assert.equal(ui._anonymousOverlayPeerBlocked({id: "fips-random"}, "fips"), true);
+    assert.equal(ui._anonymousOverlayPeerBlocked({id: "pollen-random"}, "pollen"), true);
+    assert.equal(ui._anonymousOverlayPeerBlocked({id: "local-peer"}, "ip"), false);
+    assert.equal(ui._anonymousOverlayPeerBlocked({
+        id: "pollen-private-route",
+        routeMetadata: {
+            routeType: "pollen",
+            peerPubkey: pubkey
+        }
+    }, "pollen"), false);
+    assert.equal(ui._anonymousOverlayPeerBlocked({
+        id: "fips-identity",
+        nostrIdentity: {pubkey}
+    }, "fips"), false);
+});
+
+test("PeersUI derives private route identity from controller room metadata", () => {
+    const previousPollenController = globalThis.pollenController;
+    const ui = Object.create(globalThis.PeersUI.prototype);
+    const pubkey = "e".repeat(64);
+    globalThis.pollenController = {
+        routeMetadataForRoom(roomId) {
+            if (roomId !== "npub-network:pollen-private") return null;
+            return {
+                routeType: "pollen",
+                peerPubkey: pubkey
+            };
+        }
+    };
+
+    try {
+        const peer = ui._withRouteMetadata({id: "meshdrop-fed-random"}, "pollen", "npub-network:pollen-private");
+
+        assert.equal(ui._anonymousOverlayPeerBlocked(peer, "pollen"), false);
+        assert.deepEqual(ui._peerIdentityKeys(peer, "pollen"), [`nostr:${pubkey}`]);
+    } finally {
+        globalThis.pollenController = previousPollenController;
+    }
+});
+
+test("PeersUI resolves later Nostr peers to existing private route pubkey aliases", () => {
+    const ui = Object.create(globalThis.PeersUI.prototype);
+    const pubkey = "f".repeat(64);
+    ui._peerAliases = {};
+    ui.peers = {
+        "meshdrop-fed-random": {
+            id: "meshdrop-fed-random",
+            routeMetadata: {
+                routeType: "pollen",
+                peerPubkey: pubkey
+            },
+            _roomIds: {pollen: "npub-network:pollen-private"},
+            _peerIdsByRoomType: {pollen: "meshdrop-fed-random"}
+        }
+    };
+    ui._rememberPeerAliases("meshdrop-fed-random", ui.peers["meshdrop-fed-random"]);
+
+    assert.equal(ui._existingPeerId({
+        id: pubkey,
+        nostrIdentity: {pubkey}
+    }, "nostr"), "meshdrop-fed-random");
+});
+
+test("PeersUI resolves same-instance and Nostr peers by shared pubkey", () => {
+    const ui = Object.create(globalThis.PeersUI.prototype);
+    const pubkey = "d".repeat(64);
+    ui._peerAliases = {};
+    ui.peers = {
+        "local-peer": {
+            id: "local-peer",
+            nostrIdentity: {pubkey},
+            _roomIds: {ip: "127.0.0.1"},
+            _peerIdsByRoomType: {ip: "local-peer"}
+        }
+    };
+    ui._rememberPeerAliases("local-peer", ui.peers["local-peer"]);
+
+    assert.equal(ui._existingPeerId({
+        id: pubkey,
+        nostrIdentity: {pubkey}
+    }, "nostr"), "local-peer");
+});
+
 test("route status text names the active network and phase", () => {
     assert.equal(routeStatus.text({route: "nostr", state: "connecting"}), "Connecting on Clearnet...");
     assert.equal(routeStatus.text({route: "fips", state: "requested"}), "Trying FIPS...");

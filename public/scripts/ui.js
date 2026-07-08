@@ -210,8 +210,20 @@ const PeerAvailabilityProtocol = {
     },
 
     identityKeys(peer, roomType = null) {
-        const pubkey = peer?.nostrIdentity?.pubkey || (roomType === "nostr" ? peer?.id : "");
-        return pubkey ? [`nostr:${String(pubkey).toLowerCase()}`] : [];
+        const pubkeys = [
+            peer?.nostrIdentity?.pubkey,
+            roomType === "nostr" ? peer?.id : "",
+            peer?.routeMetadata?.peerPubkey,
+            peer?.routeDescriptor?.peerPubkey
+        ];
+        Object.values(peer?._routeMetadataByRoomType || {}).forEach(routeMetadata => {
+            pubkeys.push(routeMetadata?.peerPubkey);
+        });
+
+        return [...new Set(pubkeys
+            .map(pubkey => String(pubkey || "").toLowerCase())
+            .filter(Boolean)
+            .map(pubkey => `nostr:${pubkey}`))];
     },
 
     routeLabel(roomType) {
@@ -883,10 +895,12 @@ class PeersUI {
     }
 
     _joinPeer(peer, roomType, roomId) {
+        peer = this._withRouteMetadata(peer, roomType, roomId);
         const routeAllowed = this._routeAllowed(roomType);
         const pendingRouteStatus = routeAllowed ? null : this._pendingPrivateRouteStatus(peer, roomType);
         if (!routeAllowed && !pendingRouteStatus) return;
         if (globalThis.NostrFollowPolicy?.allowsPeer(peer, roomType) === false) return;
+        if (this._anonymousOverlayPeerBlocked(peer, roomType)) return;
 
         const existingPeerId = this._existingPeerId(peer, roomType);
         const existingPeer = this.peers[existingPeerId];
@@ -986,6 +1000,40 @@ class PeersUI {
         return PeerAvailabilityProtocol.identityKeys(peer, roomType);
     }
 
+    _withRouteMetadata(peer, roomType, roomId) {
+        const routeMetadata = this._routeMetadataForRoom(peer, roomType, roomId);
+        if (!routeMetadata) return peer;
+        return {
+            ...peer,
+            routeMetadata,
+            _routeMetadataByRoomType: {
+                ...peer?._routeMetadataByRoomType,
+                [roomType]: routeMetadata
+            }
+        };
+    }
+
+    _routeMetadataForRoom(peer = {}, roomType, roomId) {
+        const embedded = peer?._routeMetadataByRoomType?.[roomType]
+            || peer?.routeMetadata
+            || peer?.routeDescriptor;
+        if (embedded?.routeType === roomType || embedded?.peerPubkey || embedded?.iceBridge || embedded?.relayIce) {
+            return embedded;
+        }
+
+        const controller = roomType === "fips"
+            ? globalThis.fipsController
+            : roomType === "pollen"
+                ? globalThis.pollenController
+                : null;
+        return controller?.routeMetadataForRoom?.(roomId) || null;
+    }
+
+    _anonymousOverlayPeerBlocked(peer, roomType) {
+        if (roomType !== "fips" && roomType !== "pollen") return false;
+        return this._peerIdentityKeys(peer, roomType).length === 0;
+    }
+
     _mergePeer(existingPeerId, peer, roomType, roomId) {
         const existingPeer = this.peers[existingPeerId];
         existingPeer._roomIds[roomType] = roomId;
@@ -996,6 +1044,11 @@ class PeersUI {
         existingPeer.nostrIdentity = {
             ...existingPeer.nostrIdentity,
             ...peer.nostrIdentity
+        };
+        existingPeer.routeMetadata = peer.routeMetadata || existingPeer.routeMetadata;
+        existingPeer._routeMetadataByRoomType = {
+            ...existingPeer._routeMetadataByRoomType,
+            ...peer._routeMetadataByRoomType
         };
         existingPeer.routeStatus = this._routeStatuses[peer.id] || this._routeStatuses[existingPeerId] || existingPeer.routeStatus || null;
 
@@ -1029,6 +1082,10 @@ class PeersUI {
         this._peerAliases[peer.id] = visiblePeerId;
         const pubkey = peer.nostrIdentity?.pubkey;
         if (pubkey) this._peerAliases[String(pubkey).toLowerCase()] = visiblePeerId;
+        this._peerIdentityKeys(peer, null).forEach(identityKey => {
+            const pubkeyKey = identityKey.startsWith("nostr:") ? identityKey.slice("nostr:".length) : "";
+            if (pubkeyKey) this._peerAliases[pubkeyKey] = visiblePeerId;
+        });
         Object.values(peer._peerIdsByRoomType || {}).forEach(peerId => this._peerAliases[peerId] = visiblePeerId);
     }
 
