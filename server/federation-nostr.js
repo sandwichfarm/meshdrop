@@ -98,20 +98,24 @@ export class FederationNostrDiscovery extends FederationNostrDiscoveryBase {
         if (this.config.pollen.clusterBootstrap && !identity.hasMembership) return;
 
         for (const scope of scopes) {
-            const event = finalizeEvent({
-                kind: FEDERATION_KIND,
-                created_at: Math.floor(Date.now() / 1000),
-                tags: [
-                    ...this._baseDiscoveryTags("pollen-federation", POLLEN_FEDERATION_PROTOCOL, scope),
-                    ["service", this.config.pollen.serviceName],
-                    ["room", scope.room],
-                    ["capability", "meshdrop-pollen-service"],
-                    ...this._pollenIdentityTags(identity)
-                ],
-                content: ""
-            }, this.config.nostr.secretKey);
+            const recipients = this._recipientPubkeysForScope(scope);
+            for (const recipient of (recipients.length ? recipients : [""])) {
+                const event = finalizeEvent({
+                    kind: FEDERATION_KIND,
+                    created_at: Math.floor(Date.now() / 1000),
+                    tags: [
+                        ...this._baseDiscoveryTags("pollen-federation", POLLEN_FEDERATION_PROTOCOL, scope),
+                        ...(recipient ? [["p", recipient]] : []),
+                        ["service", this.config.pollen.serviceName],
+                        ["room", scope.room],
+                        ["capability", "meshdrop-pollen-service"],
+                        ...this._pollenIdentityTags(identity)
+                    ],
+                    content: this._encryptedFederationPayload(recipient, "pollen", scope)
+                }, this.config.nostr.secretKey);
 
-            this._publishEvent("pollen nostr announce", event, socket, this.config.pollen.serviceName, scope);
+                this._publishEvent("pollen nostr announce", event, socket, this.config.pollen.serviceName, scope);
+            }
         }
     }
 
@@ -125,19 +129,23 @@ export class FederationNostrDiscovery extends FederationNostrDiscoveryBase {
         }
 
         for (const scope of scopes) {
-            const event = finalizeEvent({
-                kind: FEDERATION_KIND,
-                created_at: Math.floor(Date.now() / 1000),
-                tags: [
-                    ...this._baseDiscoveryTags("fips-federation", FIPS_FEDERATION_PROTOCOL, scope),
-                    ["base", baseUrl],
-                    ["capability", "meshdrop-http"],
-                    ["room", scope.room]
-                ],
-                content: ""
-            }, this.config.nostr.secretKey);
+            const recipients = this._recipientPubkeysForScope(scope);
+            for (const recipient of (recipients.length ? recipients : [""])) {
+                const event = finalizeEvent({
+                    kind: FEDERATION_KIND,
+                    created_at: Math.floor(Date.now() / 1000),
+                    tags: [
+                        ...this._baseDiscoveryTags("fips-federation", FIPS_FEDERATION_PROTOCOL, scope),
+                        ...(recipient ? [["p", recipient]] : []),
+                        ["base", baseUrl],
+                        ["capability", "meshdrop-http"],
+                        ["room", scope.room]
+                    ],
+                    content: this._encryptedFederationPayload(recipient, "fips", scope)
+                }, this.config.nostr.secretKey);
 
-            this._publishEvent("fips nostr announce", event, socket, baseUrl, scope);
+                this._publishEvent("fips nostr announce", event, socket, baseUrl, scope);
+            }
         }
     }
 
@@ -192,6 +200,13 @@ export class FederationNostrDiscovery extends FederationNostrDiscoveryBase {
     async _handleFipsFederationEvent(event, serverId) {
         const baseUrl = this._tag(event, "base") || this._tag(event, "url");
         if (!baseUrl) return;
+        const room = this._tag(event, "room");
+        const acceptedPayload = await this._receiveFederationPayload(event, serverId, "fips", {
+            baseUrl,
+            room
+        });
+        if (acceptedPayload) return;
+        if (!event.content) this.publishFederationSnapshot(event.pubkey, "fips", room);
         if (this._isFailureSuppressed("fips", baseUrl)) {
             this.trace("fips nostr suppressed", baseUrl);
             return;
@@ -207,6 +222,13 @@ export class FederationNostrDiscovery extends FederationNostrDiscoveryBase {
     async _handlePollenFederationEvent(event, serverId) {
         const serviceName = this._tag(event, "service");
         if (!serviceName) return;
+        const room = this._tag(event, "room");
+        const acceptedPayload = await this._receiveFederationPayload(event, serverId, "pollen", {
+            serviceName,
+            room
+        });
+        if (acceptedPayload) return;
+        if (!event.content) this.publishFederationSnapshot(event.pubkey, "pollen", room);
         const remoteRoot = this._tag(event, "pln-root");
         const localIdentity = await this.getPollenIdentity();
         if (localIdentity.rootHash && !remoteRoot) {

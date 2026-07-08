@@ -41,6 +41,9 @@ export default class MeshFederation {
             trace: (...parts) => this._trace(...parts),
             getFipsBaseUrl: () => this.localFipsBaseUrl,
             getPollenIdentity: () => this.pollenTransport.identity(),
+            localServerDescriptor: transport => this._localServerDescriptor(transport),
+            localSnapshot: (roomType, roomId) => this.snapshot(roomType, roomId),
+            receiveFederationEvents: (payload, server) => this._receiveNostrFederationEvents(payload, server),
             discoverHttpServer: server => this._discoverHttpServer(server),
             connectPollenService: (serverId, serviceName) => this._connectPollenService(serverId, serviceName),
             createPollenInvite: (pubkey, subjectNodeId) => this.pollenTransport.createInvite(subjectNodeId),
@@ -122,10 +125,12 @@ export default class MeshFederation {
         return this._postEvents(server, [event]);
     }
 
-    snapshot() {
+    snapshot(roomTypeFilter = "", roomIdFilter = "") {
         const peers = [];
         for (const [key, roomPeers] of this.localPeers.entries()) {
             const {roomType, roomId} = this._parseRoomKey(key);
+            if (roomTypeFilter && roomType !== roomTypeFilter) continue;
+            if (roomIdFilter && roomId !== roomIdFilter) continue;
             for (const peer of roomPeers.values()) {
                 peers.push({roomType, roomId, peer});
             }
@@ -237,6 +242,31 @@ export default class MeshFederation {
         });
     }
 
+    async _receiveNostrFederationEvents(payload = {}, server = {}) {
+        if (!payload.serverId || payload.serverId === this.config.serverId) return {accepted: 0};
+        const transport = payload.transport || server.transport || "federation";
+        const events = Array.isArray(payload.events) ? payload.events : [];
+        const discovered = {
+            ...server,
+            serverId: payload.serverId,
+            transport,
+            peerIds: events.map(event => event.peer?.id).filter(Boolean),
+            lastSeen: Date.now()
+        };
+        this.remoteServers.set(this._serverKey(discovered), discovered);
+        this._trace(
+            "nostr federation accepted",
+            transport,
+            `remote=${payload.serverId}`,
+            `events=${events.length}`
+        );
+        return this.receiveEvents({
+            serverId: payload.serverId,
+            transport,
+            events
+        });
+    }
+
     async _verifyAndRegisterSender(payload, transport) {
         const descriptor = payload.server || {};
         if (descriptor.serverId && descriptor.serverId !== payload.serverId) return false;
@@ -290,21 +320,32 @@ export default class MeshFederation {
     }
 
     async _postEvents(server, events) {
-        if (!server?.baseUrl) return;
+        if (!server || !events.length) return;
 
-        await fetch(`${server.baseUrl}/federation/events`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                serverId: this.config.serverId,
-                transport: server.transport,
-                server: this._localServerDescriptor(server.transport),
-                events
-            }),
-            signal: AbortSignal.timeout(this.config.timeoutMs)
-        }).catch(error => {
-            writeStderr("MeshDrop federation relay failed", server.baseUrl, error.message);
-        });
+        const descriptor = this._localServerDescriptor(server.transport);
+        if (server.baseUrl) {
+            try {
+                await fetch(`${server.baseUrl}/federation/events`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        serverId: this.config.serverId,
+                        transport: server.transport,
+                        server: descriptor,
+                        events
+                    }),
+                    signal: AbortSignal.timeout(this.config.timeoutMs)
+                });
+                return;
+            }
+            catch (error) {
+                writeStderr("MeshDrop federation relay failed", server.baseUrl, error.message);
+            }
+        }
+
+        if (!this.nostrDiscovery.publishFederationEvents(server, events, descriptor)) {
+            writeStderr("MeshDrop federation relay failed", server.serverId || "unknown", "no reachable federation control path");
+        }
     }
 
     _localServerDescriptor(transport) {
