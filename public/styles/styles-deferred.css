@@ -260,8 +260,10 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     display: flex;
     flex-wrap: nowrap;
     justify-content: center;
-    gap: 4px;
-    margin-top: 5px;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+    min-height: 24px;
     max-width: var(--peer-width);
 }
 
@@ -272,19 +274,43 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
 .route-attempt {
     --route-color: rgb(var(--text-color));
     position: relative;
+    isolation: isolate;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 22px;
-    width: 22px;
-    height: 18px;
+    flex: 0 0 26px;
+    width: 26px;
+    height: 22px;
     padding: 0;
-    border: 1px solid color-mix(in srgb, var(--route-color) 55%, transparent);
     border-radius: 8px;
     background: color-mix(in srgb, var(--route-color) 18%, transparent);
     color: color-mix(in srgb, var(--route-color) 72%, white);
     line-height: 1;
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--route-color) 18%, transparent);
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--route-color) 42%, transparent),
+        0 2px 8px color-mix(in srgb, var(--route-color) 18%, transparent);
+    transition:
+        opacity 180ms ease-out,
+        filter 180ms ease-out,
+        box-shadow 180ms ease-out,
+        background 180ms ease-out;
+}
+
+.route-attempt::before {
+    position: absolute;
+    inset: 1px;
+    z-index: -1;
+    border-radius: 7px;
+    background: linear-gradient(
+        105deg,
+        transparent 10%,
+        color-mix(in srgb, var(--route-color) 34%, white) 48%,
+        transparent 82%
+    );
+    content: "";
+    opacity: 0;
+    transform: translateX(-125%);
+    will-change: transform, opacity;
 }
 
 .route-attempt[data-route="ip"] {
@@ -378,6 +404,11 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
     box-shadow: none;
 }
 
+.route-attempt[data-route="nostr"][data-tone="blocked"] {
+    opacity: 0.34;
+    filter: grayscale(0.45) saturate(0.65);
+}
+
 .availability-pill[data-tone="blocked"] .availability-pill-symbol::after,
 .availability-pill[data-tone="failed"] .availability-pill-symbol::after,
 .route-attempt[data-tone="blocked"] .route-attempt-symbol::after,
@@ -395,6 +426,19 @@ x-peer:not(.type-public-id) .highlight-room-public-id {
 
 .route-attempt[data-tone="pending"] {
     animation: route-chip-pulse 1400ms ease-in-out infinite;
+}
+
+.route-attempt[data-tone="pending"]::before {
+    opacity: 0.72;
+    animation: route-chip-sweep 1400ms cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+.route-attempt[data-route="fips"][data-tone="pending"] {
+    animation-duration: 1300ms;
+}
+
+.route-attempt[data-route="pollen"][data-tone="pending"] {
+    animation-delay: 160ms;
 }
 
 .availability-pill[data-tone="pending"] .availability-pill-symbol::after,
@@ -732,6 +776,21 @@ x-peer x-icon {
     }
 }
 
+@keyframes route-chip-sweep {
+    0% {
+        opacity: 0;
+        transform: translateX(-125%);
+    }
+    18% {
+        opacity: 0.72;
+    }
+    58%,
+    100% {
+        opacity: 0;
+        transform: translateX(125%);
+    }
+}
+
 @keyframes route-ring-pulse {
     0% {
         opacity: 0.74;
@@ -747,6 +806,7 @@ x-peer x-icon {
     .availability-pill[data-tone="pending"],
     .availability-pill[data-tone="pending"] .availability-pill-symbol::after,
     .route-attempt[data-tone="pending"],
+    .route-attempt[data-tone="pending"]::before,
     .route-attempt[data-tone="pending"] .route-attempt-symbol::after {
         animation: none;
     }
