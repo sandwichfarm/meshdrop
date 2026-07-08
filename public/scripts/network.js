@@ -2297,6 +2297,10 @@ class PeersManager {
         const canonicalPeerInfo = routeMetadata ? {...policyPeer, routeMetadata} : policyPeer;
         const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
         if (globalThis.NostrFollowPolicy?.allowsPeer(canonicalPeerInfo, roomType, identity) === false) return;
+        if (this._anonymousOverlayPeerBlocked(roomType, canonicalPeerInfo, routeMetadata)) {
+            this._traceRoute("route candidate ignored", `peer=${peerId}`, `route=${roomType}`, "reason=missing-nostr-identity");
+            return;
+        }
 
         const canonicalPeerId = this._canonicalPeerId(peerId, canonicalPeerInfo, roomType);
         const identityPeerId = this._identityPeerId(canonicalPeerInfo, roomType, canonicalPeerId);
@@ -2937,6 +2941,17 @@ class PeersManager {
             pollen: globalThis.meshdropPollenTransfer
         }[roomType];
         return controller?.routeMetadataForRoom?.(roomId) || null;
+    }
+
+    _anonymousOverlayPeerBlocked(roomType, peerInfo = {}, routeMetadata = null) {
+        if (roomType !== "fips" && roomType !== "pollen") return false;
+
+        const pubkey = this._normalizePeerPubkey(peerInfo?.nostrIdentity?.pubkey)
+            || this._normalizePeerPubkey(routeMetadata?.peerPubkey)
+            || this._normalizePeerPubkey(peerInfo?.routeMetadata?.peerPubkey)
+            || this._normalizePeerPubkey(peerInfo?.routeDescriptor?.peerPubkey);
+
+        return !pubkey;
     }
 
     _rememberPeerRoute(peer, isCaller, roomType, transport, routePeerId = peer?._peerId, routeMetadata = null) {

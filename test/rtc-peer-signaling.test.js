@@ -614,7 +614,29 @@ test("PeersManager merges private route metadata peer pubkey without server auth
     assert.equal(manager._resolvePeerId("meshdrop-fed-random"), pubkey);
 });
 
-test("PeersManager collapses an existing overlay bubble when its Nostr identity arrives later", () => {
+test("PeersManager ignores anonymous public overlay peers without route identity", () => {
+    const {PeersManager, connections} = createHarness();
+    const manager = new PeersManager({send() {}});
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "fips",
+        roomId: "meshdrop-fips",
+        peer: {id: "meshdrop-fed-fips", rtcSupported: true}
+    });
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "pollen",
+        roomId: "meshdrop-pollen",
+        peer: {id: "meshdrop-fed-pollen", rtcSupported: true}
+    });
+
+    assert.deepEqual(Object.keys(manager.peers), []);
+    assert.equal(connections.length, 0);
+});
+
+test("PeersManager suppresses anonymous overlay bubbles until Nostr identity arrives", () => {
     const {PeersManager} = createHarness();
     const manager = new PeersManager({send() {}});
     const pubkey = "2".repeat(64);
@@ -640,7 +662,7 @@ test("PeersManager collapses an existing overlay bubble when its Nostr identity 
         }
     });
 
-    assert.equal(Object.keys(manager.peers).length, 2);
+    assert.deepEqual(Object.keys(manager.peers), [pubkey]);
 
     manager._onPeerJoined({
         isCaller: false,
@@ -1194,6 +1216,7 @@ test("clearnet preference allows Nostr routes when instance sharing is disabled"
 
 test("backend-free config refuses peer-advertised FIPS as a selectable signaling route", () => {
     const {PeersManager, context, connections, fired} = createHarness();
+    const pubkey = "4".repeat(64);
     context.RuntimeCapabilities = {
         transportSupported(config, transport, fallback = false) {
             const capability = config?.capabilities?.transports?.[transport];
@@ -1223,7 +1246,8 @@ test("backend-free config refuses peer-advertised FIPS as a selectable signaling
         peer: {
             id: "fips-peer",
             rtcSupported: true,
-            routeCapabilities: ["fips"]
+            routeCapabilities: ["fips"],
+            nostrIdentity: {pubkey}
         },
         isCaller: true,
         roomType: "fips",
@@ -1382,12 +1406,18 @@ test("accepted Pollen storage responses do not stream files over RTC", () => {
 test("peer lists honor explicit caller assignment", () => {
     const {PeersManager} = createHarness();
     const manager = new PeersManager({send() {}});
+    const pubkey = "3".repeat(64);
     manager._onWsConfig({rtcConfig: {}, wsFallback: false});
 
     manager._onPeers({
         roomType: "fips",
         roomId: "meshdrop-fips",
-        peers: [{id: "peer-a", rtcSupported: true, isCaller: false}]
+        peers: [{
+            id: "peer-a",
+            rtcSupported: true,
+            isCaller: false,
+            nostrIdentity: {pubkey}
+        }]
     });
 
     assert.equal(manager.peers["peer-a"]._isCaller, false);
