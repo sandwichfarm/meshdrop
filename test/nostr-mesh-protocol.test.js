@@ -247,9 +247,60 @@ test("Nostr mesh route requests use NIP-44 and accepted responses join descripto
         assert.equal(joined[0].iceBridge.source, "instance");
         assert.equal(joined[0].iceBridge.bridgeRole, "fips-instance-ice-bridge");
         assert.deepEqual(joined[0].iceBridge.rtcConfig.iceServers, [{urls: "turn:fips-instance.test:3478?transport=tcp"}]);
+        assert.equal(joined[0].peerPubkey, peerPubkey);
         assert.equal("federation" in joined[0], false);
         assert.equal("publicAdvertisement" in joined[0], false);
         assert.equal(mesh._pendingRouteRequests.has(`${peerPubkey}:fips`), false);
+    }
+    finally {
+        globalThis.meshdropFipsDiscovery = originalFips;
+    }
+});
+
+test("Nostr mesh route requests bind local join to requester and response descriptor to responder", async () => {
+    const localPubkey = "1".repeat(64);
+    const peerPubkey = "2".repeat(64);
+    const room = await globalThis.NpubNetworkProtocol.pairwiseRoom(localPubkey, peerPubkey);
+    const joined = [];
+    const published = [];
+    const originalFips = globalThis.meshdropFipsDiscovery;
+    const mesh = Object.create(globalThis.NostrMeshConnection.prototype);
+    mesh._identity = {pubkey: localPubkey};
+    mesh._identityController = {
+        canNip44: () => true,
+        decryptNip44From: async () => JSON.stringify({
+            type: "route-request",
+            routeType: "fips",
+            nonce: "nonce-1",
+            sessionId: "peer-session",
+            requesterPubkey: peerPubkey,
+            recipientPubkey: localPubkey,
+            expiresAt: Math.floor(Date.now() / 1000) + 30
+        })
+    };
+    mesh._publishEncryptedRouteEvent = async (...args) => published.push(args);
+    mesh._trace = () => {};
+    globalThis.meshdropFipsDiscovery = {
+        routeDescriptorFor: async peer => ({
+            routeType: "fips",
+            rooms: [room],
+            peerPubkey: peer
+        }),
+        joinRouteDescriptor(descriptor) {
+            joined.push(descriptor);
+            return true;
+        }
+    };
+
+    try {
+        await mesh._onRouteRequestEvent({pubkey: peerPubkey, content: "encrypted-request"});
+
+        assert.equal(joined.length, 1);
+        assert.equal(joined[0].peerPubkey, peerPubkey);
+        assert.equal(published.length, 1);
+        assert.equal(published[0][0], "route-response");
+        assert.equal(published[0][1], peerPubkey);
+        assert.equal(published[0][2].descriptor.peerPubkey, localPubkey);
     }
     finally {
         globalThis.meshdropFipsDiscovery = originalFips;

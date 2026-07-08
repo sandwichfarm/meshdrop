@@ -2293,16 +2293,20 @@ class PeersManager {
         }
 
         const policyPeer = peerInfo || {id: peerId};
-        const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
-        if (globalThis.NostrFollowPolicy?.allowsPeer(policyPeer, roomType, identity) === false) return;
-
-        const canonicalPeerId = this._canonicalPeerId(peerId, policyPeer, roomType);
-        this._rememberPeerAliases(canonicalPeerId, policyPeer, peerId);
-
         const routeMetadata = this._routeMetadataFor(roomType, roomId, policyPeer);
+        const canonicalPeerInfo = routeMetadata ? {...policyPeer, routeMetadata} : policyPeer;
+        const identity = globalThis.meshdropNostrIdentity?.getIdentity?.();
+        if (globalThis.NostrFollowPolicy?.allowsPeer(canonicalPeerInfo, roomType, identity) === false) return;
+
+        const canonicalPeerId = this._canonicalPeerId(peerId, canonicalPeerInfo, roomType);
+        const identityPeerId = this._identityPeerId(canonicalPeerInfo, roomType, canonicalPeerId);
+        if (this.peers[canonicalPeerId] && identityPeerId) {
+            this._mergePeerRecords(canonicalPeerId, identityPeerId);
+        }
+        this._rememberPeerAliases(canonicalPeerId, canonicalPeerInfo, peerId);
         const blockedReason = this._routeSelectionBlockedReason(roomType, routeMetadata);
         if (blockedReason === "route-policy") {
-            this._requestPrivateRouteFromDisallowedDiscovery(canonicalPeerId, isCaller, peerId, roomType, transport, policyPeer);
+            this._requestPrivateRouteFromDisallowedDiscovery(canonicalPeerId, isCaller, peerId, roomType, transport, canonicalPeerInfo);
             return;
         }
         if (blockedReason) {
@@ -2318,7 +2322,7 @@ class PeersManager {
         if (this._peerExists(canonicalPeerId)) {
             const peer = this.peers[canonicalPeerId];
             const pendingInfo = peer._pendingPrivateRouteSeed && !SignalingRoomPriority.primary(peer._roomIds)
-                ? this._pendingPeerInfo(peer, policyPeer)
+                ? this._pendingPeerInfo(peer, canonicalPeerInfo)
                 : null;
             if (pendingInfo) {
                 delete this.peers[canonicalPeerId];
@@ -2344,7 +2348,7 @@ class PeersManager {
                 `connected=${connected}`,
                 `selected=${preferNewRoute}`
             );
-            this._refreshPeer(canonicalPeerId, roomType, roomId, policyPeer, peerId, routeMetadata);
+            this._refreshPeer(canonicalPeerId, roomType, roomId, canonicalPeerInfo, peerId, routeMetadata);
             if (preferNewRoute && peer.switchSignalingRoute) {
                 const reason = OverlayIceBridgePolicy.routeSelectionReason(roomType, "priority", routeMetadata);
                 this._traceRoute("selected route", `peer=${canonicalPeerId}`, `route=${roomType}`, `target=${peerId}`, `reason=${reason}`);
@@ -2359,7 +2363,7 @@ class PeersManager {
             return;
         }
 
-        this._startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer, "initial", routeMetadata);
+        this._startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, canonicalPeerInfo, "initial", routeMetadata);
     }
 
     _startPeer(canonicalPeerId, isCaller, peerId, roomType, roomId, rtcSupported, transport, policyPeer = null, reason = "initial", routeMetadata = null) {
@@ -2911,6 +2915,9 @@ class PeersManager {
         if (peerInfo.nostrIdentity?.pubkey) {
             this._peerAliases[String(peerInfo.nostrIdentity.pubkey).toLowerCase()] = peerId;
         }
+        for (const identityKey of this._peerIdentityKeys(peerInfo, null)) {
+            if (identityKey.startsWith("nostr:")) this._peerAliases[identityKey.slice("nostr:".length)] = peerId;
+        }
 
         Object.values(peerInfo._peerIdsByRoomType || {}).forEach(alias => {
             if (alias) this._peerAliases[alias] = peerId;
@@ -2971,18 +2978,65 @@ class PeersManager {
         const resolvedPeerId = this._resolvePeerId(peerId);
         if (this.peers[resolvedPeerId]) return resolvedPeerId;
 
-        const identityKeys = this._peerIdentityKeys(peerInfo || {id: peerId}, roomType);
-        if (!identityKeys.length) return resolvedPeerId;
+        return this._identityPeerId(peerInfo || {id: peerId}, roomType, resolvedPeerId) || resolvedPeerId;
+    }
+
+    _identityPeerId(peerInfo = {}, roomType = null, exceptPeerId = "") {
+        const identityKeys = this._peerIdentityKeys(peerInfo, roomType);
+        if (!identityKeys.length) return "";
 
         return Object.keys(this.peers).find(existingPeerId => {
+            if (existingPeerId === exceptPeerId) return false;
             const existingKeys = this._peerIdentityKeys(this.peers[existingPeerId], null);
             return identityKeys.some(identityKey => existingKeys.includes(identityKey));
-        }) || resolvedPeerId;
+        }) || "";
     }
 
     _peerIdentityKeys(peer, roomType = null) {
-        const pubkey = peer?.nostrIdentity?.pubkey || (roomType === "nostr" ? peer?.id : "");
-        return pubkey ? [`nostr:${String(pubkey).toLowerCase()}`] : [];
+        const pubkeys = [
+            peer?.nostrIdentity?.pubkey,
+            roomType === "nostr" ? peer?.id : "",
+            peer?.routeMetadata?.peerPubkey,
+            peer?.routeDescriptor?.peerPubkey
+        ];
+        for (const routeMetadata of Object.values(peer?._routeMetadataByRoomType || {})) {
+            pubkeys.push(routeMetadata?.peerPubkey);
+        }
+
+        return [...new Set(pubkeys
+            .map(pubkey => this._normalizePeerPubkey(pubkey))
+            .filter(Boolean)
+            .map(pubkey => `nostr:${pubkey}`))];
+    }
+
+    _normalizePeerPubkey(pubkey) {
+        return globalThis.NpubNetworkProtocol?.normalizePubkey?.(pubkey)
+            || (/^[0-9a-f]{64}$/i.test(pubkey || "") ? String(pubkey).toLowerCase() : "");
+    }
+
+    _mergePeerRecords(targetPeerId, sourcePeerId) {
+        if (!targetPeerId || !sourcePeerId || targetPeerId === sourcePeerId) return false;
+        const target = this.peers[targetPeerId];
+        const source = this.peers[sourcePeerId];
+        if (!target || !source) return false;
+
+        this._applyPeerInfo(target, source);
+        target._roomIds = {...source._roomIds, ...target._roomIds};
+        target._peerIdsByRoomType = {...source._peerIdsByRoomType, ...target._peerIdsByRoomType};
+        target._transportsByRoomType = {...source._transportsByRoomType, ...target._transportsByRoomType};
+        target._isCallerByRoomType = {...source._isCallerByRoomType, ...target._isCallerByRoomType};
+        target._routeMetadataByRoomType = {...source._routeMetadataByRoomType, ...target._routeMetadataByRoomType};
+        target._pendingPrivateRouteRequests = {
+            ...source._pendingPrivateRouteRequests,
+            ...target._pendingPrivateRouteRequests
+        };
+        if (source._pendingPrivateRouteSeed && !target._pendingPrivateRouteSeed) target._pendingPrivateRouteSeed = true;
+
+        this._forgetPeerAliases(sourcePeerId);
+        delete this.peers[sourcePeerId];
+        this._rememberPeerAliases(targetPeerId, target, target._peerId || targetPeerId);
+        this._rememberPeerAliases(targetPeerId, source, sourcePeerId);
+        return true;
     }
 
     _emitRouteStatus(peerId, roomType, state, reason = "", extra = {}) {

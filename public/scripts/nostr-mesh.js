@@ -736,11 +736,17 @@ class NostrMeshConnection {
         }
 
         const expiresAt = NostrMeshProtocol.expiry();
-        const responseDescriptor = {
+        const localDescriptor = {
             ...descriptor,
+            peerPubkey: event.pubkey,
             expiresAt
         };
-        if (!this._joinPrivateRoute(content.routeType, responseDescriptor)) {
+        const responseDescriptor = {
+            ...descriptor,
+            peerPubkey: this._identity.pubkey,
+            expiresAt
+        };
+        if (!this._joinPrivateRoute(content.routeType, localDescriptor)) {
             this._trace("encrypted route request rejected", `peer=${event.pubkey.slice(0, 8)}`, `route=${content.routeType}`, "reason=local-route-inactive");
             return;
         }
@@ -814,7 +820,10 @@ class NostrMeshConnection {
         }
         if (content.recipientPubkey !== this._identity?.pubkey) return {accepted: false, reason: "recipient-mismatch"};
         if (this._isExpired(content.expiresAt)) return {accepted: false, reason: "expired-descriptor"};
-        const descriptor = this._normalizeRouteDescriptor(routeType, content.descriptor);
+        const descriptor = this._normalizeRouteDescriptor(routeType, {
+            ...content.descriptor,
+            peerPubkey: content.responderPubkey || event.pubkey
+        });
         if (!descriptor) return {accepted: false, reason: "invalid-descriptor"};
         if (this._isExpired(descriptor.expiresAt)) return {accepted: false, reason: "expired-descriptor"};
         return {accepted: true, reason: "route-response", descriptor};
@@ -828,12 +837,19 @@ class NostrMeshConnection {
             .filter(Boolean))];
         if (!rooms.length) return null;
         const iceBridge = this._normalizeIceBridgeDescriptor(routeType, descriptor.iceBridge || descriptor.relayIce);
+        const peerPubkey = this._normalizeRoutePeerPubkey(descriptor.peerPubkey);
         return {
             routeType,
             rooms,
+            ...(peerPubkey ? {peerPubkey} : {}),
             ...(iceBridge ? {iceBridge} : {}),
             expiresAt: Number(descriptor.expiresAt || 0)
         };
+    }
+
+    _normalizeRoutePeerPubkey(pubkey) {
+        return globalThis.NpubNetworkProtocol?.normalizePubkey?.(pubkey)
+            || (/^[0-9a-f]{64}$/i.test(pubkey || "") ? String(pubkey).toLowerCase() : "");
     }
 
     _normalizeIceBridgeDescriptor(routeType, iceBridge = null) {
@@ -919,6 +935,7 @@ class NostrMeshConnection {
         const descriptor = await controller.routeDescriptorFor(peerPubkey);
         return this._normalizeRouteDescriptor(routeType, {
             ...descriptor,
+            peerPubkey: descriptor?.peerPubkey || peerPubkey,
             expiresAt: NostrMeshProtocol.expiry()
         });
     }

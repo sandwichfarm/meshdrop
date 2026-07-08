@@ -733,6 +733,55 @@ test("FIPS discovery selection is restored after refresh when daemon is availabl
     }
 });
 
+test("FIPS discovery replays active public and private rooms when websocket reconnects", async () => {
+    resetUi();
+    const joined = [];
+    const originalFetch = globalThis.fetch;
+    storedValues.set("meshdrop_fips_discovery_enabled", "true");
+    globalThis.fetch = async url => {
+        assert.equal(url, "fips/status");
+        return new Response(JSON.stringify({
+            enabled: true,
+            available: true,
+            peerCount: 1,
+            room: "npub-network:fips"
+        }), {status: 200});
+    };
+    globalThis.Events.on("join-fips-room", event => joined.push(event.detail.rooms));
+
+    try {
+        const controller = new globalThis.FipsDiscoveryController();
+        await controller._onConfig({
+            fips: {
+                enabled: true,
+                room: "npub-network:fips",
+                discoveryMode: "public"
+            }
+        });
+        globalThis.Events.fire("fips-status", {enabled: true, available: true, peerCount: 1});
+
+        joined.length = 0;
+        globalThis.Events.fire("ws-connected");
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert.deepEqual(joined.at(-1), ["npub-network:fips"]);
+
+        const peerPubkey = "2".repeat(64);
+        assert.equal(controller.joinRouteDescriptor({
+            routeType: "fips",
+            rooms: ["npub-network:fips-private"],
+            peerPubkey
+        }), true);
+        assert.equal(controller.routeMetadataForRoom("npub-network:fips-private").peerPubkey, peerPubkey);
+
+        joined.length = 0;
+        globalThis.Events.fire("ws-connected");
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert.deepEqual(joined.at(-1).sort(), ["npub-network:fips", "npub-network:fips-private"].sort());
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
 test("Nostr sign-in appears with NIP-07 and dependent actions appear after sign-in", async () => {
     resetUi();
     installSigner();
@@ -1071,6 +1120,54 @@ test("Pollen action shows mesh peer count while active", () => {
     assert.equal(button.hasAttribute("hidden"), false);
     assert.equal(button.classes.has("selected"), true);
     assert.equal(button.getAttribute("data-badge"), "3");
+});
+
+test("Pollen transfer replays active public and private rooms when websocket reconnects", async () => {
+    resetUi();
+    const joined = [];
+    const originalFetch = globalThis.fetch;
+    storedValues.set("meshdrop_pollen_transfer_enabled", "true");
+    globalThis.fetch = async url => {
+        assert.equal(url, "pollen/status");
+        return new Response(JSON.stringify({
+            enabled: true,
+            available: true,
+            peerCount: 1,
+            room: "npub-network:pollen"
+        }), {status: 200});
+    };
+    globalThis.Events.on("join-pollen-room", event => joined.push(event.detail.rooms));
+
+    try {
+        const controller = new globalThis.PollenTransferController();
+        await controller._onConfig({
+            pollen: {
+                enabled: true,
+                room: "npub-network:pollen",
+                discoveryMode: "public"
+            }
+        });
+
+        joined.length = 0;
+        globalThis.Events.fire("ws-connected");
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert.deepEqual(joined.at(-1), ["npub-network:pollen"]);
+
+        const peerPubkey = "3".repeat(64);
+        assert.equal(controller.joinRouteDescriptor({
+            routeType: "pollen",
+            rooms: ["npub-network:pollen-private"],
+            peerPubkey
+        }), true);
+        assert.equal(controller.routeMetadataForRoom("npub-network:pollen-private").peerPubkey, peerPubkey);
+
+        joined.length = 0;
+        globalThis.Events.fire("ws-connected");
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert.deepEqual(joined.at(-1).sort(), ["npub-network:pollen", "npub-network:pollen-private"].sort());
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });
 
 test("Pollen action shows zero badge while visible without known peers", () => {
