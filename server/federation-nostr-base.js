@@ -269,14 +269,21 @@ export class FederationNostrDiscoveryBase {
     async _receiveFederationPayload(event, serverId, transport, descriptor = {}) {
         const payload = this._decryptFederationPayload(event, serverId, transport);
         if (!payload) return false;
-        await this.receiveFederationEvents(payload, {
+        const result = await this.receiveFederationEvents(payload, {
             ...descriptor,
             serverId,
             transport,
             relayPubkey: event.pubkey
         });
-        this.trace("nostr federation payload accepted", `server=${serverId}`, `transport=${transport}`, `events=${payload.events.length}`);
-        return true;
+        const accepted = Number(result?.accepted || 0);
+        this.trace(
+            accepted > 0 ? "nostr federation payload accepted" : "nostr federation payload rejected",
+            `server=${serverId}`,
+            `transport=${transport}`,
+            `events=${Array.isArray(payload.events) ? payload.events.length : 0}`,
+            ...(result?.error ? [`error=${result.error}`] : [])
+        );
+        return result || true;
     }
 
     _recipientPubkeysForScope(scope = null) {

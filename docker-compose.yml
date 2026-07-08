@@ -23,8 +23,6 @@ services:
       - PLN_DIR=/var/lib/meshdrop/pln # In-container Pollen state directory.
       - POLLEN_PORT=60611 # Pollen QUIC listen port.
       - TZ=Etc/UTC # Time Zone
-      - MESHDROP_PUBLIC_DISCOVERY=true
-      - MESHDROP_PUBLIC_DISCOVERY_ROOM=meshdrop-local
     cap_add:
       - NET_ADMIN
     devices:

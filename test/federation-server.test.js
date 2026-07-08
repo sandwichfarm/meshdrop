@@ -6,6 +6,11 @@ import {WebSocketServer} from "ws";
 import PairDropWsServer from "../server/ws-server.js";
 import MeshFederation, {createFederationConfig} from "../server/federation.js";
 
+const LOCAL_FIPS_NPUB = "npub1localfips";
+const LOCAL_FIPS_IPV6 = "fd00::1";
+const REMOTE_FIPS_NPUB = "npub1remotefips";
+const REMOTE_FIPS_IPV6 = "fd00::2";
+
 function createServerHarness() {
     const sent = [];
     const forwarded = [];
@@ -296,6 +301,7 @@ test("federation public discovery uses explicit network tags and filters only wh
         MESHDROP_PUBLIC_DISCOVERY: "true",
         FIPS_FEDERATION_URL: "http://[fd00::1]:3000"
     }));
+    federation.localFipsRoute = {fipsNpub: LOCAL_FIPS_NPUB, fipsIpv6: LOCAL_FIPS_IPV6};
 
     await federation._announceFipsNostr({
         readyState: 1,
@@ -322,6 +328,7 @@ test("local browser FIPS room drives Nostr federation discovery without public e
         FIPS_FEDERATION_URL: "http://[fd00::1]:3000",
         POLLEN_TRANSFER: "false"
     }));
+    federation.localFipsRoute = {fipsNpub: LOCAL_FIPS_NPUB, fipsIpv6: LOCAL_FIPS_IPV6};
 
     federation.localPeerJoined("fips", roomId, {id: "local-peer", rtcSupported: true});
 
@@ -403,7 +410,9 @@ test("active client WOT room accepts matching FIPS announcements from relays", a
             ["d", roomId],
             ["network", roomId],
             ["room", roomId],
-            ["base", "http://[fd00::2]:3000"]
+            ["base", "http://[fd00::2]:3000"],
+            ["fips-npub", REMOTE_FIPS_NPUB],
+            ["fips-ipv6", REMOTE_FIPS_IPV6]
         ],
         content: ""
     }, remoteSecret);
@@ -413,7 +422,9 @@ test("active client WOT room accepts matching FIPS announcements from relays", a
     assert.deepEqual(discovered, [{
         serverId: "remote-server",
         transport: "fips",
-        baseUrl: "http://[fd00::2]:3000"
+        baseUrl: "http://[fd00::2]:3000",
+        fipsNpub: REMOTE_FIPS_NPUB,
+        fipsIpv6: REMOTE_FIPS_IPV6
     }]);
 });
 
@@ -526,6 +537,8 @@ test("federation announces FIPS MeshDrop base URL over Nostr", async () => {
         MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
         FIPS_FEDERATION_URL: "http://[fd00::1]:3000"
     }, [peerPubkey]));
+    federation.localFipsRoute = {fipsNpub: LOCAL_FIPS_NPUB, fipsIpv6: LOCAL_FIPS_IPV6};
+    federation.localFipsRoute = {fipsNpub: LOCAL_FIPS_NPUB, fipsIpv6: LOCAL_FIPS_IPV6};
 
     await federation._announceFipsNostr({
         readyState: 1,
@@ -540,6 +553,8 @@ test("federation announces FIPS MeshDrop base URL over Nostr", async () => {
     assert.equal(tags.some(tag => tag[0] === "network"), false);
     assert(tags.some(tag => tag[0] === "p" && tag[1] === peerPubkey));
     assert(tags.some(tag => tag[0] === "base" && tag[1] === "http://[fd00::1]:3000"));
+    assert(tags.some(tag => tag[0] === "fips-npub" && tag[1] === LOCAL_FIPS_NPUB));
+    assert(tags.some(tag => tag[0] === "fips-ipv6" && tag[1] === LOCAL_FIPS_IPV6));
 });
 
 test("federation accepts Pollen Nostr announcements from trusted authors", async () => {
@@ -727,7 +742,9 @@ test("federation accepts explicit FIPS HTTP advertisements from trusted authors"
             ["protocol", "meshdrop-fips-nostr-discovery"],
             ["server", "remote-a"],
             ["capability", "meshdrop-http"],
-            ["base", "http://[fd00::2]:3000"]
+            ["base", "http://[fd00::2]:3000"],
+            ["fips-npub", REMOTE_FIPS_NPUB],
+            ["fips-ipv6", REMOTE_FIPS_IPV6]
         ],
         content: ""
     }, peerSecret);
@@ -737,7 +754,9 @@ test("federation accepts explicit FIPS HTTP advertisements from trusted authors"
     assert.deepEqual(discovered, [{
         serverId: "remote-a",
         transport: "fips",
-        baseUrl: "http://[fd00::2]:3000"
+        baseUrl: "http://[fd00::2]:3000",
+        fipsNpub: REMOTE_FIPS_NPUB,
+        fipsIpv6: REMOTE_FIPS_IPV6
     }]);
 });
 
@@ -778,7 +797,9 @@ test("federation replies to trusted FIPS announcements with encrypted room snaps
             ["room", "npub-network:test"],
             ["server", "remote-a"],
             ["capability", "meshdrop-http"],
-            ["base", "http://[fd00::2]:3000"]
+            ["base", "http://[fd00::2]:3000"],
+            ["fips-npub", REMOTE_FIPS_NPUB],
+            ["fips-ipv6", REMOTE_FIPS_IPV6]
         ],
         content: ""
     }, peerSecret);
@@ -798,7 +819,7 @@ test("federation replies to trusted FIPS announcements with encrypted room snaps
     assert.equal(payload.events[0].peer.id, "11111111-1111-4111-8111-111111111111");
 });
 
-test("federation accepts encrypted FIPS peer snapshots without overlay HTTP", async () => {
+test("federation rejects encrypted FIPS peer snapshots when the announced route is unreachable", async () => {
     const localSecret = generateSecretKey();
     const peerSecret = generateSecretKey();
     const localPubkey = getPublicKey(localSecret);
@@ -812,15 +833,23 @@ test("federation accepts encrypted FIPS peer snapshots without overlay HTTP", as
     federation.attachWsServer({
         _onFederationPeerJoined: event => handled.push(event)
     });
-    federation._discoverHttpServer = async () => {
-        throw new Error("overlay-http-should-not-run");
-    };
+    federation._verifyFipsRoute = async () => ({
+        reachable: false,
+        reason: "route-unavailable",
+        error: "Network is unreachable"
+    });
     const content = nip44.encrypt(JSON.stringify({
         version: 1,
         type: "federation-events",
         serverId: "remote-a",
         transport: "fips",
-        server: {serverId: "remote-a", transport: "fips", baseUrl: "http://[fd00::2]:3000"},
+        server: {
+            serverId: "remote-a",
+            transport: "fips",
+            baseUrl: "http://[fd00::2]:3000",
+            fipsNpub: REMOTE_FIPS_NPUB,
+            fipsIpv6: REMOTE_FIPS_IPV6
+        },
         events: [{
             type: "peer-joined",
             roomType: "fips",
@@ -839,7 +868,72 @@ test("federation accepts encrypted FIPS peer snapshots without overlay HTTP", as
             ["room", "npub-network:test"],
             ["server", "remote-a"],
             ["capability", "meshdrop-http"],
-            ["base", "http://[fd00::2]:3000"]
+            ["base", "http://[fd00::2]:3000"],
+            ["fips-npub", REMOTE_FIPS_NPUB],
+            ["fips-ipv6", REMOTE_FIPS_IPV6]
+        ],
+        content
+    }, peerSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", accepted]));
+
+    assert.equal(handled.length, 0);
+    assert.equal(federation.remoteServers.has("fips:remote-a"), false);
+});
+
+test("federation accepts encrypted FIPS peer snapshots after route proof", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const localPubkey = getPublicKey(localSecret);
+    const peerPubkey = getPublicKey(peerSecret);
+    const handled = [];
+    const federation = new MeshFederation(createFederationConfigWithRecipients({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret)
+    }, [peerPubkey]));
+    federation.attachWsServer({
+        _onFederationPeerJoined: event => handled.push(event)
+    });
+    federation._verifyFipsRoute = async server => ({
+        reachable: true,
+        baseUrl: server.baseUrl,
+        reason: "route-verified",
+        status: {available: true, streamTransfer: {available: true}}
+    });
+    const content = nip44.encrypt(JSON.stringify({
+        version: 1,
+        type: "federation-events",
+        serverId: "remote-a",
+        transport: "fips",
+        server: {
+            serverId: "remote-a",
+            transport: "fips",
+            baseUrl: "http://[fd00::2]:3000",
+            fipsNpub: REMOTE_FIPS_NPUB,
+            fipsIpv6: REMOTE_FIPS_IPV6
+        },
+        events: [{
+            type: "peer-joined",
+            roomType: "fips",
+            roomId: "npub-network:test",
+            peer: {id: "22222222-2222-4222-8222-222222222222", rtcSupported: true}
+        }]
+    }), nip44.getConversationKey(peerSecret, localPubkey));
+    const accepted = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "fips-federation"],
+            ["protocol", "meshdrop-fips-nostr-discovery"],
+            ["d", "npub-network:test"],
+            ["network", "npub-network:test"],
+            ["room", "npub-network:test"],
+            ["server", "remote-a"],
+            ["capability", "meshdrop-http"],
+            ["base", "http://[fd00::2]:3000"],
+            ["fips-npub", REMOTE_FIPS_NPUB],
+            ["fips-ipv6", REMOTE_FIPS_IPV6]
         ],
         content
     }, peerSecret);
@@ -848,7 +942,125 @@ test("federation accepts encrypted FIPS peer snapshots without overlay HTTP", as
 
     assert.equal(handled.length, 1);
     assert.equal(handled[0].peer.id, "22222222-2222-4222-8222-222222222222");
-    assert.equal(federation.remoteServers.get("fips:remote-a").relayPubkey, peerPubkey);
+    const remote = federation.remoteServers.get("fips:remote-a");
+    assert.equal(remote.relayPubkey, peerPubkey);
+    assert.equal(remote.routeStatus.reason, "route-verified");
+});
+
+test("federation verifies FIPS route against advertised FIPS npub and IPv6", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetches = [];
+    const federation = new MeshFederation(createFederationConfig({MESHDROP_FEDERATION: "false"}), {
+        fipsClient: {
+            async status() {
+                return {
+                    available: true,
+                    peers: [{
+                        npub: REMOTE_FIPS_NPUB,
+                        ipv6Addr: REMOTE_FIPS_IPV6,
+                        connectivity: "connected"
+                    }]
+                };
+            }
+        }
+    });
+    globalThis.fetch = async url => {
+        fetches.push(String(url));
+        return new Response(JSON.stringify({
+            enabled: true,
+            available: true,
+            npub: REMOTE_FIPS_NPUB,
+            ipv6Addr: REMOTE_FIPS_IPV6,
+            streamTransfer: {available: true}
+        }), {status: 200, headers: {"Content-Type": "application/json"}});
+    };
+
+    try {
+        const result = await federation._verifyFipsRoute({
+            baseUrl: "http://[fd00::2]:3000",
+            fipsNpub: REMOTE_FIPS_NPUB,
+            fipsIpv6: REMOTE_FIPS_IPV6
+        });
+
+        assert.equal(result.reachable, true);
+        assert.equal(result.reason, "route-verified");
+        assert.deepEqual(fetches, ["http://[fd00::2]:3000/fips/status"]);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test("federation rejects FIPS route when local daemon has no advertised peer", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetches = [];
+    const federation = new MeshFederation(createFederationConfig({MESHDROP_FEDERATION: "false"}), {
+        fipsClient: {
+            async status() {
+                return {
+                    available: true,
+                    peers: [{
+                        npub: "npub1other",
+                        ipv6Addr: "fd00::99"
+                    }]
+                };
+            }
+        }
+    });
+    globalThis.fetch = async url => {
+        fetches.push(String(url));
+        throw new Error("should not fetch unreachable FIPS route");
+    };
+
+    try {
+        const result = await federation._verifyFipsRoute({
+            baseUrl: "http://[fd00::2]:3000",
+            fipsNpub: REMOTE_FIPS_NPUB,
+            fipsIpv6: REMOTE_FIPS_IPV6
+        });
+
+        assert.equal(result.reachable, false);
+        assert.equal(result.reason, "fips-peer-unavailable");
+        assert.deepEqual(fetches, []);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test("federation rejects FIPS route when remote status identity mismatches advertisement", async () => {
+    const originalFetch = globalThis.fetch;
+    const federation = new MeshFederation(createFederationConfig({MESHDROP_FEDERATION: "false"}), {
+        fipsClient: {
+            async status() {
+                return {
+                    available: true,
+                    peers: [{
+                        npub: REMOTE_FIPS_NPUB,
+                        ipv6Addr: REMOTE_FIPS_IPV6
+                    }]
+                };
+            }
+        }
+    });
+    globalThis.fetch = async () => new Response(JSON.stringify({
+        enabled: true,
+        available: true,
+        npub: "npub1different",
+        ipv6Addr: REMOTE_FIPS_IPV6,
+        streamTransfer: {available: true}
+    }), {status: 200, headers: {"Content-Type": "application/json"}});
+
+    try {
+        const result = await federation._verifyFipsRoute({
+            baseUrl: "http://[fd00::2]:3000",
+            fipsNpub: REMOTE_FIPS_NPUB,
+            fipsIpv6: REMOTE_FIPS_IPV6
+        });
+
+        assert.equal(result.reachable, false);
+        assert.equal(result.reason, "fips-route-identity-mismatch");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });
 
 test("federation accepts encrypted Pollen peer snapshots before cluster HTTP checks", async () => {
@@ -1030,12 +1242,15 @@ test("federation receiveEvents rejects events from undiscovered servers", async 
 test("federation verifies reachable sender descriptor before accepting first events", async () => {
     const handled = [];
     const federation = new MeshFederation(createFederationConfig({MESHDROP_FEDERATION: "false"}));
-    federation._discoverHttpServer = async server => {
-        federation.remoteServers.set("fips:remote", {
-            serverId: "remote",
-            transport: "fips",
-            baseUrl: server.baseUrl
-        });
+    let verifiedServer = null;
+    federation._verifyFipsRoute = async server => {
+        verifiedServer = server;
+        return {
+            reachable: true,
+            baseUrl: server.baseUrl,
+            reason: "route-verified",
+            status: {available: true, streamTransfer: {available: true}}
+        };
     };
     federation.attachWsServer({
         _onFederationPeerJoined: event => handled.push(event.peer.id)
@@ -1047,13 +1262,17 @@ test("federation verifies reachable sender descriptor before accepting first eve
         server: {
             serverId: "remote",
             transport: "fips",
-            baseUrl: "http://[fd00::2]:3000"
+            baseUrl: "http://[fd00::2]:3000",
+            fipsNpub: REMOTE_FIPS_NPUB,
+            fipsIpv6: REMOTE_FIPS_IPV6
         },
         events: [{type: "peer-joined", roomType: "fips", roomId: "room", peer: {id: "peer-a"}}]
     });
 
     assert.deepEqual(result, {accepted: 1});
     assert.deepEqual(handled, ["peer-a"]);
+    assert.equal(verifiedServer.fipsNpub, REMOTE_FIPS_NPUB);
+    assert.equal(verifiedServer.fipsIpv6, REMOTE_FIPS_IPV6);
 });
 
 test("federation includes local return descriptor when relaying events", async () => {

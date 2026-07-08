@@ -3,6 +3,8 @@ import RateLimit from "express-rate-limit";
 import {fileURLToPath} from "url";
 import path, {dirname} from "path";
 import http from "http";
+import {Readable} from "stream";
+import {pipeline} from "stream/promises";
 import {adminPublicConfig, createAdminConfig, verifySignedAdminRequest} from "./admin-auth.js";
 import {normalizeNpubDiscoveryNetworkId} from "./npub-network.js";
 import {createRuntimeCapabilities} from "./runtime-capabilities.js";
@@ -241,6 +243,40 @@ export default class PairDropServer {
                 res.send(descriptor);
             } catch (error) {
                 res.status(502).send({error: error.message});
+            }
+        });
+
+        app.post('/fips/proxy-download', async (req, res) => {
+            try {
+                const status = await conf.fipsClient.status();
+                const streamStatus = await conf.fipsStreamClient.status(status);
+                if (!streamStatus.available) {
+                    res.status(503).send({error: "FIPS stream transfer is unavailable"});
+                    return;
+                }
+
+                const remote = await conf.fipsStreamClient.fetchRemoteDownload(req.body || {}, {
+                    timeoutMs: conf.federation?.timeoutMs || 10000
+                });
+                res.set("Access-Control-Allow-Origin", "*");
+                res.set("X-MeshDrop-FIPS-Proxy", "instance");
+                const contentType = remote.headers.get("content-type");
+                const contentLength = remote.headers.get("content-length");
+                if (contentType) res.set("Content-Type", contentType);
+                if (contentLength) res.set("Content-Length", contentLength);
+
+                if (!remote.body) {
+                    res.send(Buffer.from(await remote.arrayBuffer()));
+                    return;
+                }
+                await pipeline(Readable.fromWeb(remote.body), res);
+            } catch (error) {
+                if (res.headersSent) return;
+                const message = error.message || String(error);
+                const status = /FIPS mesh URL|token|id|credentials/.test(message)
+                    ? 403
+                    : (/unavailable|Network|fetch failed|timeout|download failed/.test(message) ? 503 : 502);
+                res.status(status).send({error: message});
             }
         });
 

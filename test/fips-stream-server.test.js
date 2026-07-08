@@ -152,6 +152,62 @@ test("FIPS stream HTTP routes require available FIPS and serve CORS-readable byt
     });
 });
 
+test("FIPS instance relay proxy downloads remote FIPS bytes through the backend", async () => {
+    await withTempClient(async streamClient => {
+        const originalFetch = globalThis.fetch;
+        const proxied = [];
+        globalThis.fetch = async url => {
+            proxied.push(String(url));
+            return new Response("proxied", {
+                status: 200,
+                headers: {"Content-Type": "text/plain", "Content-Length": "7"}
+            });
+        };
+        try {
+            await withServer({streamClient}, async baseUrl => {
+                const response = await originalFetch(`${baseUrl}/fips/proxy-download`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        baseUrl: "http://[fd12:3456:789a::1]:3000",
+                        id: "a".repeat(32),
+                        token: "b".repeat(64)
+                    })
+                });
+
+                assert.equal(response.status, 200);
+                assert.equal(response.headers.get("x-meshdrop-fips-proxy"), "instance");
+                assert.equal(await response.text(), "proxied");
+                assert.deepEqual(proxied, [
+                    `http://[fd12:3456:789a::1]:3000/fips/download/${"a".repeat(32)}?token=${"b".repeat(64)}`
+                ]);
+            });
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+});
+
+test("FIPS instance relay proxy rejects non-FIPS targets", async () => {
+    await withTempClient(async streamClient => {
+        await withServer({streamClient}, async baseUrl => {
+            const response = await fetch(`${baseUrl}/fips/proxy-download`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    baseUrl: "http://127.0.0.1:3000",
+                    id: "a".repeat(32),
+                    token: "b".repeat(64)
+                })
+            });
+            const body = await response.json();
+
+            assert.equal(response.status, 403);
+            assert.match(body.error, /FIPS mesh URL/);
+        });
+    });
+});
+
 test("FIPS stream upload route fails closed when FIPS has no mesh address", async () => {
     await withTempClient(async streamClient => {
         await withServer({

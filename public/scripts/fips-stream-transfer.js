@@ -4,6 +4,7 @@ const FipsStreamTransferProtocol = {
     statusPath: "fips/status",
     uploadPath: "fips/upload",
     downloadPath: "fips/download",
+    proxyDownloadPath: "fips/proxy-download",
     primitive: "fips-http-stream",
     descriptorTtlMs: 10 * 60 * 1000,
     instanceRelayTtlMs: 10 * 60 * 1000,
@@ -181,6 +182,11 @@ const FipsStreamTransferProtocol = {
         } catch (error) {
             throw new Error(error.message.replace(/^Instance relay/, "FIPS instance relay"));
         }
+    },
+
+    shouldUseInstanceRelay(streamDescriptor = {}) {
+        return streamDescriptor?.transportShape === "instance-relay"
+            || streamDescriptor?.capabilities?.instanceRelay === true;
     },
 
     validateStreamRequest(request = {}, {now = Date.now()} = {}) {
@@ -405,12 +411,39 @@ class FipsStreamTransferController {
     async downloadDescriptor(descriptor, header, streamDescriptor = null) {
         const fileDescriptor = FipsStreamTransferProtocol.validateFileDescriptor(descriptor);
         const baseUrl = FipsStreamTransferProtocol.assertFipsMeshBaseUrl(streamDescriptor?.endpoint?.baseUrl);
+        if (FipsStreamTransferProtocol.shouldUseInstanceRelay(streamDescriptor)) {
+            return this.downloadDescriptorViaInstanceRelay(fileDescriptor, header, baseUrl);
+        }
+
         const url = new URL(`${baseUrl}/${FipsStreamTransferProtocol.downloadPath}/${fileDescriptor.id}`);
         url.searchParams.set("token", fileDescriptor.token);
         const response = await fetch(url.toString());
         if (!response.ok) {
             const error = await response.json().catch(_ => ({}));
             throw new Error(error.error || `FIPS stream download failed with ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        if (blob.size !== fileDescriptor.size) throw new Error("FIPS stream download size mismatch");
+
+        return new File([blob], header.name, {
+            type: header.mime || fileDescriptor.type || blob.type || "application/octet-stream"
+        });
+    }
+
+    async downloadDescriptorViaInstanceRelay(fileDescriptor, header, baseUrl) {
+        const response = await fetch(FipsStreamTransferProtocol.endpoint(FipsStreamTransferProtocol.proxyDownloadPath), {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                baseUrl,
+                id: fileDescriptor.id,
+                token: fileDescriptor.token
+            })
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(_ => ({}));
+            throw new Error(error.error || `FIPS instance relay download failed with ${response.status}`);
         }
 
         const blob = await response.blob();

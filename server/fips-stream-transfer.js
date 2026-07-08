@@ -7,8 +7,28 @@ import {pipeline} from "stream/promises";
 
 const idPattern = /^[0-9a-f]{32}$/i;
 const tokenPattern = /^[0-9a-f]{64}$/i;
+const fipsMeshHostPattern = /^fd[0-9a-f:.]+$/i;
 const DEFAULT_MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
+
+export function normalizeFipsMeshBaseUrl(baseUrl) {
+    let parsed;
+    try {
+        parsed = new URL(baseUrl);
+    } catch {
+        throw new Error("FIPS mesh URL is invalid");
+    }
+
+    const hostname = parsed.hostname.replace(/^\[/, "").replace(/\]$/, "");
+    if (!["http:", "https:"].includes(parsed.protocol) || !fipsMeshHostPattern.test(hostname)) {
+        throw new Error("FIPS mesh URL must use a FIPS IPv6 address");
+    }
+    if (parsed.username || parsed.password) throw new Error("FIPS mesh URL must not include credentials");
+
+    parsed.hash = "";
+    parsed.search = "";
+    return parsed.toString().replace(/\/$/, "");
+}
 
 export function createFipsStreamConfig(env = process.env) {
     return {
@@ -90,6 +110,29 @@ export default class FipsStreamTransferClient {
             sha256: record.sha256,
             expiresAt: record.expiresAt
         };
+    }
+
+    remoteDownloadUrl({baseUrl, id, token} = {}) {
+        if (!idPattern.test(id || "")) throw new Error("invalid FIPS stream id");
+        if (!tokenPattern.test(token || "")) throw new Error("invalid FIPS stream token");
+
+        const normalizedBaseUrl = normalizeFipsMeshBaseUrl(baseUrl);
+        const url = new URL(`${normalizedBaseUrl}/fips/download/${String(id).toLowerCase()}`);
+        url.searchParams.set("token", String(token).toLowerCase());
+        return url.toString();
+    }
+
+    async fetchRemoteDownload(request = {}, {fetchImpl = globalThis.fetch, timeoutMs = 10000} = {}) {
+        if (typeof fetchImpl !== "function") throw new Error("FIPS remote fetch is unavailable");
+
+        const url = this.remoteDownloadUrl(request);
+        const response = await fetchImpl(url, {
+            signal: AbortSignal.timeout(timeoutMs)
+        });
+        if (!response.ok) {
+            throw new Error(`FIPS remote download failed with ${response.status}`);
+        }
+        return response;
     }
 
     openDownload(id, token) {

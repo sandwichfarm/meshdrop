@@ -2,9 +2,12 @@ import {createFederationConfig} from "./federation-config.js";
 import {FederationFipsTransport} from "./federation-fips.js";
 import {FederationNostrDiscovery} from "./federation-nostr.js";
 import {FederationPollenTransport} from "./federation-pollen.js";
+import {normalizeFipsMeshBaseUrl} from "./fips-stream-transfer.js";
 
 const writeStderr = (...parts) => process.stderr.write(`${parts.join(" ")}\n`);
 const errorMessage = error => error?.message || String(error);
+const normalizeFipsNpub = value => String(value || "").trim().toLowerCase();
+const normalizeFipsIpv6 = value => String(value || "").trim().replace(/^\[/, "").replace(/\]$/, "").toLowerCase();
 
 export {createFederationConfig};
 
@@ -20,6 +23,7 @@ export default class MeshFederation {
         this.timers = [];
         this.fipsPeerEvents = null;
         this.localFipsBaseUrl = this.config.fips.publicUrl;
+        this.localFipsRoute = {};
         this.pollenTransport = new FederationPollenTransport({
             config,
             pollenClient,
@@ -31,6 +35,7 @@ export default class MeshFederation {
             trace: (...parts) => this._trace(...parts),
             setLocalBaseUrl: baseUrl => { this.localFipsBaseUrl = baseUrl; },
             getLocalBaseUrl: () => this.localFipsBaseUrl,
+            setLocalRouteIdentity: route => { this.localFipsRoute = this._normalizeFipsRouteIdentity(route); },
             discoverPeer: peer => this._discoverFipsPeer(peer),
             removePeer: (peer, disconnect) => this._removeFipsPeer(peer, disconnect),
             removeRemoteServer: (server, disconnect) => this._removeRemoteServer(server, disconnect),
@@ -200,18 +205,33 @@ export default class MeshFederation {
 
     async _discoverHttpServer(server) {
         let response;
-        this._trace("http discover", server.transport, server.baseUrl);
+        let routeStatus = null;
+        let baseUrl = server.baseUrl;
+        if (server.transport === "fips") {
+            routeStatus = await this._verifyFipsRoute(server);
+            if (!routeStatus.reachable) {
+                this._trace(
+                    "fips route unavailable",
+                    `remote=${server.serverId || "unknown"}`,
+                    `baseUrl=${server.baseUrl || "missing"}`,
+                    `reason=${routeStatus.reason || "route-unavailable"}`
+                );
+                throw new Error(routeStatus.error || routeStatus.reason || "fips-route-unavailable");
+            }
+            baseUrl = routeStatus.baseUrl;
+        }
+        this._trace("http discover", server.transport, baseUrl);
         try {
-            response = await fetch(`${server.baseUrl}/.well-known/meshdrop-federation`, {
+            response = await fetch(`${baseUrl}/.well-known/meshdrop-federation`, {
                 signal: AbortSignal.timeout(this.config.timeoutMs)
             });
         } catch (error) {
             this._removeRemoteServer(server, true);
-            this._trace("http discover failed", server.transport, server.baseUrl, errorMessage(error));
+            this._trace("http discover failed", server.transport, baseUrl, errorMessage(error));
             throw error;
         }
         if (!response.ok) {
-            this._trace("http discover rejected", server.transport, server.baseUrl, `status=${response.status}`);
+            this._trace("http discover rejected", server.transport, baseUrl, `status=${response.status}`);
             return;
         }
 
@@ -224,9 +244,11 @@ export default class MeshFederation {
 
         const discovered = {
             ...server,
+            baseUrl,
             serverId: snapshot.serverId,
             peerIds: peers.map(peer => peer.peer?.id).filter(Boolean),
-            lastSeen: Date.now()
+            lastSeen: Date.now(),
+            ...(routeStatus ? {routeStatus} : {})
         };
         this.remoteServers.set(this._serverKey(discovered), discovered);
         this._trace(
@@ -246,6 +268,9 @@ export default class MeshFederation {
         if (!payload.serverId || payload.serverId === this.config.serverId) return {accepted: 0};
         const transport = payload.transport || server.transport || "federation";
         const events = Array.isArray(payload.events) ? payload.events : [];
+        if (transport === "fips") {
+            return this._receiveFipsNostrFederationEvents(payload, server, events);
+        }
         const discovered = {
             ...server,
             serverId: payload.serverId,
@@ -267,10 +292,72 @@ export default class MeshFederation {
         });
     }
 
+    async _receiveFipsNostrFederationEvents(payload = {}, server = {}, events = []) {
+        const descriptor = {
+            ...payload.server,
+            ...server,
+            serverId: payload.serverId,
+            transport: "fips"
+        };
+        const routeStatus = await this._verifyFipsRoute(descriptor);
+        if (!routeStatus.reachable) {
+            this._trace(
+                "nostr federation rejected",
+                "fips",
+                `remote=${payload.serverId}`,
+                `reason=${routeStatus.reason || "route-unavailable"}`,
+                `error=${routeStatus.error || "none"}`
+            );
+            return {accepted: 0, error: "fips-route-unavailable", routeStatus};
+        }
+
+        this.remoteServers.set(this._serverKey(descriptor), {
+            ...descriptor,
+            baseUrl: routeStatus.baseUrl,
+            relayPubkey: server.relayPubkey,
+            peerIds: events.map(event => event.peer?.id).filter(Boolean),
+            lastSeen: Date.now(),
+            routeStatus
+        });
+        this._trace(
+            "nostr federation accepted",
+            "fips",
+            `remote=${payload.serverId}`,
+            `events=${events.length}`
+        );
+        for (const event of events) {
+            this._dispatchEvent({
+                ...event,
+                serverId: payload.serverId,
+                transport: event.transport || "fips"
+            });
+        }
+
+        return {accepted: events.length};
+    }
+
     async _verifyAndRegisterSender(payload, transport) {
         const descriptor = payload.server || {};
         if (descriptor.serverId && descriptor.serverId !== payload.serverId) return false;
         if (descriptor.transport && descriptor.transport !== transport) return false;
+
+        if (transport === "fips" && descriptor.baseUrl) {
+            const routeStatus = await this._verifyFipsRoute({
+                ...descriptor,
+                serverId: payload.serverId,
+                transport
+            });
+            if (!routeStatus.reachable) return false;
+            this.remoteServers.set(this._serverKey({transport, serverId: payload.serverId}), {
+                serverId: payload.serverId,
+                transport,
+                baseUrl: routeStatus.baseUrl,
+                peerIds: [],
+                lastSeen: Date.now(),
+                routeStatus
+            });
+            return true;
+        }
 
         if (transport === "pollen" && descriptor.serviceName) {
             await this._connectPollenService(payload.serverId, descriptor.serviceName).catch(() => undefined);
@@ -287,6 +374,161 @@ export default class MeshFederation {
         }
 
         return false;
+    }
+
+    async _verifyFipsRoute(server = {}) {
+        const routeIdentity = this._normalizeFipsRouteIdentity(server);
+        if (!routeIdentity.fipsNpub || !routeIdentity.fipsIpv6) {
+            return {
+                reachable: false,
+                reason: "missing-fips-route-identity",
+                error: "FIPS route identity is missing"
+            };
+        }
+
+        let baseUrl;
+        try {
+            baseUrl = normalizeFipsMeshBaseUrl(server.baseUrl);
+        } catch (error) {
+            return {
+                reachable: false,
+                reason: "invalid-fips-base-url",
+                error: error.message
+            };
+        }
+        const baseHost = normalizeFipsIpv6(new URL(baseUrl).hostname);
+        if (baseHost !== routeIdentity.fipsIpv6) {
+            return {
+                reachable: false,
+                baseUrl,
+                ...routeIdentity,
+                reason: "fips-route-identity-mismatch",
+                error: "FIPS base URL does not match advertised FIPS IPv6"
+            };
+        }
+
+        const localProof = await this._localFipsPeerProof(routeIdentity);
+        if (!localProof.reachable) {
+            return {
+                reachable: false,
+                baseUrl,
+                ...routeIdentity,
+                ...localProof
+            };
+        }
+
+        try {
+            const response = await fetch(`${baseUrl}/fips/status`, {
+                signal: AbortSignal.timeout(this.config.timeoutMs)
+            });
+            if (!response.ok) {
+                return {
+                    reachable: false,
+                    baseUrl,
+                    reason: "route-unavailable",
+                    error: `FIPS status failed with ${response.status}`
+                };
+            }
+            const status = await response.json();
+            const remoteIdentity = this._normalizeFipsRouteIdentity({
+                fipsNpub: status.npub,
+                fipsIpv6: status.ipv6Addr
+            });
+            if (remoteIdentity.fipsNpub !== routeIdentity.fipsNpub || remoteIdentity.fipsIpv6 !== routeIdentity.fipsIpv6) {
+                return {
+                    reachable: false,
+                    baseUrl,
+                    ...routeIdentity,
+                    reason: "fips-route-identity-mismatch",
+                    error: "Remote FIPS status does not match advertised FIPS identity",
+                    status
+                };
+            }
+            if (status.available !== true || status.streamTransfer?.available !== true) {
+                return {
+                    reachable: false,
+                    baseUrl,
+                    ...routeIdentity,
+                    reason: "route-unavailable",
+                    error: status.error || status.streamTransfer?.error || "FIPS stream transfer is unavailable",
+                    status
+                };
+            }
+            return {
+                reachable: true,
+                baseUrl,
+                ...routeIdentity,
+                reason: "route-verified",
+                status
+            };
+        } catch (error) {
+            return {
+                reachable: false,
+                baseUrl,
+                ...routeIdentity,
+                reason: "route-unavailable",
+                error: errorMessage(error)
+            };
+        }
+    }
+
+    async _localFipsPeerProof(routeIdentity = {}) {
+        if (!this.fipsClient?.status) {
+            return {reachable: false, reason: "fips-control-unavailable", error: "FIPS control client is unavailable"};
+        }
+
+        const status = await this.fipsClient.status().catch(error => ({
+            available: false,
+            error: errorMessage(error),
+            peers: []
+        }));
+        if (!status.available) {
+            return {
+                reachable: false,
+                reason: "fips-control-unavailable",
+                error: status.error || "FIPS daemon is unavailable",
+                localStatus: status
+            };
+        }
+
+        const peer = (Array.isArray(status.peers) ? status.peers : []).find(candidate => {
+            const peerNpub = normalizeFipsNpub(candidate.npub);
+            const peerIpv6 = normalizeFipsIpv6(candidate.ipv6Addr);
+            return peerNpub === routeIdentity.fipsNpub && peerIpv6 === routeIdentity.fipsIpv6;
+        });
+        if (!peer) {
+            return {
+                reachable: false,
+                reason: "fips-peer-unavailable",
+                error: "FIPS daemon has no matching peer route",
+                localStatus: {
+                    available: true,
+                    peerCount: status.peerCount,
+                    peers: (status.peers || []).map(candidate => ({
+                        npub: candidate.npub,
+                        ipv6Addr: candidate.ipv6Addr,
+                        connectivity: candidate.connectivity
+                    }))
+                }
+            };
+        }
+
+        return {
+            reachable: true,
+            localPeer: {
+                npub: peer.npub,
+                ipv6Addr: peer.ipv6Addr,
+                connectivity: peer.connectivity,
+                transportType: peer.transportType
+            }
+        };
+    }
+
+    _normalizeFipsRouteIdentity(route = {}) {
+        return {
+            fipsNpub: normalizeFipsNpub(route.fipsNpub || route.fips_npub || route.npub),
+            fipsIpv6: normalizeFipsIpv6(route.fipsIpv6 || route.fipsIPv6 || route.fips_ipv6 || route.ipv6Addr)
+        };
     }
 
     _removeRemoteServer(server, disconnect = true) {
@@ -359,6 +601,8 @@ export default class MeshFederation {
         }
         else if (transport === "fips" && this.localFipsBaseUrl) {
             descriptor.baseUrl = this.localFipsBaseUrl;
+            if (this.localFipsRoute.fipsNpub) descriptor.fipsNpub = this.localFipsRoute.fipsNpub;
+            if (this.localFipsRoute.fipsIpv6) descriptor.fipsIpv6 = this.localFipsRoute.fipsIpv6;
         }
 
         return descriptor;
