@@ -413,3 +413,57 @@ test("validates relay WebRTC proof only when selected ICE candidate is relay", (
         {ok: false, reason: "missing-proof-field:selectedIceCandidateType"}
     );
 });
+
+test("requires route-specific topology evidence before overlay WebRTC relay proof can pass", () => {
+    const proof = {
+        senderRuntime: "browser-a",
+        recipientRuntime: "browser-b",
+        routeType: "fips",
+        dataPlanePrimitive: "webrtc-relay-ice",
+        webRtcUsed: true,
+        instanceRelayed: false,
+        bytesSent: 4096,
+        bytesReceived: 4096,
+        hashMatched: true,
+        fallbackUsed: false,
+        selectedIceCandidateType: "relay"
+    };
+
+    assert.deepEqual(
+        contract.validateRouteProof(proof),
+        {ok: false, reason: "missing-proof-field:topologyEvidence"}
+    );
+    assert.deepEqual(
+        contract.validateRouteProof({
+            ...proof,
+            topologyEvidence: {
+                overlay: "pollen",
+                relayEndpoint: "turn:fips-relay.test:3478"
+            }
+        }),
+        {ok: false, reason: "topology-overlay-mismatch"}
+    );
+    assert.deepEqual(
+        contract.validateRouteProof({
+            ...proof,
+            topologyEvidence: {
+                overlay: "fips",
+                relayEndpoint: ""
+            }
+        }),
+        {ok: false, reason: "missing-proof-field:topologyEvidence.relayEndpoint"}
+    );
+
+    const validProof = {
+        ...proof,
+        topologyEvidence: {
+            overlay: "fips",
+            relayEndpoint: "turn:[fd00::1234]:3478",
+            interface: "fips0"
+        }
+    };
+    assert.deepEqual(contract.validateRouteProof(validProof), {
+        ok: true,
+        proof: validProof
+    });
+});

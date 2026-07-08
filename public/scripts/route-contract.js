@@ -15,6 +15,7 @@ const adapterMethods = [
     "close",
     "proof"
 ];
+const overlayRelayRouteTypes = new Set(["fips", "pollen", "tor", "i2p", "loki"]);
 
 const isPlainObject = value => !!value && typeof value === "object" && !Array.isArray(value);
 const isNonEmptyString = value => typeof value === "string" && value.trim().length > 0;
@@ -191,6 +192,13 @@ const validateRouteProof = proof => {
     if (proof.dataPlanePrimitive === "webrtc-relay-ice") {
         if (!isNonEmptyString(proof.selectedIceCandidateType)) return failure("missing-proof-field:selectedIceCandidateType");
         if (proof.selectedIceCandidateType !== "relay") return failure("non-relay-ice-candidate");
+        if (overlayRelayRouteTypes.has(proof.routeType)) {
+            if (!isPlainObject(proof.topologyEvidence)) return failure("missing-proof-field:topologyEvidence");
+            if (proof.topologyEvidence.overlay !== proof.routeType) return failure("topology-overlay-mismatch");
+            if (!isNonEmptyString(proof.topologyEvidence.relayEndpoint)) {
+                return failure("missing-proof-field:topologyEvidence.relayEndpoint");
+            }
+        }
     }
 
     return {
@@ -201,6 +209,7 @@ const validateRouteProof = proof => {
 
 const MeshDropRouteContract = {
     adapterMethods: [...adapterMethods],
+    overlayRelayRouteTypes: [...overlayRelayRouteTypes],
     transportShapes: [...transportShapes],
     validateDescriptor,
     validateLegacyRoomDescriptor,

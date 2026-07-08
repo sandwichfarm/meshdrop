@@ -1,4 +1,4 @@
-# Requirements: MeshDrop v0.15.0 Loki Byte Transfer Proof
+# Requirements: MeshDrop v0.16.0 Overlay Relay Proof Preflight
 
 **Defined:** 2026-07-08
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
@@ -14,6 +14,15 @@
 - FIPS stream proof proves encrypted payload bytes over the sender's FIPS mesh IPv6 address and emits route proof.
 - TURN relay proof proves browser WebRTC can be forced through a relay candidate before route-specific overlay WebRTC claims are allowed.
 - Tor/I2P/Loki runtime capability surfaces already fail closed unless configured with explicit overlay stream endpoints.
+
+## v0.16.0 Requirements
+
+### Overlay Relay Proof Preflight
+
+- [x] **OVR-PRE-01**: Generic `turn-relay` WebRTC route proof remains valid when WebRTC stats show selected ICE candidate type `relay`, but it cannot be relabeled as FIPS/Pollen/Tor/I2P/Loki without route-specific topology evidence.
+- [x] **OVR-PRE-02**: Overlay `webrtc-relay-ice` proofs for FIPS, Pollen, Tor, I2P, or Loki require topology evidence naming the same overlay and a non-empty `relayEndpoint`.
+- [x] **OVR-PRE-03**: A fail-closed preflight command validates route-specific relay ICE config plus matching topology evidence before runtime UAT and reports `provenTransfer=false` so preflight cannot be mistaken for byte proof.
+- [x] **OVR-PRE-04**: FIPS/Pollen route-specific WebRTC relay bytes remain blocked by issue #152 until a real overlay-reachable relay endpoint carries a browser transfer with selected `relay` candidates and no Clearnet fallback.
 
 ## v0.15.0 Requirements
 
@@ -77,7 +86,7 @@
 
 ## Future Requirements
 
-- **OVERLAY-WEBRTC-01**: FIPS/Pollen route-specific WebRTC relay claims stay unavailable until a relay endpoint reachable through that route proves selected relay candidates and no Clearnet fallback. Tracked by https://github.com/sandwichfarm/meshdrop/issues/152.
+- **OVERLAY-WEBRTC-01**: FIPS/Pollen route-specific WebRTC relay claims stay unavailable until a relay endpoint reachable through that route passes the preflight, proves selected relay candidates, transfers bytes, and avoids Clearnet fallback. Tracked by https://github.com/sandwichfarm/meshdrop/issues/152.
 
 ## v0.11.0 Requirements
 
@@ -115,6 +124,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| OVR-PRE-01 | Phase 20 | Complete |
+| OVR-PRE-02 | Phase 20 | Complete |
+| OVR-PRE-03 | Phase 20 | Complete |
+| OVR-PRE-04 | Phase 20 | Complete |
 | LOKI-BYTE-01 | Phase 19 | Complete |
 | LOKI-BYTE-02 | Phase 19 | Complete |
 | LOKI-BYTE-03 | Phase 19 | Complete |
@@ -157,10 +170,10 @@
 | BLOCKER-05 | Phase 16 | Complete |
 
 **Coverage:**
-- v0.15.0 requirements: 5 total
-- Mapped to phases: 5
+- v0.16.0 requirements: 4 total
+- Mapped to phases: 4
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-08*
-*Last updated: 2026-07-08 completing Phase 19 Loki Byte Transfer Proof.*
+*Last updated: 2026-07-08 completing Phase 20 Overlay Relay Proof Preflight.*

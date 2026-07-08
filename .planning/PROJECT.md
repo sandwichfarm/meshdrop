@@ -14,16 +14,15 @@ Nostr is the control plane, not the only data path. MeshDrop should discover tru
 
 Proof beats labels. A toggle, badge, route descriptor, status response, or discovered peer is not enough. A claimed route is real only after transfer proof shows file bytes crossed that route and the receiver verified them.
 
-## Current Milestone: v0.15.0 Loki Byte Transfer Proof
+## Current Milestone: v0.16.0 Overlay Relay Proof Preflight
 
-**Goal:** close the Loki portion of blocker #151 with a reproducible byte-transfer proof using a Dockerized Lokinet daemon, local `.loki` SNApp address, and plain `.loki` DNS resolution through Lokinet.
+**Goal:** prevent false FIPS/Pollen WebRTC overlay claims by requiring route-specific topology evidence before any overlay `webrtc-relay-ice` proof can pass, and provide an opt-in preflight harness for the real relay endpoint work tracked by #152.
 
 **Target features:**
-- Reuse the generic overlay stream transfer endpoint for configured Loki adapters without adding Loki-only storage behavior.
-- Generate and validate Loki stream descriptors with `.loki` endpoint evidence, short-lived tokens, byte limits, hash metadata, and fail-closed constraints.
-- Add a Dockerized Lokinet runtime smoke that starts Lokinet inside an isolated NET_ADMIN container, serves MeshDrop on the Lokinet interface, fetches the payload through plain `.loki` DNS resolution, and emits route proof for `loki-http-stream`.
-- Keep Loki WebRTC and public Lokinet reachability separate from this local daemon byte proof.
-- Update blocker #151 for the final Tor/I2P/Loki daemon/proxy byte-transfer proof.
+- Keep generic TURN relay proof valid for `turn-relay` without relabeling it as FIPS/Pollen.
+- Require topology evidence that names the selected overlay and relay endpoint for FIPS/Pollen/Tor/I2P/Loki WebRTC relay proofs.
+- Add a fail-closed preflight command that validates route-specific relay ICE config and topology evidence before runtime UAT.
+- Keep issue #152 open until a real FIPS/Pollen relay endpoint carries browser transfer bytes with selected `relay` candidates and no Clearnet fallback.
 
 ## Requirements
 
@@ -49,6 +48,7 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 - [x] Generalize instance relay so Pollen, FIPS, Tor, I2P, Loki, and future backend networks share descriptor, validation, and proof behavior instead of duplicating route contracts.
 - [x] Add Tor, I2P, and Loki route adapter capability surfaces that fail closed until a local instance/native runtime can prove dial support.
 - [x] Prove relay-only WebRTC transfer through a configured TURN path before labeling FIPS/Pollen overlay WebRTC as byte-carrying routes. Requirements: `docs/webrtc-overlay-transport-requirements.md`.
+- [x] Require route-specific topology evidence and add a fail-closed preflight before any FIPS/Pollen overlay WebRTC relay proof can pass. Blocker: https://github.com/sandwichfarm/meshdrop/issues/152.
 - [x] Keep current FIPS/Pollen room descriptors working while the generic contract is introduced; Slice 1 must not rewrite live route selection.
 - [x] Document remaining blocked route/release/UAT work in live GitHub issues with acceptance evidence.
 - [x] Prove a Tor overlay stream route transfers bytes through a reproducible Dockerized `.onion` path, validates the payload hash, and emits proof with fallback disabled.
@@ -117,10 +117,11 @@ Proof beats labels. A toggle, badge, route descriptor, status response, or disco
 | Generic instance relay comes before more networks | Pollen proved the first backend-mediated byte path; future FIPS/Tor/I2P/Loki routes need shared descriptor/proof semantics before more one-off adapters | ✓ Good |
 | Overlay networks start fail-closed | Tor/I2P/Loki need local dial proof before MeshDrop can claim transfer support | ✓ Good |
 | TURN relay proof precedes overlay WebRTC claims | Browser WebRTC can only count as FIPS/Pollen/Tor/I2P/Loki when stats prove file bytes used a relay candidate constrained to that route | ✓ Good |
+| Overlay WebRTC proof needs route-specific topology evidence | A selected relay ICE candidate proves relay use, but not that the TURN endpoint was reached through FIPS/Pollen/Tor/I2P/Loki | ✓ Good |
 | Blocked transport claims live in GitHub issues | Future work needs a tracker-owned acceptance contract, not stale notes buried in PR bodies | ✓ Good |
 | Dockerized Tor proof unblocks local daemon absence | A route-specific smoke can provide its own Tor daemon/proxy surface instead of depending on host-installed Tor | ✓ Good |
 | Dockerized i2pd proof uses a local zero-hop tunnel first | i2pd can provide a deterministic HTTP proxy/server tunnel smoke without depending on host I2P state; public I2P reachability and WebRTC remain separate future work | ✓ Good |
 | Dockerized Lokinet proof runs MeshDrop inside the Lokinet container | Lokinet configures a network interface and resolver, so the proof avoids mutating host networking while still proving `.loki` DNS and interface-routed bytes | ✓ Good |
 
 ---
-*Last updated: 2026-07-08 completing Phase 19 Loki Byte Transfer Proof.*
+*Last updated: 2026-07-08 completing Phase 20 Overlay Relay Proof Preflight.*

@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.15.0
-milestone_name: Loki Byte Transfer Proof
+milestone: v0.16.0
+milestone_name: Overlay Relay Proof Preflight
 status: complete
-last_updated: "2026-07-08T00:31:00.000Z"
+last_updated: "2026-07-08T02:02:50+02:00"
 last_activity: 2026-07-08
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-08)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** Phase 19 Loki Byte Transfer Proof is complete; Tor, I2P, and Loki have reproducible overlay daemon/proxy byte-transfer evidence.
+**Current focus:** Phase 20 Overlay Relay Proof Preflight is complete; FIPS/Pollen WebRTC overlay bytes remain blocked by issue #152 until a route-specific relay endpoint is proven.
 
 ## Milestone Audit: 2026-07-06
 
@@ -185,6 +185,7 @@ Closed during this audit branch:
 | 2026-07-07 | `260707-tor-byte-transfer-proof` | complete | Generic overlay stream upload/download endpoints; Dockerized Tor hidden-service smoke emits `Proof tor-http-stream` with generated `.onion`, 42/42 bytes, hash matched, fallback disabled; focused 31/31; `npm test` 368/368; diff check |
 | 2026-07-08 | `260708-i2p-byte-transfer-proof` | complete | Dockerized i2pd HTTP proxy/server tunnel smoke emits `Proof i2p-http-stream` with generated `.b32.i2p`, 42/42 bytes, hash matched, fallback disabled; focused 33/33; `npm test` 369/369 |
 | 2026-07-08 | `260708-loki-byte-transfer-proof` | complete | Dockerized Lokinet daemon/SNApp smoke emits `Proof loki-http-stream` with generated `.loki`, resolver `127.3.2.1:53`, interface `lokitun0`, 43/43 bytes, hash matched, fallback disabled; focused 16/16; `npm test` 370/370 |
+| 2026-07-08 | `260708-overlay-relay-proof-preflight` | complete | Overlay `webrtc-relay-ice` proofs require topology evidence; preflight validates matching FIPS relay config/evidence and reports `provenTransfer=false`; focused 21/21; `npm test` 375/375; diff/slop gates |
 
 ## Active Quick Task
 
@@ -195,7 +196,7 @@ None.
 
 ## Current Position
 
-Phase: 19 Loki Byte Transfer Proof
-Plan: `.planning/phases/19-loki-byte-transfer-proof/19-01-PLAN.md`
+Phase: 20 Overlay Relay Proof Preflight
+Plan: `.planning/phases/20-overlay-relay-proof-preflight/20-01-PLAN.md`
 Status: Complete
-Last activity: 2026-07-08 — Loki byte-transfer proof completed with Dockerized `.loki` route evidence.
+Last activity: 2026-07-08 — Phase 20 completed with route-contract topology guard and fail-closed overlay relay preflight
