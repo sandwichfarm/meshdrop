@@ -94,6 +94,7 @@ export default class MeshFederation {
         const key = this._roomKey(roomType, roomId);
         if (!this.localPeers.has(key)) this.localPeers.set(key, new Map());
         this.localPeers.get(key).set(peerInfo.id, peerInfo);
+        this.nostrDiscovery.addLocalRoom(roomType, roomId);
         this._broadcast({type: "peer-joined", roomType, roomId, peer: peerInfo}, roomType);
     }
 
@@ -102,6 +103,7 @@ export default class MeshFederation {
 
         const key = this._roomKey(roomType, roomId);
         this.localPeers.get(key)?.delete(peerId);
+        this.nostrDiscovery.removeLocalRoom(roomType, roomId);
         this._broadcast({type: "peer-left", roomType, roomId, peerId, disconnect: true}, roomType);
     }
 
