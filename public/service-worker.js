@@ -1,4 +1,4 @@
-const cacheVersion = 'v1.11.9-route-status-polish-verified';
+const cacheVersion = 'v1.11.9-route-status-polish-fips-script-assets';
 const cacheTitle = `meshdrop-cache-${cacheVersion}`;
 const relativePathsToCache = [
     './',
@@ -15,8 +15,24 @@ const relativePathsToCache = [
     'scripts/ui-main.js',
     'scripts/util.js',
     'scripts/nostr-relays.js',
+    'scripts/nostr-relay-globals.js',
+    'scripts/nostr-pubkey.js',
+    'scripts/nostr-android-signer.js',
+    'scripts/nostr-identity.js',
     'scripts/route-contract.js',
+    'scripts/instance-relay-transfer.js',
+    'scripts/local-discovery.js',
+    'scripts/nostr-mesh.js',
     'scripts/nostr-mesh-autostart.js',
+    'scripts/blossom-transfer.js',
+    'scripts/hashtree-transfer.js',
+    'scripts/pollen-transfer.js',
+    'scripts/fips-stream-transfer.js',
+    'scripts/android-native-routes.js',
+    'scripts/fips-discovery.js',
+    'scripts/fips-stream-integration.js',
+    'scripts/native-share-inbox.js',
+    'scripts/nostr-login-dialog.js',
     'scripts/worker/canvas-worker.js',
     'scripts/libs/noble-ciphers/LICENSE',
     'scripts/libs/noble-ciphers/_polyval.js',
