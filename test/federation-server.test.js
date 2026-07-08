@@ -311,6 +311,145 @@ test("federation public discovery uses explicit network tags and filters only wh
     assert(tags.some(tag => tag[0] === "network" && tag[1] === "npub-network:unconfigured"));
 });
 
+test("local browser FIPS room drives Nostr federation discovery without public env", async () => {
+    const localSecret = generateSecretKey();
+    const roomId = "npub-network:client-wot-fips";
+    const sent = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        FIPS_FEDERATION_URL: "http://[fd00::1]:3000",
+        POLLEN_TRANSFER: "false"
+    }));
+
+    federation.localPeerJoined("fips", roomId, {id: "local-peer", rtcSupported: true});
+
+    assert.deepEqual(federation._nostrDiscoveryFilters(), [
+        {kinds: [20385], "#d": [roomId]}
+    ]);
+
+    await federation._announceFipsNostr({
+        readyState: 1,
+        send: message => sent.push(JSON.parse(message))
+    });
+
+    assert.equal(sent.length, 1);
+    const tags = sent[0][1].tags;
+    assert(tags.some(tag => tag[0] === "type" && tag[1] === "fips-federation"));
+    assert(tags.some(tag => tag[0] === "d" && tag[1] === roomId));
+    assert(tags.some(tag => tag[0] === "network" && tag[1] === roomId));
+    assert(tags.some(tag => tag[0] === "room" && tag[1] === roomId));
+    assert(tags.some(tag => tag[0] === "base" && tag[1] === "http://[fd00::1]:3000"));
+});
+
+test("local browser Pollen room drives Nostr federation discovery without public env", async () => {
+    const localSecret = generateSecretKey();
+    const roomId = "npub-network:client-wot-pollen";
+    const sent = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret)
+    }));
+    federation.nostrDiscovery.getPollenIdentity = async () => ({
+        nodeId: "local-pln-node",
+        rootHash: "local-pln-root",
+        hasMembership: true
+    });
+
+    federation.localPeerJoined("pollen", roomId, {id: "local-peer", rtcSupported: true});
+
+    assert.deepEqual(federation._nostrDiscoveryFilters(), [
+        {kinds: [20385], "#d": [roomId]}
+    ]);
+
+    await federation._announcePollenNostr({
+        readyState: 1,
+        send: message => sent.push(JSON.parse(message))
+    });
+
+    assert.equal(sent.length, 1);
+    const tags = sent[0][1].tags;
+    assert(tags.some(tag => tag[0] === "type" && tag[1] === "pollen-federation"));
+    assert(tags.some(tag => tag[0] === "d" && tag[1] === roomId));
+    assert(tags.some(tag => tag[0] === "network" && tag[1] === roomId));
+    assert(tags.some(tag => tag[0] === "room" && tag[1] === roomId));
+    assert(tags.some(tag => tag[0] === "service" && tag[1] === federation.config.pollen.serviceName));
+});
+
+test("active client WOT room accepts matching FIPS announcements from relays", async () => {
+    const localSecret = generateSecretKey();
+    const remoteSecret = generateSecretKey();
+    const roomId = "npub-network:client-wot-accept";
+    const discovered = [];
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        POLLEN_TRANSFER: "false"
+    }));
+    federation._discoverHttpServer = async server => discovered.push(server);
+    federation.nostrDiscovery.discoverHttpServer = server => federation._discoverHttpServer(server);
+
+    federation.localPeerJoined("fips", roomId, {id: "local-peer", rtcSupported: true});
+    const event = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "fips-federation"],
+            ["protocol", "meshdrop-fips-nostr-discovery"],
+            ["server", "remote-server"],
+            ["d", roomId],
+            ["network", roomId],
+            ["room", roomId],
+            ["base", "http://[fd00::2]:3000"]
+        ],
+        content: ""
+    }, remoteSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", event]));
+
+    assert.deepEqual(discovered, [{
+        serverId: "remote-server",
+        transport: "fips",
+        baseUrl: "http://[fd00::2]:3000"
+    }]);
+});
+
+test("client WOT discovery room stops accepting relay announcements after last local peer leaves", () => {
+    const localSecret = generateSecretKey();
+    const remoteSecret = generateSecretKey();
+    const roomId = "npub-network:client-wot-left";
+    const federation = new MeshFederation(createFederationConfig({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        POLLEN_TRANSFER: "false"
+    }));
+
+    federation.localPeerJoined("fips", roomId, {id: "local-peer", rtcSupported: true});
+    federation.localPeerLeft("fips", roomId, "local-peer");
+
+    const event = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "fips-federation"],
+            ["protocol", "meshdrop-fips-nostr-discovery"],
+            ["server", "remote-server"],
+            ["d", roomId],
+            ["network", roomId],
+            ["room", roomId],
+            ["base", "http://[fd00::2]:3000"]
+        ],
+        content: ""
+    }, remoteSecret);
+
+    assert.deepEqual(federation._nostrDiscoveryFilters(), []);
+    assert.equal(federation._isNostrDiscoveryEventForThisNetwork(event), false);
+});
+
 test("federation subscribes to trusted authors and local-addressed announcements", async () => {
     const localSecret = generateSecretKey();
     const peerSecret = generateSecretKey();
