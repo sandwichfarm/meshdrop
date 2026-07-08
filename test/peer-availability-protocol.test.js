@@ -206,18 +206,20 @@ test("transfer options expose privacy and encryption metadata", () => {
             ["Exclude with", "Instance toggle"]
         ]);
         assert.equal(fipsMesh.group, "Network routes");
-        assert.equal(fipsMesh.privacy, "FIPS signaling, ICE data path");
+        assert.equal(fipsMesh.privacy, "FIPS signaling, instance ICE bridge when configured");
         assert.deepEqual(fipsMesh.details, [
+            ["Discovery", "Nostr WOT route request"],
             ["Signaling", "FIPS substrate"],
-            ["Data path", "browser WebRTC ICE"],
-            ["Clearnet bytes", "possible unless relay-only ICE exists"]
+            ["ICE bridge", "instance-scoped when descriptor exists"],
+            ["Transfer primitive", "FIPS stream is separate"]
         ]);
         assert.equal(pollenMesh.group, "Network routes");
-        assert.equal(pollenMesh.privacy, "Pollen signaling, ICE data path");
+        assert.equal(pollenMesh.privacy, "Pollen signaling, instance ICE bridge when configured");
         assert.deepEqual(pollenMesh.details, [
+            ["Discovery", "Nostr WOT route request"],
             ["Signaling", "Pollen substrate"],
-            ["Data path", "browser WebRTC ICE"],
-            ["Clearnet bytes", "possible unless relay-only ICE exists"]
+            ["ICE bridge", "instance-scoped when descriptor exists"],
+            ["Transfer primitive", "Pollen storage is separate"]
         ]);
         assert.equal(webrtc.label, "Clearnet via Nostr");
         assert.equal(webrtc.privacy, "Direct clearnet path");

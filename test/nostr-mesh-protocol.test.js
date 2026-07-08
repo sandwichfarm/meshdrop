@@ -206,6 +206,18 @@ test("Nostr mesh route requests use NIP-44 and accepted responses join descripto
             descriptor: {
                 routeType: "fips",
                 rooms: [room],
+                iceBridge: {
+                    supported: true,
+                    source: "instance",
+                    bridgeRole: "fips-instance-ice-bridge",
+                    rtcConfig: {
+                        iceServers: [{urls: "turn:fips-instance.test:3478?transport=tcp"}]
+                    },
+                    topologyEvidence: {
+                        overlay: "fips",
+                        instance: "meshdrop-a"
+                    }
+                },
                 expiresAt: Math.floor(Date.now() / 1000) + 30
             }
         })
@@ -232,6 +244,11 @@ test("Nostr mesh route requests use NIP-44 and accepted responses join descripto
 
         await mesh._onRouteResponseEvent({pubkey: peerPubkey, content: "encrypted-response"});
         assert.deepEqual(joined.map(descriptor => descriptor.rooms), [[room]]);
+        assert.equal(joined[0].iceBridge.source, "instance");
+        assert.equal(joined[0].iceBridge.bridgeRole, "fips-instance-ice-bridge");
+        assert.deepEqual(joined[0].iceBridge.rtcConfig.iceServers, [{urls: "turn:fips-instance.test:3478?transport=tcp"}]);
+        assert.equal("federation" in joined[0], false);
+        assert.equal("publicAdvertisement" in joined[0], false);
         assert.equal(mesh._pendingRouteRequests.has(`${peerPubkey}:fips`), false);
     }
     finally {

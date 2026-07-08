@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.16.0
-milestone_name: Overlay Relay Proof Preflight
+milestone: v0.17.0
+milestone_name: Instance-Backed FIPS/Pollen ICE Bridge
 status: complete
-last_updated: "2026-07-08T12:56:01+02:00"
+last_updated: "2026-07-08T13:16:56.714Z"
 last_activity: 2026-07-08
 progress:
   total_phases: 1
@@ -20,7 +20,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-08)
 
 **Core value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
-**Current focus:** Phase 20 Overlay Relay Proof Preflight is complete; FIPS/Pollen WebRTC overlay bytes remain blocked by issue #152 until a route-specific relay endpoint is proven.
+**Current focus:** Phase 21 Instance-Backed FIPS/Pollen ICE Bridge is complete; full WebRTC byte-transfer proof still needs a deployed route-specific bridge endpoint.
 
 ## Milestone Audit: 2026-07-06
 
@@ -198,7 +198,7 @@ None.
 
 ## Current Position
 
-Phase: 20 Overlay Relay Proof Preflight
-Plan: `.planning/phases/20-overlay-relay-proof-preflight/20-01-PLAN.md`
+Phase: 21 Instance-Backed FIPS/Pollen ICE Bridge
+Plan: `.planning/phases/21-instance-backed-fips-pollen-ice-bridge/21-01-PLAN.md`
 Status: Complete
-Last activity: 2026-07-08 — Phase 20 completed with route-contract topology guard and fail-closed overlay relay preflight
+Last activity: 2026-07-08 — Instance ICE bridge descriptor slice verified; route setup proof avoids default Clearnet ICE config without claiming byte-transfer proof

@@ -1,4 +1,4 @@
-# Requirements: MeshDrop v0.16.0 Overlay Relay Proof Preflight
+# Requirements: MeshDrop v0.17.0 Instance-Backed FIPS/Pollen ICE Bridge
 
 **Defined:** 2026-07-08
 **Core Value:** Files must transfer between trusted peers over the route MeshDrop claims it selected, with encrypted bytes, receiver verification, and no silent fallback.
@@ -14,6 +14,17 @@
 - FIPS stream proof proves encrypted payload bytes over the sender's FIPS mesh IPv6 address and emits route proof.
 - TURN relay proof proves browser WebRTC can be forced through a relay candidate before route-specific overlay WebRTC claims are allowed.
 - Tor/I2P/Loki runtime capability surfaces already fail closed unless configured with explicit overlay stream endpoints.
+
+## v0.17.0 Requirements
+
+### Instance-Backed FIPS/Pollen ICE Bridge
+
+- [x] **IBR-01**: Server runtime capabilities expose FIPS/Pollen ICE bridge descriptors whose source is `instance` when the instance has route-scoped bridge config.
+- [x] **IBR-02**: Trusted WOT route descriptors can carry route-scoped `iceBridge` metadata, and route response normalization preserves it without requiring server-side public/trusted federation advertisement.
+- [x] **IBR-03**: With direct Clearnet disabled and no global TURN env vars, FIPS/Pollen route selection is allowed when trusted descriptor bridge config is present.
+- [x] **IBR-04**: With direct Clearnet disabled and no descriptor or global bridge config, FIPS/Pollen route selection fails closed with explicit unavailable status.
+- [x] **IBR-05**: Route UI/status copy distinguishes WOT discovery/signaling, instance ICE bridge, and FIPS stream/Pollen storage transfer.
+- [x] **IBR-06**: Executable smoke proves selected FIPS/Pollen route setup creates bridge-constrained `RTCPeerConnection` config from instance route metadata and avoids default Clearnet ICE config.
 
 ## v0.16.0 Requirements
 
@@ -86,7 +97,7 @@
 
 ## Future Requirements
 
-- **OVERLAY-WEBRTC-01**: FIPS/Pollen route-specific WebRTC relay claims stay unavailable until a relay endpoint reachable through that route passes the preflight, proves selected relay candidates, transfers bytes, and avoids Clearnet fallback. Tracked by https://github.com/sandwichfarm/meshdrop/issues/152.
+- **OVERLAY-WEBRTC-01**: Full browser byte-transfer proof should use the instance-backed ICE bridge route metadata added in Phase 21 plus deployed route-specific bridge endpoints to prove selected relay candidates, transferred bytes, and no Clearnet fallback. Tracked by https://github.com/sandwichfarm/meshdrop/issues/152.
 
 ## v0.11.0 Requirements
 
@@ -124,6 +135,12 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| IBR-01 | Phase 21 | Complete |
+| IBR-02 | Phase 21 | Complete |
+| IBR-03 | Phase 21 | Complete |
+| IBR-04 | Phase 21 | Complete |
+| IBR-05 | Phase 21 | Complete |
+| IBR-06 | Phase 21 | Complete |
 | OVR-PRE-01 | Phase 20 | Complete |
 | OVR-PRE-02 | Phase 20 | Complete |
 | OVR-PRE-03 | Phase 20 | Complete |
@@ -170,10 +187,10 @@
 | BLOCKER-05 | Phase 16 | Complete |
 
 **Coverage:**
-- v0.16.0 requirements: 4 total
-- Mapped to phases: 4
+- v0.17.0 requirements: 6 total
+- Mapped to phases: 6
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-08*
-*Last updated: 2026-07-08 completing Phase 20 Overlay Relay Proof Preflight.*
+*Last updated: 2026-07-08 completing Phase 21 Instance-Backed FIPS/Pollen ICE Bridge.*

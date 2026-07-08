@@ -29,6 +29,7 @@
     "test:docker:admin": "node scripts/docker-compose-admin-uat.mjs",
     "test:docker:two-host": "node scripts/docker-two-host-relay-smoke.mjs",
     "test:turn-relay": "node scripts/turn-relay-smoke.mjs",
+    "test:instance-ice-bridge": "node scripts/instance-ice-bridge-smoke.mjs",
     "test:overlay-relay-preflight": "node scripts/overlay-relay-preflight.mjs",
     "test:tor-stream": "node scripts/tor-stream-smoke.mjs",
     "test:i2p-stream": "node scripts/i2p-stream-smoke.mjs",

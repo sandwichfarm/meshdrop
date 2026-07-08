@@ -1,45 +1,43 @@
-# Roadmap: MeshDrop v0.16.0 Overlay Relay Proof Preflight
+# Roadmap: MeshDrop v0.17.0 Instance-Backed FIPS/Pollen ICE Bridge
 
-## Phase 20: Overlay Relay Proof Preflight
+## Phase 21: Instance-Backed FIPS/Pollen ICE Bridge
 
-Goal: block false overlay WebRTC claims by requiring route-specific relay topology evidence and adding a preflight harness for the real FIPS/Pollen relay endpoint work tracked by #152.
+Goal: let trusted WOT-negotiated FIPS/Pollen private routes create bridge-constrained WebRTC peer connections using instance-backed route metadata, without public discovery or silent Clearnet fallback.
 
 Current status: complete.
 
-Requirements: OVR-PRE-01, OVR-PRE-02, OVR-PRE-03, OVR-PRE-04.
+Requirements: IBR-01, IBR-02, IBR-03, IBR-04, IBR-05, IBR-06.
 
 Success criteria:
 
-1. Generic `turn-relay` WebRTC proof still passes with selected ICE candidate type `relay`.
-2. FIPS/Pollen/Tor/I2P/Loki `webrtc-relay-ice` proofs fail unless topology evidence names the same overlay and selected relay endpoint.
-3. `npm run test:overlay-relay-preflight` fails closed without route-specific relay ICE config or topology evidence.
-4. The preflight passes with matching route-specific TURN/TURNS config and topology evidence while explicitly reporting `provenTransfer=false`.
-5. Issue #152 remains the tracker for real FIPS/Pollen WebRTC bytes through an overlay-reachable relay endpoint.
+1. Server runtime capabilities expose instance-backed FIPS/Pollen ICE bridge descriptors.
+2. Trusted WOT route descriptors preserve route-scoped `iceBridge` metadata.
+3. FIPS/Pollen route selection uses descriptor ICE bridge config when direct Clearnet is disabled and legacy global TURN env vars are absent.
+4. FIPS/Pollen route selection fails closed when no descriptor or global bridge config is available.
+5. UI/status copy distinguishes WOT discovery/signaling, instance ICE bridge, and FIPS stream/Pollen storage transfer.
+6. Executable smoke proves selected route setup uses descriptor bridge-constrained ICE and not default Clearnet ICE.
 
 Verification:
 
-- Red guard: focused tests fail before the route contract guard and preflight script exist.
-- Focused: route contract, preflight helper, Docker smoke script, and blocker issue tests.
-- Preflight: configured `npm run test:overlay-relay-preflight` with matching FIPS relay topology evidence.
+- Focused: relay config, runtime capabilities, Nostr route metadata, RTC route selection, copy/status tests.
+- Smoke: `npm run test:instance-ice-bridge`.
 - Broad: `npm test`.
 - Hygiene: `git diff --check`.
 - AI-slop: `npx --yes aislop scan --changes .`.
 
 Completion evidence:
 
-- Red guard: `node --test test/route-contract.test.js test/overlay-relay-preflight.test.js test/docker-smoke-script.test.js` failed until the contract topology guard, preflight script, and package script existed.
-- `node --test test/route-contract.test.js test/overlay-relay-preflight.test.js test/docker-smoke-script.test.js test/route-blocker-issues.test.js` -> 21/21 pass.
-- Configured `npm run test:overlay-relay-preflight` -> `preflight-ready`, matching FIPS relay endpoints, issue #152 blocker URL, and `provenTransfer=false`.
-- `npm test` -> 375/375 pass.
+- `node --test test/relay-ice-config.test.js test/runtime-capabilities.test.js test/nostr-mesh-protocol.test.js test/rtc-peer-signaling.test.js test/peer-availability-protocol.test.js test/header-copy.test.js test/action-visibility.test.js` -> 121/121 pass.
+- `npm run test:instance-ice-bridge` -> FIPS and Pollen selected route setup used `iceTransportPolicy="relay"`, instance bridge TURN URLs, and no default Clearnet/STUN ICE config; `provenTransfer=false` by design.
+- `npm test` -> 380/380 pass.
 - `git diff --check` -> clean.
-- `npx --yes aislop scan --changes .` -> clean.
+- `npx --yes aislop scan --changes .` -> exit 0; AI Slop, Security, Linting, and Formatting clean; code-quality warnings remain for existing large files/duplicate blocks.
 
 ## Future Milestone Queue
 
-1. FIPS/Pollen route-specific WebRTC relay proof using the generic TURN proof harness once a relay endpoint is reachable through those overlays and passes the preflight. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/152.
-2. GHCR anonymous release image readback once package visibility or authenticated distribution policy is decided. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
-3. Deployed StartOS/Umbrel UAT once real installed service URLs are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
-4. Signed iOS device/share-transfer UAT once macOS signing hardware and a real device are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/158.
+1. GHCR anonymous release image readback once package visibility or authenticated distribution policy is decided. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/156.
+2. Deployed StartOS/Umbrel UAT once real installed service URLs are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/157.
+3. Signed iOS device/share-transfer UAT once macOS signing hardware and a real device are available. Current blocker: https://github.com/sandwichfarm/meshdrop/issues/158.
 
 ---
-*Roadmap updated: 2026-07-08 completing Phase 20 Overlay Relay Proof Preflight.*
+*Roadmap updated: 2026-07-08 completing Phase 21 Instance-Backed FIPS/Pollen ICE Bridge.*

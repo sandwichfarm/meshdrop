@@ -180,6 +180,7 @@ class PollenTransferController {
         this._lastStatus = null;
         this._available = false;
         this._connecting = false;
+        this._routeDescriptorsByRoom = new Map();
         this._preferredActive = PollenTransferProtocol.readEnabled();
 
         if (this.$button) {
@@ -243,6 +244,7 @@ class PollenTransferController {
 
         this._active = false;
         this._connecting = false;
+        this._routeDescriptorsByRoom.clear();
         this._render();
         Events.fire("leave-pollen-room");
 
@@ -364,9 +366,11 @@ class PollenTransferController {
             : "";
         if (explicitRoom) rooms.push(explicitRoom);
 
+        const iceBridge = globalThis.RuntimeCapabilities?.iceBridgeDescriptor?.(this._config, "pollen");
         return {
             routeType: "pollen",
-            rooms: [...new Set(rooms)]
+            rooms: [...new Set(rooms)],
+            ...(iceBridge ? {iceBridge} : {})
         };
     }
 
@@ -377,8 +381,28 @@ class PollenTransferController {
             .filter(Boolean))];
         if (!rooms.length) return false;
 
+        this._rememberRouteDescriptor({...descriptor, routeType: "pollen", rooms});
         Events.fire("join-pollen-room", {rooms});
         return true;
+    }
+
+    routeMetadataForRoom(room) {
+        const normalized = globalThis.NpubNetworkProtocol?.normalizeRoom?.(room) || "";
+        const descriptor = this._routeDescriptorsByRoom.get(normalized);
+        if (!descriptor) return null;
+        const expiresAt = Number(descriptor.expiresAt || 0);
+        if (expiresAt && expiresAt <= Math.floor(Date.now() / 1000)) {
+            this._routeDescriptorsByRoom.delete(normalized);
+            return null;
+        }
+        return descriptor;
+    }
+
+    _rememberRouteDescriptor(descriptor = {}) {
+        for (const room of descriptor.rooms || []) {
+            const normalized = globalThis.NpubNetworkProtocol?.normalizeRoom?.(room) || "";
+            if (normalized) this._routeDescriptorsByRoom.set(normalized, descriptor);
+        }
     }
 
     async _runtimeRooms(options = {}) {
@@ -403,8 +427,10 @@ class PollenTransferController {
         const translationKey = this._active
             ? "header.pollen-transfer-disable"
             : "header.pollen-transfer-enable";
-        const signalingOnly = supported && !globalThis.RuntimeCapabilities?.relayIceSupported?.(this._config, "pollen")
-            ? " Signaling only: no Pollen WebRTC relay ICE is configured."
+        const iceBridgeSupported = globalThis.RuntimeCapabilities?.iceBridgeSupported?.(this._config, "pollen")
+            || globalThis.RuntimeCapabilities?.relayIceSupported?.(this._config, "pollen");
+        const signalingOnly = supported && !iceBridgeSupported
+            ? " Signaling only: no Pollen instance ICE bridge descriptor is configured."
             : "";
 
         this.$button.title = this._connecting

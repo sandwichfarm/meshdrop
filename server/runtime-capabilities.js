@@ -30,12 +30,18 @@ function createRelayIceCapability(routeType, transportSupported, conf = {}) {
     return normalizeRelayIceConfig(routeType, conf.relayIce);
 }
 
+function createIceBridgeCapability(relayIce = {}) {
+    return relayIce.supported === true ? {kind: "ice-bridge", ...relayIce} : relayIce;
+}
+
 export function createRuntimeCapabilities(conf = {}) {
     const runtime = conf.runtime || createServerRuntimeConfig();
     const hasBackend = runtime.hasBackend !== false;
     const fipsSupported = hasBackend && !!conf.fips?.enabled;
     const pollenSupported = hasBackend && !!conf.pollen?.enabled;
     const adminEnabled = hasBackend && !!conf.admin?.enabled;
+    const pollenRelayIce = createRelayIceCapability("pollen", pollenSupported, conf.pollen);
+    const fipsRelayIce = createRelayIceCapability("fips", fipsSupported, conf.fips);
     const overlayNetworkCapabilities = createOverlayNetworkCapabilities(
         hasBackend ? (conf.overlayNetworks || createOverlayNetworkConfig({})) : createOverlayNetworkConfig({}),
         {hasBackend}
@@ -80,7 +86,8 @@ export function createRuntimeCapabilities(conf = {}) {
                 requiresBackend: true,
                 room: normalizeNpubDiscoveryNetworkId(conf.federation?.pollen?.room),
                 maxUploadBytes: conf.pollen?.maxUploadBytes || 0,
-                relayIce: createRelayIceCapability("pollen", pollenSupported, conf.pollen)
+                iceBridge: createIceBridgeCapability(pollenRelayIce),
+                relayIce: pollenRelayIce
             },
             fips: {
                 supported: fipsSupported,
@@ -91,7 +98,8 @@ export function createRuntimeCapabilities(conf = {}) {
                     primitive: "fips-http-stream",
                     maxUploadBytes: conf.fipsStream?.maxUploadBytes || 0
                 },
-                relayIce: createRelayIceCapability("fips", fipsSupported, conf.fips)
+                iceBridge: createIceBridgeCapability(fipsRelayIce),
+                relayIce: fipsRelayIce
             },
             ...overlayNetworkCapabilities
         },
