@@ -18,6 +18,9 @@ export class FederationNostrDiscoveryBase {
         trace = noop,
         getFipsBaseUrl = () => "",
         getPollenIdentity = async () => ({}),
+        localServerDescriptor = () => ({}),
+        localSnapshot = () => ({}),
+        receiveFederationEvents = async () => ({accepted: 0}),
         discoverHttpServer,
         connectPollenService,
         createPollenInvite = async () => "",
@@ -28,6 +31,9 @@ export class FederationNostrDiscoveryBase {
         this.trace = trace;
         this.getFipsBaseUrl = getFipsBaseUrl;
         this.getPollenIdentity = getPollenIdentity;
+        this.localServerDescriptor = localServerDescriptor;
+        this.localSnapshot = localSnapshot;
+        this.receiveFederationEvents = receiveFederationEvents;
         this.discoverHttpServer = discoverHttpServer;
         this.connectPollenService = connectPollenService;
         this.createPollenInvite = createPollenInvite;
@@ -222,6 +228,108 @@ export class FederationNostrDiscoveryBase {
 
     _decryptFrom(pubkey, ciphertext) {
         return nip44.decrypt(ciphertext, nip44.getConversationKey(this.config.nostr.secretKey, pubkey));
+    }
+
+    _encryptedFederationPayload(recipientPubkey, transport, scope = null, events = null) {
+        if (!recipientPubkey) return "";
+        const roomId = scope?.room || "";
+        const snapshot = events ? null : this.localSnapshot(transport, roomId);
+        const federationEvents = events || (snapshot?.peers || []).map(peer => ({
+            type: "peer-joined",
+            ...peer
+        }));
+        const payload = {
+            version: 1,
+            type: "federation-events",
+            serverId: this.config.serverId,
+            transport,
+            server: this.localServerDescriptor(transport),
+            events: federationEvents
+        };
+        return this._encryptFor(recipientPubkey, JSON.stringify(payload));
+    }
+
+    _decryptFederationPayload(event, serverId, transport) {
+        if (!event.content) return null;
+        let payload;
+        try {
+            payload = JSON.parse(this._decryptFrom(event.pubkey, event.content));
+        }
+        catch (error) {
+            this.trace("nostr federation payload rejected", `server=${serverId}`, `reason=${errorMessage(error)}`);
+            return null;
+        }
+        if (payload?.type !== "federation-events") return null;
+        if (payload.serverId !== serverId) return null;
+        if (payload.transport !== transport) return null;
+        if (!Array.isArray(payload.events)) payload.events = [];
+        return payload;
+    }
+
+    async _receiveFederationPayload(event, serverId, transport, descriptor = {}) {
+        const payload = this._decryptFederationPayload(event, serverId, transport);
+        if (!payload) return false;
+        await this.receiveFederationEvents(payload, {
+            ...descriptor,
+            serverId,
+            transport,
+            relayPubkey: event.pubkey
+        });
+        this.trace("nostr federation payload accepted", `server=${serverId}`, `transport=${transport}`, `events=${payload.events.length}`);
+        return true;
+    }
+
+    _recipientPubkeysForScope(scope = null) {
+        const pubkeys = (scope?.tags || [])
+            .filter(tag => tag[0] === "p")
+            .map(tag => tag[1])
+            .filter(Boolean);
+        return [...new Set(pubkeys)];
+    }
+
+    publishFederationEvents(server, events = [], descriptor = {}) {
+        if (!this.config.nostr.enabled || !server?.relayPubkey || !events.length) return false;
+        const transport = server.transport;
+        const protocol = transport === "fips" ? FIPS_FEDERATION_PROTOCOL : POLLEN_FEDERATION_PROTOCOL;
+        const type = `${transport}-federation`;
+        const room = server.room || this.config[transport]?.room || this.config.nostr.networkId || "";
+        const content = this._encryptFor(server.relayPubkey, JSON.stringify({
+            version: 1,
+            type: "federation-events",
+            serverId: this.config.serverId,
+            transport,
+            server: descriptor,
+            events
+        }));
+        const event = finalizeEvent({
+            kind: FEDERATION_KIND,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [
+                ["type", type],
+                ["protocol", protocol],
+                ["server", this.config.serverId],
+                ["p", server.relayPubkey],
+                ...(room ? [...this._roomNetworkTags(room), ["room", room]] : []),
+                ...(descriptor.baseUrl ? [["base", descriptor.baseUrl]] : []),
+                ...(descriptor.serviceName ? [["service", descriptor.serviceName]] : [])
+            ],
+            content
+        }, this.config.nostr.secretKey);
+        this._publishEvent("nostr federation relay", event, null, server.relayPubkey, room ? {label: room} : null);
+        return true;
+    }
+
+    publishFederationSnapshot(recipientPubkey, transport, room = "") {
+        const snapshot = this.localSnapshot(transport, room);
+        const events = (snapshot?.peers || []).map(peer => ({
+            type: "peer-joined",
+            ...peer
+        }));
+        return this.publishFederationEvents({
+            relayPubkey: recipientPubkey,
+            transport,
+            room
+        }, events, this.localServerDescriptor(transport));
     }
 
     _tag(event, name) {

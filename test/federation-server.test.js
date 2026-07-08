@@ -741,6 +741,170 @@ test("federation accepts explicit FIPS HTTP advertisements from trusted authors"
     }]);
 });
 
+test("federation replies to trusted FIPS announcements with encrypted room snapshot", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const localPubkey = getPublicKey(localSecret);
+    const peerPubkey = getPublicKey(peerSecret);
+    const sent = [];
+    const federation = new MeshFederation(createFederationConfigWithRecipients({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        FIPS_FEDERATION_URL: "http://[fd00::1]:3000"
+    }, [peerPubkey]));
+    federation.relaySockets.set("test", {
+        readyState: 1,
+        send: message => sent.push(JSON.parse(message))
+    });
+    federation.localPeerJoined("fips", "npub-network:test", {
+        id: "11111111-1111-4111-8111-111111111111",
+        rtcSupported: true,
+        nostrIdentity: {pubkey: localPubkey}
+    });
+    sent.length = 0;
+    federation._discoverHttpServer = async () => {
+        throw new Error("overlay-http-unreachable");
+    };
+
+    const accepted = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "fips-federation"],
+            ["protocol", "meshdrop-fips-nostr-discovery"],
+            ["d", "npub-network:test"],
+            ["network", "npub-network:test"],
+            ["room", "npub-network:test"],
+            ["server", "remote-a"],
+            ["capability", "meshdrop-http"],
+            ["base", "http://[fd00::2]:3000"]
+        ],
+        content: ""
+    }, peerSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", accepted]));
+
+    const relay = sent.find(message => message[0] === "EVENT" && message[1].content);
+    assert(relay);
+    const event = relay[1];
+    assert(event.tags.some(tag => tag[0] === "p" && tag[1] === peerPubkey));
+    const plaintext = nip44.decrypt(event.content, nip44.getConversationKey(peerSecret, localPubkey));
+    const payload = JSON.parse(plaintext);
+    assert.equal(payload.type, "federation-events");
+    assert.equal(payload.serverId, "local-server");
+    assert.equal(payload.transport, "fips");
+    assert.equal(payload.events[0].type, "peer-joined");
+    assert.equal(payload.events[0].peer.id, "11111111-1111-4111-8111-111111111111");
+});
+
+test("federation accepts encrypted FIPS peer snapshots without overlay HTTP", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const localPubkey = getPublicKey(localSecret);
+    const peerPubkey = getPublicKey(peerSecret);
+    const handled = [];
+    const federation = new MeshFederation(createFederationConfigWithRecipients({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret)
+    }, [peerPubkey]));
+    federation.attachWsServer({
+        _onFederationPeerJoined: event => handled.push(event)
+    });
+    federation._discoverHttpServer = async () => {
+        throw new Error("overlay-http-should-not-run");
+    };
+    const content = nip44.encrypt(JSON.stringify({
+        version: 1,
+        type: "federation-events",
+        serverId: "remote-a",
+        transport: "fips",
+        server: {serverId: "remote-a", transport: "fips", baseUrl: "http://[fd00::2]:3000"},
+        events: [{
+            type: "peer-joined",
+            roomType: "fips",
+            roomId: "npub-network:test",
+            peer: {id: "22222222-2222-4222-8222-222222222222", rtcSupported: true}
+        }]
+    }), nip44.getConversationKey(peerSecret, localPubkey));
+    const accepted = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "fips-federation"],
+            ["protocol", "meshdrop-fips-nostr-discovery"],
+            ["d", "npub-network:test"],
+            ["network", "npub-network:test"],
+            ["room", "npub-network:test"],
+            ["server", "remote-a"],
+            ["capability", "meshdrop-http"],
+            ["base", "http://[fd00::2]:3000"]
+        ],
+        content
+    }, peerSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", accepted]));
+
+    assert.equal(handled.length, 1);
+    assert.equal(handled[0].peer.id, "22222222-2222-4222-8222-222222222222");
+    assert.equal(federation.remoteServers.get("fips:remote-a").relayPubkey, peerPubkey);
+});
+
+test("federation accepts encrypted Pollen peer snapshots before cluster HTTP checks", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const localPubkey = getPublicKey(localSecret);
+    const peerPubkey = getPublicKey(peerSecret);
+    const handled = [];
+    const federation = new MeshFederation(createFederationConfigWithRecipients({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local-server",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret)
+    }, [peerPubkey]));
+    federation.pollenTransport.identity = async () => ({rootHash: "local-root"});
+    federation.attachWsServer({
+        _onFederationPeerJoined: event => handled.push(event)
+    });
+    federation._connectPollenService = async () => {
+        throw new Error("pollen-service-should-not-run");
+    };
+    const content = nip44.encrypt(JSON.stringify({
+        version: 1,
+        type: "federation-events",
+        serverId: "remote-a",
+        transport: "pollen",
+        server: {serverId: "remote-a", transport: "pollen", serviceName: "meshdrop-fed-a"},
+        events: [{
+            type: "peer-joined",
+            roomType: "pollen",
+            roomId: "npub-network:test",
+            peer: {id: "33333333-3333-4333-8333-333333333333", rtcSupported: true}
+        }]
+    }), nip44.getConversationKey(peerSecret, localPubkey));
+    const accepted = finalizeEvent({
+        kind: 20385,
+        created_at: 1,
+        tags: [
+            ["type", "pollen-federation"],
+            ["protocol", "meshdrop-pollen-nostr-discovery"],
+            ["d", "npub-network:test"],
+            ["network", "npub-network:test"],
+            ["room", "npub-network:test"],
+            ["server", "remote-a"],
+            ["service", "meshdrop-fed-a"],
+            ["pln-root", "remote-root"]
+        ],
+        content
+    }, peerSecret);
+
+    await federation._onNostrRelayMessage(JSON.stringify(["EVENT", "sub", accepted]));
+
+    assert.equal(handled.length, 1);
+    assert.equal(handled[0].peer.id, "33333333-3333-4333-8333-333333333333");
+    assert.equal(federation.remoteServers.get("pollen:remote-a").relayPubkey, peerPubkey);
+});
+
 test("federation rejects explicit FIPS HTTP advertisements from untrusted authors", async () => {
     const localSecret = generateSecretKey();
     const trustedSecret = generateSecretKey();
@@ -964,6 +1128,65 @@ test("federation sendSignal resolves registered server transport details", async
         sender: {id: "sender"},
         sdp: {type: "offer"}
     }]);
+});
+
+test("federation sendSignal falls back to encrypted Nostr relay when overlay HTTP fails", async () => {
+    const localSecret = generateSecretKey();
+    const peerSecret = generateSecretKey();
+    const localPubkey = getPublicKey(localSecret);
+    const peerPubkey = getPublicKey(peerSecret);
+    const sent = [];
+    const originalFetch = globalThis.fetch;
+    const federation = new MeshFederation(createFederationConfigWithRecipients({
+        MESHDROP_FEDERATION: "true",
+        MESHDROP_SERVER_ID: "local",
+        MESHDROP_NOSTR_SECRET_KEY: utils.bytesToHex(localSecret),
+        FIPS_FEDERATION_URL: "http://[fd00::1]:3000"
+    }, [peerPubkey]));
+    federation.relaySockets.set("test", {
+        readyState: 1,
+        send: message => sent.push(JSON.parse(message))
+    });
+    federation.remoteServers.set("fips:remote", {
+        serverId: "remote",
+        transport: "fips",
+        baseUrl: "http://[fd00::2]:3000",
+        relayPubkey: peerPubkey,
+        room: "npub-network:test"
+    });
+    globalThis.fetch = async () => {
+        throw new Error("overlay-http-unreachable");
+    };
+
+    try {
+        await federation.sendSignal({
+            serverId: "remote",
+            transport: "fips"
+        }, {
+            id: "local-peer",
+            rtcSupported: true
+        }, {
+            roomType: "fips",
+            roomId: "npub-network:test",
+            to: "remote-peer",
+            sdp: {type: "offer"},
+            sessionId: "session-a"
+        });
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(sent.length, 1);
+    const event = sent[0][1];
+    assert(event.tags.some(tag => tag[0] === "p" && tag[1] === peerPubkey));
+    const plaintext = nip44.decrypt(event.content, nip44.getConversationKey(peerSecret, localPubkey));
+    const payload = JSON.parse(plaintext);
+    assert.equal(payload.type, "federation-events");
+    assert.equal(payload.transport, "fips");
+    assert.equal(payload.events[0].type, "signal");
+    assert.equal(payload.events[0].to, "remote-peer");
+    assert.deepEqual(payload.events[0].sdp, {type: "offer"});
 });
 
 test("federation listens to FIPS peer discovery events", async () => {
