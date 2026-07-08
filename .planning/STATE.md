@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v0.16.0
 milestone_name: Overlay Relay Proof Preflight
 status: complete
-last_updated: "2026-07-08T02:38:55+02:00"
+last_updated: "2026-07-08T12:56:01+02:00"
 last_activity: 2026-07-08
 progress:
   total_phases: 1
@@ -68,6 +68,7 @@ Closed during this audit branch:
 
 | Date | Task | Status | Evidence |
 |------|------|--------|----------|
+| 2026-07-08 | `260708-hk1-add-fips-mesh-topology-byte-proofs` | complete | Direct FIPS stream proof remains green; shared-public-peer and different-public-peers Docker topologies prove B fetches A over literal FIPS IPv6 with `route=fips`, `primitive=fips-http-stream`, `hashMatched=true`, `fallback=false`, and no direct A/B peer config; endpoint `fips0` byte deltas positive; transit peers expose positive FIPS `forwarded_bytes` while local `fips0` remains zero by daemon design; focused checks, `npm run test:fips-stream`, `npm run test:fips-mesh`, `npm test` 376/376, diff check, and changed-code slop pass |
 | 2026-07-08 | `260708-route-status-polish` | complete | Route chips remain wordless and fixed-size; blocked Clearnet opacity `0.34` with strike/desaturation; pending FIPS/Pollen use sweep/pulse motion with stagger; mobile browser proof `/tmp/meshdrop-route-status-polish-mobile-dark.png`; focused route UI 11/11; `npm test` 376/376; service-worker cache build passed with `v1.11.9-route-status-polish-verified`; diff/changed-code slop clean |
 | 2026-07-07 | `260707-route-blocker-issue-tracking` | complete | GitHub issues enabled/admin; route blockers #151/#152 read back; GHCR #156, deployed StartOS/Umbrel #157, signed iOS #158 created; focused docs guard covers links and stale disabled-tracker wording |
 | 2026-07-07 | `260707-uov-polish-peer-route-badges-so-clearnet-fip` | complete | Peer and transfer-choice route attempts render icon-only chips with ARIA/title detail; Clearnet blocked chip muted/struck; FIPS/Pollen pending chips animate; visual proof `/tmp/meshdrop-route-badge-motion-mobile-dark.png`; focused route UI 7/7; `npm test` 357/357; e2e transfer smoke; diff/changed-code slop exit 0 with existing size/duplicate warnings |
