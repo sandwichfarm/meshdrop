@@ -1453,6 +1453,7 @@ test("federation treats generic FIPS peers as route candidates, not MeshDrop HTT
             async status() {
                 return {
                     available: true,
+                    npub: REMOTE_FIPS_NPUB,
                     ipv6Addr: "fd00::1",
                     peers: [{
                         displayName: "router-a",
@@ -1479,6 +1480,7 @@ test("federation treats generic FIPS peers as route candidates, not MeshDrop HTT
     }
 
     assert.deepEqual(fetches, []);
+    assert(traces.some(parts => parts[0] === "fips status" && parts.includes(`fipsUrl=http://${REMOTE_FIPS_NPUB}.fips:3000`)));
     assert(traces.some(parts => parts[0] === "fips route candidate" && parts.includes("fd00::2")));
     assert.equal(federation.remoteServers.size, 0);
 });

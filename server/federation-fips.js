@@ -1,4 +1,16 @@
 const noop = () => undefined;
+const normalizeFipsNpub = value => String(value || "").trim().toLowerCase();
+
+export function fipsHttpUrl({npub, port = 3000, basePath = ""} = {}) {
+    const normalizedNpub = normalizeFipsNpub(npub);
+    if (!normalizedNpub) return "";
+
+    const url = new URL(`http://${normalizedNpub}.fips`);
+    const normalizedPort = Number.parseInt(port, 10);
+    if (normalizedPort && normalizedPort !== 80) url.port = String(normalizedPort);
+    url.pathname = basePath || "";
+    return url.toString().replace(/\/$/, "");
+}
 
 export class FederationFipsTransport {
 
@@ -47,6 +59,11 @@ export class FederationFipsTransport {
         this.trace(
             "fips status",
             `local=${status.ipv6Addr || "unknown"}`,
+            `fipsUrl=${fipsHttpUrl({
+                npub: status.npub,
+                port: this.config.fips.port,
+                basePath: this.config.basePath
+            }) || "none"}`,
             `peerCount=${peers.length}`,
             `baseUrl=${this.getLocalBaseUrl() || "none"}`
         );
