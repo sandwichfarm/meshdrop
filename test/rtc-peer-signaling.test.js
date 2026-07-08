@@ -569,6 +569,100 @@ test("PeersManager merges same-npub routes and signals the route-specific target
     assert.equal(sent.at(-1).roomType, "nostr");
 });
 
+test("PeersManager merges private route metadata peer pubkey without server auth identity", () => {
+    const {PeersManager, context} = createHarness();
+    const manager = new PeersManager({send() {}});
+    const pubkey = "1".repeat(64);
+    context.meshdropFipsDiscovery = {
+        routeMetadataForRoom(roomId) {
+            return roomId === "fips-private-room"
+                ? {
+                    ...instanceIceBridgeDescriptor("fips", roomId, "turn:fips-instance.test:3478?transport=tcp"),
+                    peerPubkey: pubkey
+                }
+                : null;
+        }
+    };
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager._onPeerJoined({
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room",
+        peer: {
+            id: pubkey,
+            rtcSupported: true,
+            routeCapabilities: ["fips"],
+            nostrIdentity: {pubkey}
+        }
+    });
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "fips",
+        roomId: "fips-private-room",
+        peer: {
+            id: "meshdrop-fed-random",
+            rtcSupported: true
+        }
+    });
+
+    assert.deepEqual(Object.keys(manager.peers), [pubkey]);
+    assert.equal(manager.peers[pubkey]._roomIds.nostr, "nostr-room");
+    assert.equal(manager.peers[pubkey]._roomIds.fips, "fips-private-room");
+    assert.equal(manager.peers[pubkey]._peerIdsByRoomType.fips, "meshdrop-fed-random");
+    assert.equal(manager.peers[pubkey]._routeMetadataByRoomType.fips.peerPubkey, pubkey);
+    assert.equal(manager._resolvePeerId("meshdrop-fed-random"), pubkey);
+});
+
+test("PeersManager collapses an existing overlay bubble when its Nostr identity arrives later", () => {
+    const {PeersManager} = createHarness();
+    const manager = new PeersManager({send() {}});
+    const pubkey = "2".repeat(64);
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager._onPeerJoined({
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room",
+        peer: {
+            id: pubkey,
+            rtcSupported: true,
+            nostrIdentity: {pubkey}
+        }
+    });
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "fips",
+        roomId: "fips-room",
+        peer: {
+            id: "meshdrop-fed-random",
+            rtcSupported: true
+        }
+    });
+
+    assert.equal(Object.keys(manager.peers).length, 2);
+
+    manager._onPeerJoined({
+        isCaller: false,
+        roomType: "fips",
+        roomId: "fips-room",
+        peer: {
+            id: "meshdrop-fed-random",
+            rtcSupported: true,
+            nostrIdentity: {pubkey},
+            name: {displayName: "NADAR2", deviceName: "Mac Macintosh"}
+        }
+    });
+
+    const peerIds = Object.keys(manager.peers);
+    assert.equal(peerIds.length, 1);
+    assert.equal(manager.peers[peerIds[0]]._roomIds.nostr, "nostr-room");
+    assert.equal(manager.peers[peerIds[0]]._roomIds.fips, "fips-room");
+    assert.equal(manager.peers[peerIds[0]].nostrIdentity.pubkey, pubkey);
+    assert.equal(manager._resolvePeerId(pubkey), peerIds[0]);
+    assert.equal(manager._resolvePeerId("meshdrop-fed-random"), peerIds[0]);
+});
+
 test("peer-left removes a room type even when the websocket remains connected", () => {
     const {PeersManager, fired} = createHarness();
     const manager = new PeersManager({send() {}});

@@ -70,6 +70,7 @@ class FipsDiscoveryController {
 
         Events.on("config", e => this._onConfig(e.detail || {}));
         Events.on("fips-status", e => this._onStatus(e.detail));
+        Events.on("ws-connected", _ => this._onWsConnected());
         Events.on("ws-disconnected", _ => {
             this._active = false;
             this._connecting = false;
@@ -118,7 +119,7 @@ class FipsDiscoveryController {
         }
 
         if (remember) this._setPreferredActive(true);
-        Events.fire("join-fips-room", {rooms: await this._runtimeRooms({pairwise: false})});
+        await this._joinActiveRooms();
     }
 
     disable(notify = true, remember = notify) {
@@ -202,14 +203,24 @@ class FipsDiscoveryController {
         await this.enable({notify: false, remember: false});
     }
 
+    async _onWsConnected() {
+        if (this._active || this._connecting) {
+            await this._joinActiveRooms();
+            return;
+        }
+
+        await this._restorePreferredActive();
+    }
+
     async routeDescriptorFor(peerPubkey) {
         if (!this._active || !this._available) return null;
 
         const identityController = globalThis.meshdropNostrIdentity;
         const identity = identityController?.getIdentity?.();
-        if (!identity?.pubkey || !globalThis.NpubNetworkProtocol?.pairwiseRoom) return null;
+        const normalizedPeerPubkey = this._normalizePeerPubkey(peerPubkey);
+        if (!identity?.pubkey || !normalizedPeerPubkey || !globalThis.NpubNetworkProtocol?.pairwiseRoom) return null;
 
-        const pairwiseRoom = await globalThis.NpubNetworkProtocol.pairwiseRoom(identity.pubkey, peerPubkey);
+        const pairwiseRoom = await globalThis.NpubNetworkProtocol.pairwiseRoom(identity.pubkey, normalizedPeerPubkey);
         const rooms = [pairwiseRoom].filter(Boolean);
         const explicitRoom = this._config?.fips?.discoveryMode === "public"
             ? FipsDiscoveryProtocol.roomFromConfig(this._config)
@@ -220,6 +231,7 @@ class FipsDiscoveryController {
         return {
             routeType: "fips",
             rooms: [...new Set(rooms)],
+            peerPubkey: normalizedPeerPubkey,
             ...(iceBridge ? {iceBridge} : {})
         };
     }
@@ -231,8 +243,15 @@ class FipsDiscoveryController {
             .filter(Boolean))];
         if (!rooms.length) return false;
 
-        this._rememberRouteDescriptor({...descriptor, routeType: "fips", rooms});
-        Events.fire("join-fips-room", {rooms});
+        const peerPubkey = this._normalizePeerPubkey(descriptor.peerPubkey);
+        const routeDescriptor = {
+            ...descriptor,
+            routeType: "fips",
+            rooms,
+            ...(peerPubkey ? {peerPubkey} : {})
+        };
+        this._rememberRouteDescriptor(routeDescriptor);
+        this._joinRooms(rooms);
         return true;
     }
 
@@ -253,6 +272,23 @@ class FipsDiscoveryController {
             const normalized = globalThis.NpubNetworkProtocol?.normalizeRoom?.(room) || "";
             if (normalized) this._routeDescriptorsByRoom.set(normalized, descriptor);
         }
+    }
+
+    async _joinActiveRooms() {
+        const rooms = [...new Set([
+            ...await this._runtimeRooms({pairwise: false}),
+            ...this._routeDescriptorsByRoom.keys()
+        ])];
+        this._joinRooms(rooms);
+    }
+
+    _joinRooms(rooms = []) {
+        Events.fire("join-fips-room", {rooms});
+    }
+
+    _normalizePeerPubkey(pubkey) {
+        return globalThis.NpubNetworkProtocol?.normalizePubkey?.(pubkey)
+            || (/^[0-9a-f]{64}$/i.test(pubkey || "") ? String(pubkey).toLowerCase() : "");
     }
 
     async _runtimeRooms(options = {}) {
