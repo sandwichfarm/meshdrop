@@ -22,6 +22,7 @@
     "build:start9": "node scripts/build-start9-package.mjs",
     "build:umbrel": "node scripts/build-umbrel-package.mjs",
     "build:service-worker": "node scripts/set-service-worker-version.mjs",
+    "dev:spa": "node scripts/dev-spa.mjs",
     "start": "node server/index.js",
     "start:prod": "node server/index.js --rate-limit --auto-restart",
     "test": "node --test",

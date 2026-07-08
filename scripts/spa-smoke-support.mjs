@@ -49,7 +49,9 @@ export async function loadPlaywright(playwrightModulePath) {
     return import("playwright");
 }
 
-export function startStaticServer(root) {
+export function startStaticServer(root, options = {}) {
+    const host = options.host || "127.0.0.1";
+    const port = normalizePort(options.port);
     const server = http.createServer(async (request, response) => {
         const urlPath = new URL(request.url, "http://127.0.0.1").pathname;
         const requested = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, "");
@@ -73,14 +75,26 @@ export function startStaticServer(root) {
         }
     });
 
-    return new Promise(resolve => {
-        server.listen(0, "127.0.0.1", () => {
+    return new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(port, host, () => {
+            server.off("error", reject);
             resolve({
                 close: callback => server.close(callback),
+                host,
                 port: server.address().port
             });
         });
     });
+}
+
+function normalizePort(value) {
+    if (value === undefined || value === null || value === "") return 0;
+    const port = Number.parseInt(value, 10);
+    if (Number.isNaN(port) || port < 0 || port > 65535) {
+        throw new Error(`Invalid static server port: ${value}`);
+    }
+    return port;
 }
 
 async function fallbackIndexPath(root) {
