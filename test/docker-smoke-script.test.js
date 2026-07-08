@@ -16,6 +16,7 @@ const dockerTwoHostRelay = fs.readFileSync(
 );
 const turnRelaySmokePath = new URL("../scripts/turn-relay-smoke.mjs", import.meta.url);
 const turnRelaySmokeBrowserPath = new URL("../scripts/turn-relay-smoke-browser.mjs", import.meta.url);
+const overlayRelayPreflightPath = new URL("../scripts/overlay-relay-preflight.mjs", import.meta.url);
 const torStreamSmokePath = new URL("../scripts/tor-stream-smoke.mjs", import.meta.url);
 const i2pStreamSmokePath = new URL("../scripts/i2p-stream-smoke.mjs", import.meta.url);
 const lokiStreamSmokePath = new URL("../scripts/loki-stream-smoke.mjs", import.meta.url);
@@ -86,6 +87,11 @@ test("Docker smoke initiates browser transfer proof against the built container"
     assert.match(turnRelaySmoke, /Proof turn-relay-webrtc/);
     assert.match(turnRelaySmoke, /selectedIceCandidateType/);
     assert.match(turnRelaySmoke, /iceTransportPolicy.*relay/s);
+    assert.match(packageJson, /"test:overlay-relay-preflight": "node scripts\/overlay-relay-preflight\.mjs"/);
+    assert.equal(fs.existsSync(overlayRelayPreflightPath), true);
+    const overlayRelayPreflight = fs.readFileSync(overlayRelayPreflightPath, "utf8");
+    assert.match(overlayRelayPreflight, /issues\/152/);
+    assert.match(overlayRelayPreflight, /provenTransfer: false/);
     assert.match(packageJson, /"test:tor-stream": "node scripts\/tor-stream-smoke\.mjs"/);
     assert.equal(fs.existsSync(torStreamSmokePath), true);
     const torStreamSmoke = fs.readFileSync(torStreamSmokePath, "utf8");
