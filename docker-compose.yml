@@ -10,10 +10,10 @@ services:
     environment:
       - PUID=1000 # UID to run the application as
       - PGID=1000 # GID to run the application as
-      - WS_FALLBACK=false # Set to true to enable websocket fallback if the peer to peer WebRTC connection is not available to the client.
-      - RATE_LIMIT=false # Set to true to limit clients to 1000 requests per 5 min.
+      - WS_FALLBACK=true # Set to true to enable websocket fallback if the peer to peer WebRTC connection is not available to the client.
+      - RATE_LIMIT=true # Set to true to limit clients to 1000 requests per 5 min.
       - RTC_CONFIG=false # Set to the path of a file that specifies the STUN/TURN servers.
-      - DEBUG_MODE=false # Set to true to debug container and peer connections.
+      - DEBUG_MODE=true # Set to true to debug container and peer connections.
       - NOSTR_RELAYS=wss://bucket.coracle.social # Relay list for Nostr WEB-RTC signaling and announcements.
       - MESHDROP_ADMIN_PUBKEY=e771af0b05c8e95fcdf6feb3500544d2fb1ccd384788e9f490bb3ee28e # Shared-instance admin pubkey allowed to sign server-side settings changes.
       - BLOSSOM_SERVERS= # Comma-separated Blossom servers for optional storage-backed transfers.
@@ -23,6 +23,8 @@ services:
       - PLN_DIR=/var/lib/meshdrop/pln # In-container Pollen state directory.
       - POLLEN_PORT=60611 # Pollen QUIC listen port.
       - TZ=Etc/UTC # Time Zone
+      - MESHDROP_PUBLIC_DISCOVERY=true
+      - MESHDROP_PUBLIC_DISCOVERY_ROOM=meshdrop-local
     cap_add:
       - NET_ADMIN
     devices:
