@@ -2869,6 +2869,7 @@ class PeersManager {
     _notifyPeerDisplayNameChanged(peerId) {
         const peer = this.peers[this._resolvePeerId(peerId)];
         if (!peer) return;
+        if (typeof peer.sendDisplayName !== "function") return;
         peer.sendDisplayName(this._displayName);
     }
 

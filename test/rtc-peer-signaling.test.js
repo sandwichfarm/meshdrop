@@ -903,6 +903,31 @@ test("disabled clearnet requests private FIPS signaling but blocks WebRTC withou
     );
 });
 
+test("display-name restore skips pending private route placeholders", () => {
+    const {PeersManager, connections, context} = createHarness();
+    context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
+    context.ClearnetRouteProtocol = {allowsRoomType: roomType => roomType !== "nostr"};
+    const manager = new PeersManager({send() {}});
+    const pubkey = "d".repeat(64);
+
+    manager._onWsConfig({rtcConfig: {}, wsFallback: false});
+    manager._onPeerJoined({
+        peer: {
+            id: pubkey,
+            rtcSupported: true,
+            routeCapabilities: ["fips"],
+            nostrIdentity: {pubkey}
+        },
+        isCaller: true,
+        roomType: "nostr",
+        roomId: "nostr-room"
+    });
+
+    assert.equal(connections.length, 0);
+    assert.equal(manager.peers[pubkey]._pendingPrivateRouteRequests.fips, true);
+    assert.doesNotThrow(() => manager._notifyPeersDisplayNameChanged("NADAR2"));
+});
+
 test("disabled clearnet uses bridge-constrained RTC config when FIPS global route bridge config is available", () => {
     const {PeersManager, connections, context} = createHarness();
     context.LocalDiscoveryProtocol = {allowsRoomType: () => true};
