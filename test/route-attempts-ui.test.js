@@ -200,6 +200,19 @@ test("availability badge styles animate pending routes and strike blocked routes
     assert.match(styles, /\.availability-pill-symbol/);
 });
 
+test("route attempt polish is motion-first and cache-busted", () => {
+    const styles = fs.readFileSync(new URL("../public/styles/styles-deferred.css", import.meta.url), "utf8");
+    const serviceWorker = fs.readFileSync(new URL("../public/service-worker.js", import.meta.url), "utf8");
+
+    assert.match(styles, /\.route-attempt\[data-tone="pending"\]::before/);
+    assert.match(styles, /@keyframes route-chip-sweep/);
+    assert.match(styles, /\.route-attempt\[data-route="nostr"\]\[data-tone="blocked"\]/);
+    assert.match(styles, /opacity:\s*0\.34/);
+    assert.match(styles, /\.route-attempt\[data-route="fips"\]\[data-tone="pending"\]/);
+    assert.match(styles, /\.route-attempt\[data-route="pollen"\]\[data-tone="pending"\]/);
+    assert.match(serviceWorker, /route-status-polish/);
+});
+
 test("peer route visuals remove fallback status words from the visible DOM", () => {
     const source = fs.readFileSync(new URL("../public/scripts/ui.js", import.meta.url), "utf8");
 
