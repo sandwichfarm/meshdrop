@@ -319,6 +319,45 @@ test("recipient decrypts FIPS stream, verifies hash, and emits route proof", asy
     assert.equal(proof.fallbackUsed, false);
 });
 
+test("FIPS instance relay downloads through the local backend proxy", async () => {
+    const harness = createHarness();
+    const requests = [];
+    harness.context.fetch = async (url, options = {}) => {
+        requests.push({url: String(url), options});
+        return new harness.context.Response("proxied", {
+            status: 200,
+            headers: {"Content-Type": "text/plain"}
+        });
+    };
+    const controller = new harness.context.FipsStreamTransferController();
+    const file = await controller.downloadDescriptor(
+        {
+            id: "a".repeat(32),
+            token: "b".repeat(64),
+            sha256: "c".repeat(64),
+            size: 7,
+            type: "text/plain"
+        },
+        {name: "proxied.txt", mime: "text/plain"},
+        {
+            transportShape: "instance-relay",
+            endpoint: {
+                baseUrl: "http://[fd12:3456:789a::1]:3000"
+            }
+        }
+    );
+
+    assert.equal(await file.text(), "proxied");
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, "fips/proxy-download");
+    assert.equal(requests[0].options.method, "POST");
+    assert.deepEqual(JSON.parse(requests[0].options.body), {
+        baseUrl: "http://[fd12:3456:789a::1]:3000",
+        id: "a".repeat(32),
+        token: "b".repeat(64)
+    });
+});
+
 test("recipient keeps legacy FIPS stream proof when instance-relay metadata is absent", async () => {
     const harness = createHarness();
     const sender = new harness.WSPeer(harness.server, false, harness.peerPubkey, "fips", "npub-network:pairwise");

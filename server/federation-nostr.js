@@ -122,9 +122,14 @@ export class FederationNostrDiscovery extends FederationNostrDiscoveryBase {
     async announceFips(socket = null) {
         const baseUrl = this.getFipsBaseUrl();
         if (!this.config.nostr.enabled || !this.config.fips.enabled || !baseUrl) return;
+        const descriptor = this.localServerDescriptor("fips") || {};
         const scopes = this._discoveryScopes("fips");
         if (!scopes.length) {
             this._traceAnnouncementSkip("fips nostr announce skipped", "no-client-trusted-or-public-discovery");
+            return;
+        }
+        if (!descriptor.fipsNpub || !descriptor.fipsIpv6) {
+            this._traceAnnouncementSkip("fips nostr announce skipped", "missing-fips-route-identity");
             return;
         }
 
@@ -138,6 +143,8 @@ export class FederationNostrDiscovery extends FederationNostrDiscoveryBase {
                         ...this._baseDiscoveryTags("fips-federation", FIPS_FEDERATION_PROTOCOL, scope),
                         ...(recipient ? [["p", recipient]] : []),
                         ["base", baseUrl],
+                        ["fips-npub", descriptor.fipsNpub],
+                        ["fips-ipv6", descriptor.fipsIpv6],
                         ["capability", "meshdrop-http"],
                         ["room", scope.room]
                     ],
@@ -201,9 +208,13 @@ export class FederationNostrDiscovery extends FederationNostrDiscoveryBase {
         const baseUrl = this._tag(event, "base") || this._tag(event, "url");
         if (!baseUrl) return;
         const room = this._tag(event, "room");
+        const fipsNpub = this._tag(event, "fips-npub");
+        const fipsIpv6 = this._tag(event, "fips-ipv6");
         const acceptedPayload = await this._receiveFederationPayload(event, serverId, "fips", {
             baseUrl,
-            room
+            room,
+            fipsNpub,
+            fipsIpv6
         });
         if (acceptedPayload) return;
         if (!event.content) this.publishFederationSnapshot(event.pubkey, "fips", room);
@@ -213,7 +224,7 @@ export class FederationNostrDiscovery extends FederationNostrDiscoveryBase {
         }
 
         this.trace("fips nostr event", `server=${serverId}`, `baseUrl=${baseUrl}`, `pubkey=${event.pubkey}`);
-        await this.discoverHttpServer({serverId, transport: "fips", baseUrl}).catch(error => {
+        await this.discoverHttpServer({serverId, transport: "fips", baseUrl, fipsNpub, fipsIpv6}).catch(error => {
             this._rememberFailure("fips", baseUrl);
             this.reportError("FIPS federation Nostr discovery failed", baseUrl, errorMessage(error));
         });

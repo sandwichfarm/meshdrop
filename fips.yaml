@@ -33,12 +33,30 @@ transports:
   tcp:
     bind_addr: "0.0.0.0:8443"
 
-peers: []
-# Example:
-# peers:
-#   - npub: "npub1..."
-#     alias: "peer-name"
-#     addresses:
-#       - transport: udp
-#         addr: "203.0.113.10:2121"
-#     connect_policy: auto_connect
+peers:
+  - npub: "npub10yffd020a4ag8zcy75f9pruq3rnghvvhd5hphl9s62zgp35s560qrksp9u"
+    alias: "one"
+    addresses:
+      - transport: udp
+        addr: "23.182.128.74:2121"
+      - transport: tcp
+        addr: "23.182.128.74:443"
+    connect_policy: auto_connect
+  - npub: "npub136yqae6na688fs75g95ppps3lxe07fvxefj77938zf47uhm6074sxw8ctm"
+    alias: "two"
+    addresses:
+      - transport: udp
+        addr: "54.183.70.180:2121"
+    connect_policy: auto_connect
+  - npub: "npub1mqelkzqp4659fws35h2wvr7z9caka5ml8qddj3ssnwaulwpxdd9sdc3esw"
+    alias: "three"
+    addresses:
+      - transport: tcp
+        addr: "66.92.204.38:8443"
+    connect_policy: auto_connect
+  - npub: "npub180h826menu06dh0856dvqdkz4jraplxmu4u6aclmve2zh27j6fnsncd93m"
+    alias: "four"
+    addresses:
+      - transport: udp
+        addr: "139.84.199.225:51820"
+    connect_policy: auto_connect

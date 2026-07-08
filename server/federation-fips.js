@@ -8,6 +8,7 @@ export class FederationFipsTransport {
         trace = noop,
         setLocalBaseUrl = noop,
         getLocalBaseUrl = () => "",
+        setLocalRouteIdentity = noop,
         discoverPeer = noop,
         removePeer = noop,
         removeRemoteServer = noop,
@@ -18,6 +19,7 @@ export class FederationFipsTransport {
         this.trace = trace;
         this.setLocalBaseUrl = setLocalBaseUrl;
         this.getLocalBaseUrl = getLocalBaseUrl;
+        this.setLocalRouteIdentity = setLocalRouteIdentity;
         this.discoverPeer = discoverPeer;
         this.removePeer = removePeer;
         this.removeRemoteServer = removeRemoteServer;
@@ -36,6 +38,10 @@ export class FederationFipsTransport {
         if (!this.config.fips.publicUrl && status.ipv6Addr) {
             this.setLocalBaseUrl(`http://[${status.ipv6Addr}]:${this.config.fips.port}${this.config.basePath}`);
         }
+        this.setLocalRouteIdentity({
+            fipsNpub: status.npub || "",
+            fipsIpv6: status.ipv6Addr || ""
+        });
 
         const peers = Array.isArray(status.peers) ? status.peers : [];
         this.trace(
