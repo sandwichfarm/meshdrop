@@ -799,8 +799,7 @@ class Peer {
                 }
             );
 
-            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
-            this.sendJSON({
+            this._sendPreparedStorageRequest({
                 type: 'blossom-request',
                 ...request,
                 blossomDescriptors,
@@ -808,8 +807,7 @@ class Peer {
                     ...blossomEncryption,
                     keyDelivery
                 }
-            });
-            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
+            }, transfer);
         }
         catch (error) {
             console.error(error);
@@ -827,6 +825,12 @@ class Peer {
 
     _isNostrPubkey(value) {
         return /^[0-9a-f]{64}$/i.test(value || "");
+    }
+
+    _sendPreparedStorageRequest(message, transfer) {
+        Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
+        this.sendJSON(message);
+        Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
     }
 
     _recipientNostrPubkey() {
@@ -981,14 +985,12 @@ class Peer {
                 Events.fire('set-progress', {peerId: this._peerId, progress: 0.8 + 0.2 * progress, status: 'prepare', transport: transfer});
             });
 
-            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
-            this.sendJSON({
+            this._sendPreparedStorageRequest({
                 type: 'hashtree-request',
                 ...request,
                 ...payload.requestFields,
                 hashtreeManifest
-            });
-            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
+            }, transfer);
         }
         catch (error) {
             console.error(error);
@@ -1006,15 +1008,13 @@ class Peer {
             });
             const pollenInstanceRelay = this._createPollenInstanceRelayMetadata(payload, pollenDescriptors);
 
-            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare', transport: transfer});
-            this.sendJSON({
+            this._sendPreparedStorageRequest({
                 type: 'pollen-request',
                 ...request,
                 ...payload.requestFields,
                 pollenDescriptors,
                 ...(pollenInstanceRelay ? {pollenInstanceRelay} : {})
-            });
-            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'wait', transport: transfer})
+            }, transfer);
         }
         catch (error) {
             console.error(error);
@@ -1394,16 +1394,7 @@ class Peer {
 
         this._filesReceived.push(receivedFile);
         if (!request.header.length) {
-            this._busy = false;
-            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
-            Events.fire('files-received', {
-                peerId: this._peerId,
-                files: this._filesReceived,
-                imagesOnly: request.imagesOnly,
-                totalSize: request.totalSize
-            });
-            this._filesReceived = [];
-            this._requestAccepted = null;
+            this._completeIncomingFiles(request, {notifySender: false});
         }
     }
 
@@ -1435,6 +1426,35 @@ class Peer {
         return decrypted;
     }
 
+    _completeIncomingFiles(request, {notifySender = true} = {}) {
+        this._busy = false;
+        Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
+        Events.fire('files-received', {
+            peerId: this._peerId,
+            files: this._filesReceived,
+            imagesOnly: request.imagesOnly,
+            totalSize: request.totalSize
+        });
+        this._filesReceived = [];
+        this._requestAccepted = null;
+        if (notifySender) this.sendJSON({type: 'file-transfer-complete'});
+    }
+
+    _completeDownloadedFiles(files, request) {
+        this._filesReceived = files;
+        files.forEach(file => Events.fire('file-received', file));
+        this._completeIncomingFiles(request);
+    }
+
+    _handleIncomingDownloadError(error, notification) {
+        console.error(error);
+        Events.fire('notify-user', notification);
+        Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
+        this._busy = false;
+        this._filesReceived = [];
+        this._requestAccepted = null;
+    }
+
     async _downloadBlossomFiles(request) {
         try {
             const blossomEncryption = BlossomTransferProtocol.validateEncryptionEnvelope(
@@ -1460,28 +1480,13 @@ class Peer {
                 this._filesReceived.push(file);
             }
 
-            this._busy = false;
-            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
-            Events.fire('files-received', {
-                peerId: this._peerId,
-                files: this._filesReceived,
-                imagesOnly: request.imagesOnly,
-                totalSize: request.totalSize
-            });
-            this._filesReceived = [];
-            this._requestAccepted = null;
-            this.sendJSON({type: 'file-transfer-complete'});
+            this._completeIncomingFiles(request);
         }
         catch (error) {
-            console.error(error);
-            Events.fire(
-                'notify-user',
+            this._handleIncomingDownloadError(
+                error,
                 `${Localization.getTranslation("notifications.blossom-transfer-download-failed")}: ${error.message}`
             );
-            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
-            this._busy = false;
-            this._filesReceived = [];
-            this._requestAccepted = null;
         }
     }
 
@@ -1494,28 +1499,13 @@ class Peer {
             );
             const files = await this._decryptPayloadFiles(downloadedFiles, request);
 
-            this._filesReceived = files;
-            files.forEach(file => Events.fire('file-received', file));
-
-            this._busy = false;
-            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
-            Events.fire('files-received', {
-                peerId: this._peerId,
-                files: this._filesReceived,
-                imagesOnly: request.imagesOnly,
-                totalSize: request.totalSize
-            });
-            this._filesReceived = [];
-            this._requestAccepted = null;
-            this.sendJSON({type: 'file-transfer-complete'});
+            this._completeDownloadedFiles(files, request);
         }
         catch (error) {
-            console.error(error);
-            Events.fire('notify-user', Localization.getTranslation("notifications.hashtree-transfer-download-failed"));
-            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
-            this._busy = false;
-            this._filesReceived = [];
-            this._requestAccepted = null;
+            this._handleIncomingDownloadError(
+                error,
+                Localization.getTranslation("notifications.hashtree-transfer-download-failed")
+            );
         }
     }
 
@@ -1546,30 +1536,13 @@ class Peer {
                 Events.fire('route-proof', proof);
             }
 
-            this._filesReceived = files;
-            files.forEach(file => Events.fire('file-received', file));
-            this._busy = false;
-            Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'process'});
-            Events.fire('files-received', {
-                peerId: this._peerId,
-                files: this._filesReceived,
-                imagesOnly: request.imagesOnly,
-                totalSize: request.totalSize
-            });
-            this._filesReceived = [];
-            this._requestAccepted = null;
-            this.sendJSON({type: 'file-transfer-complete'});
+            this._completeDownloadedFiles(files, request);
         }
         catch (error) {
-            console.error(error);
-            Events.fire(
-                'notify-user',
+            this._handleIncomingDownloadError(
+                error,
                 `${Localization.getTranslation("notifications.pollen-transfer-download-failed")}: ${error.message}`
             );
-            Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
-            this._busy = false;
-            this._filesReceived = [];
-            this._requestAccepted = null;
         }
     }
 

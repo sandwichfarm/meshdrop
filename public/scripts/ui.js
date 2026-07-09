@@ -18,6 +18,16 @@ const meshdropNetworkRouteMeta = (meta, privacyTone = "direct") => ({
     privacyTone,
     ...meta
 });
+const meshdropRouteDetails = (discovery, dataPath, extraLabel, extraValue) => [
+    ["Discovery", discovery],
+    ["Data path", dataPath],
+    [extraLabel, extraValue]
+];
+const meshdropPrivateStorageDetails = (path, unencrypted) => [
+    ["Path", path],
+    ["Private mode", "encrypts before upload"],
+    ["Unencrypted", unencrypted]
+];
 const meshdropMeshSignaledRouteMeta = (id, label, className, substrate, transferPrimitive) => meshdropNetworkRouteMeta({
     id,
     label,
@@ -32,6 +42,31 @@ const meshdropMeshSignaledRouteMeta = (id, label, className, substrate, transfer
         ["Transfer primitive", transferPrimitive]
     ]
 });
+const meshdropStorageOption = (option) => ({
+    id: option.id,
+    type: "storage",
+    label: option.label,
+    description: option.description,
+    group: "Storage routes",
+    privacy: option.privacy,
+    privacyTone: option.privacyTone,
+    details: option.details,
+    attempt: PeerRouteStatusProtocol.attempt({
+        route: option.route,
+        routeLabel: option.label,
+        state: "candidate",
+        encrypted: option.encrypted,
+        objectStore: true
+    })
+});
+const meshdropSendFilesOrText = (files, text, peerId) => {
+    if (files.length > 0) {
+        meshdropEvents.fire('select-files-transport', {files, to: peerId});
+    }
+    else if (text.length > 0) {
+        meshdropEvents.fire('send-text', {text, to: peerId});
+    }
+};
 
 const PeerAvailabilityProtocol = {
     roomTypeOrder: ["ip", "nostr", "fips", "pollen", "secret", "public-id"],
@@ -51,11 +86,7 @@ const PeerAvailabilityProtocol = {
             className: "badge-room-ip",
             description: "Instance-assisted WebRTC path through same-instance discovery",
             privacy: "Instance-assisted path",
-            details: [
-                ["Discovery", "same MeshDrop instance"],
-                ["Data path", "clearnet WebRTC ICE"],
-                ["Exclude with", "Instance toggle"]
-            ]
+            details: meshdropRouteDetails("same MeshDrop instance", "clearnet WebRTC ICE", "Exclude with", "Instance toggle")
         }, "strong"),
         "secret": meshdropNetworkRouteMeta({
             id: "paired",
@@ -64,11 +95,7 @@ const PeerAvailabilityProtocol = {
             className: "badge-room-secret",
             description: "Paired-device peer-to-peer data channel",
             privacy: "Direct paired path",
-            details: [
-                ["Discovery", "paired device"],
-                ["Data path", "WebRTC ICE direct"],
-                ["Best case", "local network candidate"]
-            ]
+            details: meshdropRouteDetails("paired device", "WebRTC ICE direct", "Best case", "local network candidate")
         }, "strong"),
         "nostr": meshdropNetworkRouteMeta({
             id: "webrtc",
@@ -77,11 +104,7 @@ const PeerAvailabilityProtocol = {
             className: "badge-room-nostr",
             description: "Direct clearnet WebRTC route discovered and signaled by Nostr",
             privacy: "Direct clearnet path",
-            details: [
-                ["Discovery", "Nostr WOT"],
-                ["Data path", "clearnet WebRTC ICE"],
-                ["Nostr events", "discovery/signaling only"]
-            ]
+            details: meshdropRouteDetails("Nostr WOT", "clearnet WebRTC ICE", "Nostr events", "discovery/signaling only")
         }),
         "fips": meshdropMeshSignaledRouteMeta("fips", "FIPS", "badge-room-fips", "FIPS", "FIPS stream is separate"),
         "pollen": meshdropMeshSignaledRouteMeta("pollen-mesh", "Pollen", "badge-room-pollen", "Pollen", "Pollen storage is separate"),
@@ -92,11 +115,7 @@ const PeerAvailabilityProtocol = {
             className: "badge-room-public-id",
             description: "Peer-to-peer transfer found through room signaling",
             privacy: "Direct after room signaling",
-            details: [
-                ["Discovery", "public room"],
-                ["Data path", "WebRTC ICE direct"],
-                ["Room server", "signaling only"]
-            ]
+            details: meshdropRouteDetails("public room", "WebRTC ICE direct", "Room server", "signaling only")
         })
     },
 
@@ -244,77 +263,58 @@ const PeerAvailabilityProtocol = {
     },
 
     storageOptions() {
-        const options = [];
-        if (globalThis.meshdropHashtreeTransfer?.isActive?.() && this.storageRouteSupported("hashtree")) {
-            options.push({
-                id: "hashtree",
-                type: "storage",
-                label: "Hashtree storage",
-                description: "Server-assisted content-addressed storage route",
-                group: "Storage routes",
-                privacy: "Integrity, not secrecy",
-                privacyTone: "caution",
-                details: [
-                    ["Path", "Blossom storage"],
-                    ["Private mode", "encrypts before upload"],
-                    ["Unencrypted", "servers see chunks"]
-                ],
-                attempt: PeerRouteStatusProtocol.attempt({
+        const routes = [
+            {
+                active: globalThis.meshdropHashtreeTransfer?.isActive?.(),
+                transport: "hashtree",
+                option: {
+                    id: "hashtree",
+                    label: "Hashtree storage",
+                    description: "Server-assisted content-addressed storage route",
+                    privacy: "Integrity, not secrecy",
+                    privacyTone: "caution",
+                    details: meshdropPrivateStorageDetails("Blossom storage", "servers see chunks"),
                     route: "hashtree",
-                    routeLabel: "Hashtree storage",
-                    state: "candidate",
-                    encrypted: false,
-                    objectStore: true
-                })
-            });
-        }
-        if (globalThis.meshdropBlossomTransfer?.isActive?.() && this.storageRouteSupported("blossom")) {
-            options.push({
-                id: "blossom",
-                type: "storage",
-                label: "Blossom storage",
-                description: "Server-assisted encrypted object storage route",
-                group: "Storage routes",
-                privacy: "Stored ciphertext",
-                privacyTone: "encrypted",
-                details: [
-                    ["Path", "selected Blossom servers"],
-                    ["Encryption", "AES-256-GCM"],
-                    ["Servers store", "ciphertext only"]
-                ],
-                attempt: PeerRouteStatusProtocol.attempt({
+                    encrypted: false
+                }
+            },
+            {
+                active: globalThis.meshdropBlossomTransfer?.isActive?.(),
+                transport: "blossom",
+                option: {
+                    id: "blossom",
+                    label: "Blossom storage",
+                    description: "Server-assisted encrypted object storage route",
+                    privacy: "Stored ciphertext",
+                    privacyTone: "encrypted",
+                    details: [
+                        ["Path", "selected Blossom servers"],
+                        ["Encryption", "AES-256-GCM"],
+                        ["Servers store", "ciphertext only"]
+                    ],
                     route: "blossom",
-                    routeLabel: "Blossom storage",
-                    state: "candidate",
-                    encrypted: true,
-                    objectStore: true
-                })
-            });
-        }
-        if (globalThis.meshdropPollenTransfer?.isActive?.() && this.storageRouteSupported("pollen")) {
-            options.push({
-                id: "pollen",
-                type: "storage",
-                label: "Pollen Storage",
-                description: "Seed files into Pollen storage for handoff",
-                group: "Storage routes",
-                privacy: "Storage handoff",
-                privacyTone: "caution",
-                details: [
-                    ["Path", "browser to MeshDrop server to Pollen blob"],
-                    ["Private mode", "encrypts before upload"],
-                    ["Unencrypted", "server sees files"]
-                ],
-                attempt: PeerRouteStatusProtocol.attempt({
+                    encrypted: true
+                }
+            },
+            {
+                active: globalThis.meshdropPollenTransfer?.isActive?.(),
+                transport: "pollen",
+                option: {
+                    id: "pollen",
+                    label: "Pollen Storage",
+                    description: "Seed files into Pollen storage for handoff",
+                    privacy: "Storage handoff",
+                    privacyTone: "caution",
+                    details: meshdropPrivateStorageDetails("browser to MeshDrop server to Pollen blob", "server sees files"),
                     route: "pollen-storage",
-                    routeLabel: "Pollen Storage",
-                    state: "candidate",
-                    encrypted: false,
-                    objectStore: true
-                })
-            });
-        }
-        return options;
+                    encrypted: false
+                }
+            }
+        ];
+
+        return routes
+            .filter(route => route.active && this.storageRouteSupported(route.transport))
+            .map(route => meshdropStorageOption(route.option));
     },
 
     optionsFor(peer) {
@@ -1439,22 +1439,7 @@ class PeersUI {
 
     _sendShareData(e) {
         // send the shared file/text content
-        const peerId = e.detail.peerId;
-        const files = this.shareMode.files;
-        const text = this.shareMode.text;
-
-        if (files.length > 0) {
-            meshdropEvents.fire('select-files-transport', {
-                files: files,
-                to: peerId
-            });
-        }
-        else if (text.length > 0) {
-            meshdropEvents.fire('send-text', {
-                text: text,
-                to: peerId
-            });
-        }
+        meshdropSendFilesOrText(this.shareMode.files, this.shareMode.text, e.detail.peerId);
     }
 }
 
@@ -1862,18 +1847,7 @@ class PeerUI {
         const files = e.dataTransfer.files;
         const text = e.dataTransfer.getData("text");
 
-        if (files.length > 0) {
-            meshdropEvents.fire('select-files-transport', {
-                files: files,
-                to: peerId
-            });
-        }
-        else if (text.length > 0) {
-            meshdropEvents.fire('send-text', {
-                text: text,
-                to: peerId
-            });
-        }
+        meshdropSendFilesOrText(files, text, peerId);
     }
 
     _onDragOver() {
