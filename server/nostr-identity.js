@@ -8,7 +8,8 @@ const MAX_CLOCK_SKEW_SECONDS = 10 * 60;
 const PUBKEY_REGEX = /^[0-9a-f]{64}$/;
 
 export function getNostrIdentityFromRequest(request) {
-    const searchParams = new URL(request.url, "http://server").searchParams;
+    const query = String(request.url || "").split("?", 2)[1] || "";
+    const searchParams = new URLSearchParams(query);
     const rawIdentity = searchParams.get("nostr_identity");
 
     return verifyNostrIdentity(rawIdentity, {
